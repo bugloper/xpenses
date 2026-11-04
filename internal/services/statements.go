@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bugloper/xpensiv/internal/auth"
 	apperr "github.com/bugloper/xpensiv/internal/errors"
 	"github.com/bugloper/xpensiv/internal/models"
 	"github.com/bugloper/xpensiv/internal/pdf"
@@ -189,7 +190,7 @@ func (s *StatementService) requireAccount(ctx context.Context, db repositories.D
 	if err := v.Err(); err != nil {
 		return nil, err
 	}
-	acct, err := s.Accounts.Get(ctx, db, id)
+	acct, err := s.Accounts.Get(ctx, db, auth.UserID(ctx), id)
 	if err != nil {
 		return nil, apperr.Internal(err)
 	}
@@ -254,7 +255,7 @@ func (s *StatementService) Parse(ctx context.Context, in ParseInput) (*ImportPre
 		rows = append(rows, PreviewTransaction{LineNo: t.LineNo, TransactionDate: t.TransactionDate, ValueDate: t.ValueDate, Description: t.Description,
 			Reference: t.Reference, Debit: t.Debit, Credit: t.Credit, Balance: t.Balance, Fingerprint: fp, Warnings: w})
 	}
-	existing, err := s.BankTxs.ExistingFingerprints(ctx, s.DB, in.AccountID, fps)
+	existing, err := s.BankTxs.ExistingFingerprints(ctx, s.DB, auth.UserID(ctx), in.AccountID, fps)
 	if err != nil {
 		return nil, apperr.Internal(err)
 	}
@@ -289,13 +290,13 @@ func (s *StatementService) Parse(ctx context.Context, in ParseInput) (*ImportPre
 // detectDuplicate checks, in order: identical bytes, overlapping period on
 // the same account, and >= 80% of the rows already imported.
 func (s *StatementService) detectDuplicate(ctx context.Context, accountID, sha, start, end string, total int, existing map[string]string) (*DuplicateStatement, error) {
-	if st, err := s.Statements.GetBySHA256(ctx, s.DB, sha); err != nil {
+	if st, err := s.Statements.GetBySHA256(ctx, s.DB, auth.UserID(ctx), sha); err != nil {
 		return nil, apperr.Internal(err)
 	} else if st != nil {
 		return &DuplicateStatement{ID: st.ID, FileName: st.FileName, ImportedAt: st.ImportedAt, Reason: "sha256"}, nil
 	}
 	if start != "" && end != "" {
-		if st, err := s.Statements.FindOverlapping(ctx, s.DB, accountID, start, end); err != nil {
+		if st, err := s.Statements.FindOverlapping(ctx, s.DB, auth.UserID(ctx), accountID, start, end); err != nil {
 			return nil, apperr.Internal(err)
 		} else if st != nil {
 			return &DuplicateStatement{ID: st.ID, FileName: st.FileName, ImportedAt: st.ImportedAt, Reason: "period"}, nil
@@ -311,7 +312,7 @@ func (s *StatementService) detectDuplicate(ctx context.Context, accountID, sha, 
 				best = sid
 			}
 		}
-		st, err := s.Statements.Get(ctx, s.DB, best)
+		st, err := s.Statements.Get(ctx, s.DB, auth.UserID(ctx), best)
 		if err != nil {
 			return nil, apperr.Internal(err)
 		}
@@ -423,7 +424,7 @@ func (s *StatementService) Import(ctx context.Context, req ImportRequest) (*Impo
 	}
 	skip := req.SkipDuplicates == nil || *req.SkipDuplicates
 
-	if st, err := s.Statements.GetBySHA256(ctx, s.DB, meta.SHA256); err != nil {
+	if st, err := s.Statements.GetBySHA256(ctx, s.DB, auth.UserID(ctx), meta.SHA256); err != nil {
 		return nil, apperr.Internal(err)
 	} else if st != nil && !req.Force {
 		return nil, codeErr(http.StatusConflict, "duplicate_statement", "this file was already imported as statement "+st.ID+" (send force:true to import it again)")
@@ -440,14 +441,15 @@ func (s *StatementService) Import(ctx context.Context, req ImportRequest) (*Impo
 	// submitted row, including rows skipped below as duplicates.
 	validation := pdf.Validate(ps)
 
-	existing, err := s.BankTxs.ExistingFingerprints(ctx, s.DB, req.AccountID, fps)
+	existing, err := s.BankTxs.ExistingFingerprints(ctx, s.DB, auth.UserID(ctx), req.AccountID, fps)
 	if err != nil {
 		return nil, apperr.Internal(err)
 	}
 
 	now := models.NowUTC()
 	st := &models.BankStatement{
-		ID: NewID(), Provider: meta.Provider, AccountID: req.AccountID, FileName: meta.FileName, FileSHA256: meta.SHA256, FileSize: meta.Size,
+		UserID: auth.UserID(ctx),
+		ID:     NewID(), Provider: meta.Provider, AccountID: req.AccountID, FileName: meta.FileName, FileSHA256: meta.SHA256, FileSize: meta.Size,
 		AccountNumber: strings.TrimSpace(req.Statement.AccountNumber), AccountHolder: strings.TrimSpace(req.Statement.AccountHolder),
 		PeriodStart: req.Statement.PeriodStart, PeriodEnd: req.Statement.PeriodEnd,
 		OpeningBalance: req.Statement.OpeningBalance, ClosingBalance: req.Statement.ClosingBalance,
@@ -478,7 +480,8 @@ func (s *StatementService) Import(ctx context.Context, req ImportRequest) (*Impo
 				valueDate = &vd
 			}
 			inserts = append(inserts, models.BankTransaction{
-				ID: NewID(), StatementID: st.ID, AccountID: req.AccountID, LineNo: lineNo, TransactionDate: t.TransactionDate, ValueDate: valueDate,
+				UserID: auth.UserID(ctx),
+				ID:     NewID(), StatementID: st.ID, AccountID: req.AccountID, LineNo: lineNo, TransactionDate: t.TransactionDate, ValueDate: valueDate,
 				Description: t.Description, Reference: t.Reference, Debit: t.Debit, Credit: t.Credit, Balance: t.Balance, Fingerprint: fp, CreatedAt: now,
 			})
 		}
@@ -524,7 +527,7 @@ func (s *StatementService) Import(ctx context.Context, req ImportRequest) (*Impo
 }
 
 func (s *StatementService) List(ctx context.Context) ([]repositories.StatementWithCounts, error) {
-	out, err := s.Statements.List(ctx, s.DB)
+	out, err := s.Statements.List(ctx, s.DB, auth.UserID(ctx))
 	if err != nil {
 		return nil, apperr.Internal(err)
 	}
@@ -532,7 +535,7 @@ func (s *StatementService) List(ctx context.Context) ([]repositories.StatementWi
 }
 
 func (s *StatementService) Get(ctx context.Context, id string) (*repositories.StatementWithCounts, error) {
-	st, err := s.Statements.Get(ctx, s.DB, id)
+	st, err := s.Statements.Get(ctx, s.DB, auth.UserID(ctx), id)
 	if err != nil {
 		return nil, apperr.Internal(err)
 	}
@@ -546,7 +549,7 @@ func (s *StatementService) Transactions(ctx context.Context, id string) ([]repos
 	if _, err := s.Get(ctx, id); err != nil {
 		return nil, err
 	}
-	out, err := s.BankTxs.ListByStatement(ctx, s.DB, id)
+	out, err := s.BankTxs.ListByStatement(ctx, s.DB, auth.UserID(ctx), id)
 	if err != nil {
 		return nil, apperr.Internal(err)
 	}
@@ -572,7 +575,7 @@ func (s *StatementService) Delete(ctx context.Context, id string) error {
 	if _, err := s.Get(ctx, id); err != nil {
 		return err
 	}
-	if err := s.Statements.Delete(ctx, s.DB, id); err != nil {
+	if err := s.Statements.Delete(ctx, s.DB, auth.UserID(ctx), id); err != nil {
 		return apperr.Internal(err)
 	}
 	_ = os.Remove(s.filePath(id))

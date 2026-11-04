@@ -11,7 +11,8 @@ import (
 
 // Repo owns the reconciliations table and runs read-only queries against
 // bank_statements and bank_transactions (whose write path belongs to the
-// statement import service).
+// statement import service). Every method takes the signed-in user's id and
+// only ever sees that user's rows.
 type Repo struct{}
 
 const statementCols = `id, provider, account_id, file_name, file_sha256, file_size, account_number, account_holder,
@@ -39,8 +40,8 @@ func scanStatement(s interface{ Scan(...any) error }) (*models.BankStatement, er
 	return &st, nil
 }
 
-func (Repo) GetStatement(ctx context.Context, db repositories.DBTX, id string) (*models.BankStatement, error) {
-	st, err := scanStatement(db.QueryRowContext(ctx, `SELECT `+statementCols+` FROM bank_statements WHERE id = ?`, id))
+func (Repo) GetStatement(ctx context.Context, db repositories.DBTX, userID, id string) (*models.BankStatement, error) {
+	st, err := scanStatement(db.QueryRowContext(ctx, `SELECT `+statementCols+` FROM bank_statements WHERE id = ? AND user_id = ?`, id, userID))
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -69,16 +70,16 @@ func scanBankTx(s interface{ Scan(...any) error }) (*models.BankTransaction, err
 	return &b, nil
 }
 
-func (Repo) GetBankTransaction(ctx context.Context, db repositories.DBTX, id string) (*models.BankTransaction, error) {
-	b, err := scanBankTx(db.QueryRowContext(ctx, `SELECT `+bankTxCols+` FROM bank_transactions WHERE id = ?`, id))
+func (Repo) GetBankTransaction(ctx context.Context, db repositories.DBTX, userID, id string) (*models.BankTransaction, error) {
+	b, err := scanBankTx(db.QueryRowContext(ctx, `SELECT `+bankTxCols+` FROM bank_transactions WHERE id = ? AND user_id = ?`, id, userID))
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	return b, err
 }
 
-func (Repo) ListBankTransactions(ctx context.Context, db repositories.DBTX, statementID string) ([]models.BankTransaction, error) {
-	rows, err := db.QueryContext(ctx, `SELECT `+bankTxCols+` FROM bank_transactions WHERE statement_id = ? ORDER BY line_no, created_at, id`, statementID)
+func (Repo) ListBankTransactions(ctx context.Context, db repositories.DBTX, userID, statementID string) ([]models.BankTransaction, error) {
+	rows, err := db.QueryContext(ctx, `SELECT `+bankTxCols+` FROM bank_transactions WHERE statement_id = ? AND user_id = ? ORDER BY line_no, created_at, id`, statementID, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -94,11 +95,11 @@ func (Repo) ListBankTransactions(ctx context.Context, db repositories.DBTX, stat
 	return out, rows.Err()
 }
 
-// CountUnreconciledBank counts bank transactions with no reconciliation row.
-func (Repo) CountUnreconciledBank(ctx context.Context, db repositories.DBTX) (int, error) {
+// CountUnreconciledBank counts the user's bank transactions with no reconciliation row.
+func (Repo) CountUnreconciledBank(ctx context.Context, db repositories.DBTX, userID string) (int, error) {
 	var n int
 	err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM bank_transactions b
-		LEFT JOIN reconciliations r ON r.bank_transaction_id = b.id WHERE r.id IS NULL`).Scan(&n)
+		LEFT JOIN reconciliations r ON r.bank_transaction_id = b.id WHERE b.user_id = ? AND r.id IS NULL`, userID).Scan(&n)
 	return n, err
 }
 
@@ -118,26 +119,26 @@ func scanRecon(s interface{ Scan(...any) error }) (*models.Reconciliation, error
 	return &r, nil
 }
 
-func (Repo) GetByBankTransaction(ctx context.Context, db repositories.DBTX, bankTxID string) (*models.Reconciliation, error) {
-	r, err := scanRecon(db.QueryRowContext(ctx, `SELECT `+reconCols+` FROM reconciliations WHERE bank_transaction_id = ?`, bankTxID))
+func (Repo) GetByBankTransaction(ctx context.Context, db repositories.DBTX, userID, bankTxID string) (*models.Reconciliation, error) {
+	r, err := scanRecon(db.QueryRowContext(ctx, `SELECT `+reconCols+` FROM reconciliations WHERE bank_transaction_id = ? AND user_id = ?`, bankTxID, userID))
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	return r, err
 }
 
-func (Repo) GetByTransaction(ctx context.Context, db repositories.DBTX, txID string) (*models.Reconciliation, error) {
-	r, err := scanRecon(db.QueryRowContext(ctx, `SELECT `+reconCols+` FROM reconciliations WHERE transaction_id = ?`, txID))
+func (Repo) GetByTransaction(ctx context.Context, db repositories.DBTX, userID, txID string) (*models.Reconciliation, error) {
+	r, err := scanRecon(db.QueryRowContext(ctx, `SELECT `+reconCols+` FROM reconciliations WHERE transaction_id = ? AND user_id = ?`, txID, userID))
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	return r, err
 }
 
-func (Repo) ListByStatement(ctx context.Context, db repositories.DBTX, statementID string) ([]models.Reconciliation, error) {
+func (Repo) ListByStatement(ctx context.Context, db repositories.DBTX, userID, statementID string) ([]models.Reconciliation, error) {
 	rows, err := db.QueryContext(ctx, `SELECT r.id, r.bank_transaction_id, r.transaction_id, r.status, r.match_type, r.rule,
 		r.confidence, r.amount_diff, r.date_diff_days, r.note, r.created_at FROM reconciliations r
-		JOIN bank_transactions b ON b.id = r.bank_transaction_id WHERE b.statement_id = ? ORDER BY b.line_no`, statementID)
+		JOIN bank_transactions b ON b.id = r.bank_transaction_id WHERE b.statement_id = ? AND r.user_id = ? ORDER BY b.line_no`, statementID, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -159,14 +160,14 @@ func (Repo) Insert(ctx context.Context, db repositories.DBTX, r *models.Reconcil
 		txID = *r.TransactionID
 	}
 	_, err := db.ExecContext(ctx, `INSERT INTO reconciliations
-		(id, bank_transaction_id, transaction_id, status, match_type, rule, confidence, amount_diff, date_diff_days, note, created_at)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-		r.ID, r.BankTransactionID, txID, r.Status, r.MatchType, r.Rule, r.Confidence, r.AmountDiff, r.DateDiffDays, r.Note, r.CreatedAt)
+		(user_id, id, bank_transaction_id, transaction_id, status, match_type, rule, confidence, amount_diff, date_diff_days, note, created_at)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+		r.UserID, r.ID, r.BankTransactionID, txID, r.Status, r.MatchType, r.Rule, r.Confidence, r.AmountDiff, r.DateDiffDays, r.Note, r.CreatedAt)
 	return err
 }
 
-func (Repo) DeleteByBankTransaction(ctx context.Context, db repositories.DBTX, bankTxID string) error {
-	_, err := db.ExecContext(ctx, `DELETE FROM reconciliations WHERE bank_transaction_id = ?`, bankTxID)
+func (Repo) DeleteByBankTransaction(ctx context.Context, db repositories.DBTX, userID, bankTxID string) error {
+	_, err := db.ExecContext(ctx, `DELETE FROM reconciliations WHERE bank_transaction_id = ? AND user_id = ?`, bankTxID, userID)
 	return err
 }
 
@@ -185,14 +186,16 @@ type StatementOverview struct {
 	Transfer    int    `json:"transfer"`
 }
 
-func (Repo) ListOverview(ctx context.Context, db repositories.DBTX) ([]StatementOverview, error) {
+// ListOverview lists the user's statements with their reconciliation tallies.
+func (Repo) ListOverview(ctx context.Context, db repositories.DBTX, userID string) ([]StatementOverview, error) {
 	rows, err := db.QueryContext(ctx, `SELECT s.id, s.file_name, s.period_start, s.period_end, s.account_id, a.name,
 		(SELECT COUNT(*) FROM bank_transactions b WHERE b.statement_id = s.id),
 		(SELECT COUNT(*) FROM bank_transactions b JOIN reconciliations r ON r.bank_transaction_id = b.id WHERE b.statement_id = s.id AND r.status = 'matched'),
 		(SELECT COUNT(*) FROM bank_transactions b JOIN reconciliations r ON r.bank_transaction_id = b.id WHERE b.statement_id = s.id AND r.status = 'ignored'),
 		(SELECT COUNT(*) FROM bank_transactions b JOIN reconciliations r ON r.bank_transaction_id = b.id WHERE b.statement_id = s.id AND r.status = 'transfer')
-		FROM bank_statements s JOIN accounts a ON a.id = s.account_id
-		ORDER BY s.period_end DESC, s.imported_at DESC, s.id`)
+		FROM bank_statements s JOIN accounts a ON a.id = s.account_id AND a.user_id = s.user_id
+		WHERE s.user_id = ?
+		ORDER BY s.period_end DESC, s.imported_at DESC, s.id`, userID)
 	if err != nil {
 		return nil, err
 	}

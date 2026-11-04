@@ -6,6 +6,7 @@ import (
 	"errors"
 	"math"
 
+	"github.com/bugloper/xpensiv/internal/auth"
 	"github.com/bugloper/xpensiv/internal/dto"
 	apperr "github.com/bugloper/xpensiv/internal/errors"
 	"github.com/bugloper/xpensiv/internal/models"
@@ -15,6 +16,12 @@ import (
 // Service answers report queries over the ledger. Every report counts only
 // cleared transactions and never treats a transfer as income or expense.
 // "Income" is income + refund; "expenses" is expense only.
+//
+// Every query is scoped to auth.UserID(ctx). Joins onto categories/accounts
+// repeat the user predicate (c.user_id = t.user_id) rather than relying on
+// the FK alone: the FK only guarantees the referenced row exists, not that it
+// belongs to the same user, so a stray cross-user reference can never pull
+// another user's names or colours into a report.
 type Service struct {
 	db       *sql.DB
 	accounts repositories.AccountRepo
@@ -163,8 +170,8 @@ func (s *Service) totals(ctx context.Context, p Period) (PeriodTotals, error) {
 	err := s.db.QueryRowContext(ctx, `SELECT
 		COALESCE(SUM(CASE WHEN t.type IN ('income','refund') THEN t.amount ELSE 0 END), 0),
 		COALESCE(SUM(CASE WHEN t.type = 'expense' THEN t.amount ELSE 0 END), 0)
-		FROM transactions t WHERE t.status = 'cleared' AND t.transaction_date BETWEEN ? AND ?`,
-		p.From, p.To).Scan(&out.Income, &out.Expenses)
+		FROM transactions t WHERE t.user_id = ? AND t.status = 'cleared' AND t.transaction_date BETWEEN ? AND ?`,
+		auth.UserID(ctx), p.From, p.To).Scan(&out.Income, &out.Expenses)
 	out.Net = out.Income - out.Expenses
 	return out, err
 }
@@ -180,20 +187,22 @@ func (s *Service) Summary(ctx context.Context, p Period) (*Summary, error) {
 	}
 	out := &Summary{Income: cur.Income, Expenses: cur.Expenses, Net: cur.Net, Previous: prev,
 		ExpenseChangePct: ExpenseChangePct(cur.Expenses, prev.Expenses)}
-	if out.TotalBalance, err = s.accounts.TotalBalance(ctx, s.db); err != nil {
+	if out.TotalBalance, err = s.accounts.TotalBalance(ctx, s.db, auth.UserID(ctx)); err != nil {
 		return nil, apperr.Internal(err)
 	}
+	uid := auth.UserID(ctx)
 	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM bank_transactions bt
-		LEFT JOIN reconciliations r ON r.bank_transaction_id = bt.id WHERE r.id IS NULL`).Scan(&out.UnreconciledBankCount); err != nil {
+		LEFT JOIN reconciliations r ON r.bank_transaction_id = bt.id AND r.user_id = bt.user_id
+		WHERE bt.user_id = ? AND r.id IS NULL`, uid).Scan(&out.UnreconciledBankCount); err != nil {
 		return nil, apperr.Internal(err)
 	}
-	if out.UnmatchedManualCount, err = s.txs.CountUnmatchedManual(ctx, s.db); err != nil {
+	if out.UnmatchedManualCount, err = s.txs.CountUnmatchedManual(ctx, s.db, uid); err != nil {
 		return nil, apperr.Internal(err)
 	}
-	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM transactions WHERE status = 'pending'`).Scan(&out.PendingCount); err != nil {
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM transactions WHERE user_id = ? AND status = 'pending'`, uid).Scan(&out.PendingCount); err != nil {
 		return nil, apperr.Internal(err)
 	}
-	recent, _, err := s.txs.List(ctx, s.db, dto.TransactionFilter{Sort: "date", Order: "desc", Page: 1, PerPage: 10})
+	recent, _, err := s.txs.List(ctx, s.db, dto.TransactionFilter{UserID: uid, Sort: "date", Order: "desc", Page: 1, PerPage: 10})
 	if err != nil {
 		return nil, apperr.Internal(err)
 	}
@@ -204,9 +213,9 @@ func (s *Service) Summary(ctx context.Context, p Period) (*Summary, error) {
 func (s *Service) Categories(ctx context.Context, p Period, typ string) ([]CategoryRow, error) {
 	rows, err := s.db.QueryContext(ctx, `SELECT t.category_id, COALESCE(c.name, 'Uncategorised'),
 		COALESCE(c.icon, 'circle'), COALESCE(c.color, '#64748b'), SUM(t.amount), COUNT(*)
-		FROM transactions t LEFT JOIN categories c ON c.id = t.category_id
-		WHERE t.status = 'cleared' AND `+flowFilter(typ)+` AND t.transaction_date BETWEEN ? AND ?
-		GROUP BY t.category_id ORDER BY SUM(t.amount) DESC, c.name`, p.From, p.To)
+		FROM transactions t LEFT JOIN categories c ON c.id = t.category_id AND c.user_id = t.user_id
+		WHERE t.user_id = ? AND t.status = 'cleared' AND `+flowFilter(typ)+` AND t.transaction_date BETWEEN ? AND ?
+		GROUP BY t.category_id ORDER BY SUM(t.amount) DESC, c.name`, auth.UserID(ctx), p.From, p.To)
 	if err != nil {
 		return nil, apperr.Internal(err)
 	}
@@ -241,8 +250,8 @@ func (s *Service) CashFlow(ctx context.Context, p Period, granularity string) ([
 	rows, err := s.db.QueryContext(ctx, `SELECT t.transaction_date,
 		COALESCE(SUM(CASE WHEN t.type IN ('income','refund') THEN t.amount ELSE 0 END), 0),
 		COALESCE(SUM(CASE WHEN t.type = 'expense' THEN t.amount ELSE 0 END), 0)
-		FROM transactions t WHERE t.status = 'cleared' AND t.transaction_date BETWEEN ? AND ?
-		GROUP BY t.transaction_date`, p.From, p.To)
+		FROM transactions t WHERE t.user_id = ? AND t.status = 'cleared' AND t.transaction_date BETWEEN ? AND ?
+		GROUP BY t.transaction_date`, auth.UserID(ctx), p.From, p.To)
 	if err != nil {
 		return nil, apperr.Internal(err)
 	}
@@ -283,8 +292,8 @@ func (s *Service) CashFlow(ctx context.Context, p Period, granularity string) ([
 func (s *Service) Merchants(ctx context.Context, p Period, typ string) ([]MerchantRow, error) {
 	rows, err := s.db.QueryContext(ctx, `SELECT CASE WHEN TRIM(t.payee) = '' THEN '(no payee)' ELSE t.payee END AS payee,
 		SUM(t.amount), COUNT(*)
-		FROM transactions t WHERE t.status = 'cleared' AND `+flowFilter(typ)+` AND t.transaction_date BETWEEN ? AND ?
-		GROUP BY payee ORDER BY SUM(t.amount) DESC, payee LIMIT 50`, p.From, p.To)
+		FROM transactions t WHERE t.user_id = ? AND t.status = 'cleared' AND `+flowFilter(typ)+` AND t.transaction_date BETWEEN ? AND ?
+		GROUP BY payee ORDER BY SUM(t.amount) DESC, payee LIMIT 50`, auth.UserID(ctx), p.From, p.To)
 	if err != nil {
 		return nil, apperr.Internal(err)
 	}
@@ -307,7 +316,8 @@ func (s *Service) Merchants(ctx context.Context, p Period, typ string) ([]Mercha
 // count (positive as income, negative as expenses) because the point of this
 // report is to explain the balance movement of each account.
 func (s *Service) Accounts(ctx context.Context, p Period) ([]AccountRow, error) {
-	accts, err := s.accounts.List(ctx, s.db, false)
+	uid := auth.UserID(ctx)
+	accts, err := s.accounts.List(ctx, s.db, uid, false)
 	if err != nil {
 		return nil, apperr.Internal(err)
 	}
@@ -322,8 +332,8 @@ func (s *Service) Accounts(ctx context.Context, p Period) ([]AccountRow, error) 
 		COALESCE(SUM(CASE WHEN t.type IN ('income','refund') OR (t.type = 'adjustment' AND t.amount > 0) THEN t.amount ELSE 0 END), 0),
 		COALESCE(SUM(CASE WHEN t.type = 'expense' THEN t.amount WHEN t.type = 'adjustment' AND t.amount < 0 THEN -t.amount ELSE 0 END), 0),
 		COALESCE(SUM(CASE WHEN t.type = 'transfer' THEN t.amount ELSE 0 END), 0)
-		FROM transactions t WHERE t.status = 'cleared' AND t.transaction_date BETWEEN ? AND ?
-		GROUP BY t.account_id`, p.From, p.To)
+		FROM transactions t WHERE t.user_id = ? AND t.status = 'cleared' AND t.transaction_date BETWEEN ? AND ?
+		GROUP BY t.account_id`, uid, p.From, p.To)
 	if err != nil {
 		return nil, apperr.Internal(err)
 	}
@@ -342,8 +352,8 @@ func (s *Service) Accounts(ctx context.Context, p Period) ([]AccountRow, error) 
 		return nil, apperr.Internal(err)
 	}
 	in, err := s.db.QueryContext(ctx, `SELECT t.transfer_account_id, COALESCE(SUM(t.amount), 0)
-		FROM transactions t WHERE t.status = 'cleared' AND t.type = 'transfer' AND t.transaction_date BETWEEN ? AND ?
-		GROUP BY t.transfer_account_id`, p.From, p.To)
+		FROM transactions t WHERE t.user_id = ? AND t.status = 'cleared' AND t.type = 'transfer' AND t.transaction_date BETWEEN ? AND ?
+		GROUP BY t.transfer_account_id`, uid, p.From, p.To)
 	if err != nil {
 		return nil, apperr.Internal(err)
 	}
@@ -369,11 +379,12 @@ func (s *Service) Accounts(ctx context.Context, p Period) ([]AccountRow, error) 
 func (s *Service) Budgets(ctx context.Context, month Period) ([]BudgetRow, error) {
 	rows, err := s.db.QueryContext(ctx, `SELECT b.id, b.category_id, c.name, c.icon, c.color, b.amount,
 		COALESCE((SELECT SUM(t.amount) FROM transactions t
-			WHERE t.status = 'cleared' AND t.type = 'expense' AND t.transaction_date BETWEEN ? AND ?
+			WHERE t.user_id = b.user_id AND t.status = 'cleared' AND t.type = 'expense' AND t.transaction_date BETWEEN ? AND ?
 			AND (t.category_id = b.category_id
-				OR t.category_id IN (SELECT ch.id FROM categories ch WHERE ch.parent_id = b.category_id))), 0)
-		FROM budgets b JOIN categories c ON c.id = b.category_id
-		ORDER BY c.sort_order, c.name`, month.From, month.To)
+				OR t.category_id IN (SELECT ch.id FROM categories ch WHERE ch.user_id = b.user_id AND ch.parent_id = b.category_id))), 0)
+		FROM budgets b JOIN categories c ON c.id = b.category_id AND c.user_id = b.user_id
+		WHERE b.user_id = ?
+		ORDER BY c.sort_order, c.name`, month.From, month.To, auth.UserID(ctx))
 	if err != nil {
 		return nil, apperr.Internal(err)
 	}
@@ -396,12 +407,14 @@ func (s *Service) Budgets(ctx context.Context, month Period) ([]BudgetRow, error
 }
 
 func (s *Service) Reconciliation(ctx context.Context, statementID string) (*ReconciliationReport, error) {
+	uid := auth.UserID(ctx)
 	var st models.BankStatement
 	var opening, closing sql.NullInt64
 	var verified int
+	// Another user's statement is indistinguishable from a missing one: 404.
 	err := s.db.QueryRowContext(ctx, `SELECT id, provider, account_id, file_name, file_sha256, file_size, account_number,
 		account_holder, period_start, period_end, opening_balance, closing_balance, total_debits, total_credits,
-		transaction_count, balance_verified, notes, imported_at FROM bank_statements WHERE id = ?`, statementID).
+		transaction_count, balance_verified, notes, imported_at FROM bank_statements WHERE id = ? AND user_id = ?`, statementID, uid).
 		Scan(&st.ID, &st.Provider, &st.AccountID, &st.FileName, &st.FileSHA256, &st.FileSize, &st.AccountNumber,
 			&st.AccountHolder, &st.PeriodStart, &st.PeriodEnd, &opening, &closing, &st.TotalDebits, &st.TotalCredits,
 			&st.TransactionCount, &verified, &st.Notes, &st.ImportedAt)
@@ -427,8 +440,8 @@ func (s *Service) Reconciliation(ctx context.Context, statementID string) (*Reco
 	rows, err := s.db.QueryContext(ctx, `SELECT bt.id, bt.statement_id, bt.account_id, bt.line_no, bt.transaction_date, bt.value_date,
 		bt.description, bt.reference, bt.debit, bt.credit, bt.balance, bt.fingerprint, bt.created_at,
 		COALESCE(r.status, ''), r.transaction_id, COALESCE(r.amount_diff, 0)
-		FROM bank_transactions bt LEFT JOIN reconciliations r ON r.bank_transaction_id = bt.id
-		WHERE bt.statement_id = ? ORDER BY bt.line_no`, statementID)
+		FROM bank_transactions bt LEFT JOIN reconciliations r ON r.bank_transaction_id = bt.id AND r.user_id = bt.user_id
+		WHERE bt.statement_id = ? AND bt.user_id = ? ORDER BY bt.line_no`, statementID, uid)
 	if err != nil {
 		return nil, apperr.Internal(err)
 	}
@@ -474,7 +487,7 @@ func (s *Service) Reconciliation(ctx context.Context, statementID string) (*Reco
 		return nil, apperr.Internal(err)
 	}
 	for _, d := range discrepancies {
-		t, err := s.txs.Get(ctx, s.db, d.txID)
+		t, err := s.txs.Get(ctx, s.db, uid, d.txID)
 		if err != nil {
 			return nil, apperr.Internal(err)
 		}
@@ -485,7 +498,7 @@ func (s *Service) Reconciliation(ctx context.Context, statementID string) (*Reco
 	}
 
 	// Manual side: non-void transactions touching the account within the period.
-	filter := dto.TransactionFilter{AccountID: st.AccountID, DateFrom: st.PeriodStart, DateTo: st.PeriodEnd,
+	filter := dto.TransactionFilter{UserID: uid, AccountID: st.AccountID, DateFrom: st.PeriodStart, DateTo: st.PeriodEnd,
 		Sort: "date", Order: "asc", Page: 1, PerPage: 200}
 	var manual []models.Transaction
 	for {

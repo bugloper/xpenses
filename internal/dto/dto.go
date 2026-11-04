@@ -100,6 +100,8 @@ type UpdateTransactionRequest struct {
 
 // TransactionFilter is the query model for GET /transactions.
 type TransactionFilter struct {
+	// UserID scopes the query; it is set by the service, never from the client.
+	UserID     string
 	Search     string
 	DateFrom   string
 	DateTo     string

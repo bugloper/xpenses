@@ -42,6 +42,7 @@ const (
 )
 
 type Account struct {
+	UserID             string `json:"-"`
 	ID                 string `json:"id"`
 	Name               string `json:"name"`
 	Type               string `json:"type"`
@@ -56,6 +57,7 @@ type Account struct {
 }
 
 type Category struct {
+	UserID    string  `json:"-"`
 	ID        string  `json:"id"`
 	Name      string  `json:"name"`
 	Icon      string  `json:"icon"`
@@ -70,6 +72,7 @@ type Category struct {
 }
 
 type Transaction struct {
+	UserID                  string   `json:"-"`
 	ID                      string   `json:"id"`
 	Type                    string   `json:"type"`
 	Amount                  int64    `json:"amount"`
@@ -100,6 +103,7 @@ type Transaction struct {
 }
 
 type RecurringTransaction struct {
+	UserID            string  `json:"-"`
 	ID                string  `json:"id"`
 	Name              string  `json:"name"`
 	Type              string  `json:"type"`
@@ -122,6 +126,7 @@ type RecurringTransaction struct {
 }
 
 type Budget struct {
+	UserID     string `json:"-"`
 	ID         string `json:"id"`
 	CategoryID string `json:"category_id"`
 	Amount     int64  `json:"amount"`
@@ -130,6 +135,7 @@ type Budget struct {
 }
 
 type BankStatement struct {
+	UserID           string `json:"-"`
 	ID               string `json:"id"`
 	Provider         string `json:"provider"`
 	AccountID        string `json:"account_id"`
@@ -151,6 +157,7 @@ type BankStatement struct {
 }
 
 type BankTransaction struct {
+	UserID          string  `json:"-"`
 	ID              string  `json:"id"`
 	StatementID     string  `json:"statement_id"`
 	AccountID       string  `json:"account_id"`
@@ -167,6 +174,7 @@ type BankTransaction struct {
 }
 
 type Reconciliation struct {
+	UserID            string  `json:"-"`
 	ID                string  `json:"id"`
 	BankTransactionID string  `json:"bank_transaction_id"`
 	TransactionID     *string `json:"transaction_id"`
@@ -178,4 +186,44 @@ type Reconciliation struct {
 	DateDiffDays      int     `json:"date_diff_days"`
 	Note              string  `json:"note"`
 	CreatedAt         string  `json:"created_at"`
+}
+
+// User roles.
+const (
+	RoleAdmin = "admin"
+	RoleUser  = "user"
+)
+
+type User struct {
+	ID          string  `json:"id"`
+	Name        string  `json:"name"`
+	Email       string  `json:"email"`
+	Role        string  `json:"role"`
+	IsActive    bool    `json:"is_active"`
+	LastLoginAt *string `json:"last_login_at"`
+	CreatedAt   string  `json:"created_at"`
+	UpdatedAt   string  `json:"updated_at"`
+	// PasswordHash is never serialised.
+	PasswordHash string `json:"-"`
+}
+
+type Session struct {
+	ID         string `json:"id"`
+	UserID     string `json:"-"`
+	CreatedAt  string `json:"created_at"`
+	LastSeenAt string `json:"last_seen_at"`
+	ExpiresAt  string `json:"-"`
+	UserAgent  string `json:"user_agent"`
+	IP         string `json:"-"`
+	Current    bool   `json:"current"`
+}
+
+type Invite struct {
+	ID          string  `json:"id"`
+	Email       string  `json:"email"`
+	CreatedBy   string  `json:"-"`
+	CreatedAt   string  `json:"created_at"`
+	ExpiresAt   string  `json:"expires_at"`
+	UsedAt      *string `json:"used_at"`
+	UsedByEmail *string `json:"used_by_email"`
 }

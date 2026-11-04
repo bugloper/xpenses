@@ -10,8 +10,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/bugloper/xpensiv/internal/auth"
 	"github.com/bugloper/xpensiv/internal/database"
 	apperr "github.com/bugloper/xpensiv/internal/errors"
+	"github.com/bugloper/xpensiv/internal/models"
 )
 
 const ts = "2026-11-04T00:00:00Z"
@@ -23,10 +25,60 @@ func exec(t *testing.T, db *sql.DB, q string, args ...any) {
 	}
 }
 
+// newUser inserts a user row (the hash is never verified by the reports
+// service) and seeds the default categories exactly as registration does.
+func newUser(t *testing.T, db *sql.DB, id string) {
+	t.Helper()
+	exec(t, db, `INSERT INTO users (id,email,name,password_hash,role,is_active,created_at,updated_at)
+		VALUES (?,?,?,'$argon2id$v=19$m=65536,t=3,p=1$test$test','user',1,?,?)`, id, id+"@example.com", id, ts, ts)
+	if err := auth.SeedDefaultCategories(context.Background(), db, id); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// userCtx is the context the auth middleware would hand the service.
+func userCtx(id string) context.Context {
+	return auth.WithUser(context.Background(), &models.User{ID: id})
+}
+
+// categoryIDs maps a user's category names to their (per-user, random) ids.
+func categoryIDs(t *testing.T, db *sql.DB, userID string) map[string]string {
+	t.Helper()
+	rows, err := db.Query(`SELECT name, id FROM categories WHERE user_id = ?`, userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	out := map[string]string{}
+	for rows.Next() {
+		var name, id string
+		if err := rows.Scan(&name, &id); err != nil {
+			t.Fatal(err)
+		}
+		out[name] = id
+	}
+	return out
+}
+
+// fixture is one user's view of the shared test database.
+type fixture struct {
+	svc    *Service
+	db     *sql.DB
+	ctx    context.Context
+	userID string
+	cat    map[string]string
+}
+
+// Decoy user whose ledger shares every table, period, payee and category name
+// with the user under test. Every exact assertion below therefore doubles as
+// an isolation check: a query missing its user predicate changes the totals.
+const otherUser = "u-b"
+
 // seed builds a ledger whose expected totals are worked out by hand in the
 // tests below. Reporting period under test: 2026-11-01..2026-11-30, so the
-// "previous" period is 2026-10-02..2026-10-31.
-func seed(t *testing.T) *Service {
+// "previous" period is 2026-10-02..2026-10-31. The same database also holds
+// otherUser's ledger (see seedOther).
+func seed(t *testing.T) *fixture {
 	t.Helper()
 	db, err := database.OpenTest()
 	if err != nil {
@@ -34,16 +86,21 @@ func seed(t *testing.T) *Service {
 	}
 	t.Cleanup(func() { db.Close() })
 
+	const uid = "u-a"
+	newUser(t, db, uid)
+	cat := categoryIDs(t, db, uid)
+
 	acct := func(id, name, typ string, opening int64, active int) {
-		exec(t, db, `INSERT INTO accounts (id,name,type,currency,opening_balance,opening_balance_date,is_active,created_at,updated_at)
-			VALUES (?,?,?,'BTN',?,'2026-01-01',?,?,?)`, id, name, typ, opening, active, ts, ts)
+		exec(t, db, `INSERT INTO accounts (id,user_id,name,type,currency,opening_balance,opening_balance_date,is_active,created_at,updated_at)
+			VALUES (?,?,?,?,'BTN',?,'2026-01-01',?,?,?)`, id, uid, name, typ, opening, active, ts, ts)
 	}
 	acct("acc-bank", "BOB", "bank", 100000, 1)
 	acct("acc-cash", "Wallet", "cash", 5000, 1)
 	acct("acc-old", "Closed", "bank", 777, 0)
 
-	exec(t, db, `INSERT INTO categories (id,name,icon,color,type,parent_id,created_at,updated_at)
-		VALUES ('cat-coffee','Coffee','coffee','#000000','expense','cat-food',?,?)`, ts, ts)
+	exec(t, db, `INSERT INTO categories (id,user_id,name,icon,color,type,parent_id,created_at,updated_at)
+		VALUES ('cat-coffee',?,'Coffee','coffee','#000000','expense',?,?,?)`, uid, cat["Food"], ts, ts)
+	cat["Coffee"] = "cat-coffee"
 
 	type tx struct {
 		id, typ   string
@@ -58,35 +115,36 @@ func seed(t *testing.T) *Service {
 		createdAt string
 	}
 	rows := []tx{
-		{"tx1", "expense", 2500, "acc-bank", nil, "cat-food", "Ambient Cafe", "2026-11-01", "manual", "cleared", "2026-11-01T01:00:00Z"},
-		{"tx2", "expense", 1500, "acc-bank", nil, "cat-coffee", "Ambient Cafe", "2026-11-03", "manual", "cleared", "2026-11-03T01:00:00Z"},
-		{"tx3", "expense", 4000, "acc-bank", nil, "cat-groceries", "8 Eleven", "2026-11-05", "manual", "cleared", "2026-11-05T01:00:00Z"},
+		{"tx1", "expense", 2500, "acc-bank", nil, cat["Food"], "Ambient Cafe", "2026-11-01", "manual", "cleared", "2026-11-01T01:00:00Z"},
+		{"tx2", "expense", 1500, "acc-bank", nil, cat["Coffee"], "Ambient Cafe", "2026-11-03", "manual", "cleared", "2026-11-03T01:00:00Z"},
+		{"tx3", "expense", 4000, "acc-bank", nil, cat["Groceries"], "8 Eleven", "2026-11-05", "manual", "cleared", "2026-11-05T01:00:00Z"},
 		{"tx4", "expense", 1000, "acc-cash", nil, nil, "", "2026-11-10", "manual", "cleared", "2026-11-10T01:00:00Z"},
-		{"tx5", "income", 50000, "acc-bank", nil, "cat-salary", "Employer", "2026-11-01", "manual", "cleared", "2026-11-01T02:00:00Z"},
-		{"tx6", "refund", 500, "acc-bank", nil, "cat-refund", "Ambient Cafe", "2026-11-02", "manual", "cleared", "2026-11-02T01:00:00Z"},
+		{"tx5", "income", 50000, "acc-bank", nil, cat["Salary"], "Employer", "2026-11-01", "manual", "cleared", "2026-11-01T02:00:00Z"},
+		{"tx6", "refund", 500, "acc-bank", nil, cat["Refund"], "Ambient Cafe", "2026-11-02", "manual", "cleared", "2026-11-02T01:00:00Z"},
 		{"tx7", "transfer", 10000, "acc-bank", "acc-cash", nil, "", "2026-11-02", "manual", "cleared", "2026-11-02T02:00:00Z"},
 		{"tx8", "adjustment", -300, "acc-cash", nil, nil, "", "2026-11-03", "adjustment", "cleared", "2026-11-03T02:00:00Z"},
 		{"tx9", "adjustment", 200, "acc-bank", nil, nil, "", "2026-11-04", "adjustment", "cleared", "2026-11-04T01:00:00Z"},
-		{"tx10", "expense", 99999, "acc-cash", nil, "cat-food", "Draft", "2026-11-03", "manual", "pending", "2026-11-03T03:00:00Z"},
-		{"tx11", "expense", 99999, "acc-bank", nil, "cat-food", "Void", "2026-11-03", "manual", "void", "2026-11-03T04:00:00Z"},
-		{"tx12", "expense", 8000, "acc-bank", nil, "cat-food", "Ambient Cafe", "2026-10-15", "manual", "cleared", "2026-10-15T01:00:00Z"},
-		{"tx13", "expense", 700, "acc-bank", nil, "cat-food", "Ambient Cafe", "2026-10-01", "manual", "cleared", "2026-10-01T01:00:00Z"},
-		{"tx14", "expense", 300, "acc-bank", nil, "cat-food", "Ambient Cafe", "2026-12-01", "manual", "cleared", "2026-12-01T01:00:00Z"},
+		{"tx10", "expense", 99999, "acc-cash", nil, cat["Food"], "Draft", "2026-11-03", "manual", "pending", "2026-11-03T03:00:00Z"},
+		{"tx11", "expense", 99999, "acc-bank", nil, cat["Food"], "Void", "2026-11-03", "manual", "void", "2026-11-03T04:00:00Z"},
+		{"tx12", "expense", 8000, "acc-bank", nil, cat["Food"], "Ambient Cafe", "2026-10-15", "manual", "cleared", "2026-10-15T01:00:00Z"},
+		{"tx13", "expense", 700, "acc-bank", nil, cat["Food"], "Ambient Cafe", "2026-10-01", "manual", "cleared", "2026-10-01T01:00:00Z"},
+		{"tx14", "expense", 300, "acc-bank", nil, cat["Food"], "Ambient Cafe", "2026-12-01", "manual", "cleared", "2026-12-01T01:00:00Z"},
 	}
 	for _, r := range rows {
-		exec(t, db, `INSERT INTO transactions (id,type,amount,currency,account_id,transfer_account_id,category_id,payee,transaction_date,origin,status,created_at,updated_at)
-			VALUES (?,?,?,'BTN',?,?,?,?,?,?,?,?,?)`, r.id, r.typ, r.amount, r.acct, r.transfer, r.cat, r.payee, r.date, r.origin, r.status, r.createdAt, r.createdAt)
+		exec(t, db, `INSERT INTO transactions (id,user_id,type,amount,currency,account_id,transfer_account_id,category_id,payee,transaction_date,origin,status,created_at,updated_at)
+			VALUES (?,?,?,?,'BTN',?,?,?,?,?,?,?,?,?)`, r.id, uid, r.typ, r.amount, r.acct, r.transfer, r.cat, r.payee, r.date, r.origin, r.status, r.createdAt, r.createdAt)
 	}
 
-	exec(t, db, `INSERT INTO budgets (id,category_id,amount,created_at,updated_at) VALUES
-		('b-food','cat-food',5000,?,?), ('b-groc','cat-groceries',4000,?,?), ('b-trans','cat-transport',1000,?,?)`, ts, ts, ts, ts, ts, ts)
+	exec(t, db, `INSERT INTO budgets (id,user_id,category_id,amount,created_at,updated_at) VALUES
+		('b-food',?,?,5000,?,?), ('b-groc',?,?,4000,?,?), ('b-trans',?,?,1000,?,?)`,
+		uid, cat["Food"], ts, ts, uid, cat["Groceries"], ts, ts, uid, cat["Transportation"], ts, ts)
 
-	exec(t, db, `INSERT INTO bank_statements (id,provider,account_id,file_name,file_sha256,file_size,period_start,period_end,
+	exec(t, db, `INSERT INTO bank_statements (id,user_id,provider,account_id,file_name,file_sha256,file_size,period_start,period_end,
 		opening_balance,closing_balance,total_debits,total_credits,transaction_count,imported_at)
-		VALUES ('st-1','bob','acc-bank','nov.pdf','abc',10,'2026-11-01','2026-11-30',100000,144911,5099,50010,5,?)`, ts)
+		VALUES ('st-1',?,'bob','acc-bank','nov.pdf','abc',10,'2026-11-01','2026-11-30',100000,144911,5099,50010,5,?)`, uid, ts)
 	bt := func(id string, line int, date, desc string, debit, credit int64) {
-		exec(t, db, `INSERT INTO bank_transactions (id,statement_id,account_id,line_no,transaction_date,description,debit,credit,fingerprint,created_at)
-			VALUES (?,'st-1','acc-bank',?,?,?,?,?,?,?)`, id, line, date, desc, debit, credit, "fp-"+id, ts)
+		exec(t, db, `INSERT INTO bank_transactions (id,user_id,statement_id,account_id,line_no,transaction_date,description,debit,credit,fingerprint,created_at)
+			VALUES (?,?,'st-1','acc-bank',?,?,?,?,?,?,?)`, id, uid, line, date, desc, debit, credit, "fp-"+id, ts)
 	}
 	bt("bt-1", 1, "2026-11-01", "AMBIENT CAFE", 2500, 0)
 	bt("bt-2", 2, "2026-11-03", "AMBIENT CAFE", 1600, 0)
@@ -94,21 +152,54 @@ func seed(t *testing.T) *Service {
 	bt("bt-4", 4, "2026-11-07", "ATM FEE", 999, 0)
 	bt("bt-5", 5, "2026-11-08", "INTEREST", 0, 10)
 	rec := func(id, btID string, txID any, status string, diff int64) {
-		exec(t, db, `INSERT INTO reconciliations (id,bank_transaction_id,transaction_id,status,match_type,amount_diff,created_at)
-			VALUES (?,?,?,?,'manual',?,?)`, id, btID, txID, status, diff, ts)
+		exec(t, db, `INSERT INTO reconciliations (id,user_id,bank_transaction_id,transaction_id,status,match_type,amount_diff,created_at)
+			VALUES (?,?,?,?,?,'manual',?,?)`, id, uid, btID, txID, status, diff, ts)
 	}
 	rec("r-1", "bt-1", "tx1", "matched", 0)
 	rec("r-2", "bt-2", "tx2", "matched", 100)
 	rec("r-3", "bt-3", "tx5", "matched", 0)
 	rec("r-5", "bt-5", nil, "ignored", 0)
-	return NewService(db)
+
+	seedOther(t, db)
+	return &fixture{svc: NewService(db), db: db, ctx: userCtx(uid), userID: uid, cat: cat}
+}
+
+// seedOther gives otherUser a small ledger in the same periods. Expected
+// numbers (used by TestIsolation): November income 7000, expenses 1000,
+// previous-period expenses 600, balance 20000+7000-1000-600 = 25400 (the
+// statement-side computed closing is 26000: bx3 predates its period).
+func seedOther(t *testing.T, db *sql.DB) *fixture {
+	t.Helper()
+	const uid = otherUser
+	newUser(t, db, uid)
+	cat := categoryIDs(t, db, uid)
+	exec(t, db, `INSERT INTO accounts (id,user_id,name,type,currency,opening_balance,opening_balance_date,is_active,created_at,updated_at)
+		VALUES ('acc-b-bank',?,'BOB','bank','BTN',20000,'2026-01-01',1,?,?)`, uid, ts, ts)
+	tx := func(id, typ string, amount int64, catID any, payee, date, status, createdAt string) {
+		exec(t, db, `INSERT INTO transactions (id,user_id,type,amount,currency,account_id,category_id,payee,transaction_date,origin,status,created_at,updated_at)
+			VALUES (?,?,?,?,'BTN','acc-b-bank',?,?,?,'manual',?,?,?)`, id, uid, typ, amount, catID, payee, date, status, createdAt, createdAt)
+	}
+	tx("bx1", "expense", 1000, cat["Food"], "Ambient Cafe", "2026-11-02", "cleared", "2026-11-02T01:00:00Z")
+	tx("bx2", "income", 7000, cat["Salary"], "Employer B", "2026-11-01", "cleared", "2026-11-01T01:00:00Z")
+	tx("bx3", "expense", 600, cat["Groceries"], "8 Eleven", "2026-10-10", "cleared", "2026-10-10T01:00:00Z")
+	tx("bx4", "expense", 5, cat["Food"], "Draft B", "2026-12-02", "pending", "2026-12-02T01:00:00Z")
+	exec(t, db, `INSERT INTO budgets (id,user_id,category_id,amount,created_at,updated_at) VALUES ('b-b-food',?,?,2000,?,?)`, uid, cat["Food"], ts, ts)
+	exec(t, db, `INSERT INTO bank_statements (id,user_id,provider,account_id,file_name,file_sha256,file_size,period_start,period_end,
+		opening_balance,closing_balance,total_debits,total_credits,transaction_count,imported_at)
+		VALUES ('st-b',?,'bob','acc-b-bank','nov-b.pdf','def',10,'2026-11-01','2026-11-30',20000,26000,1000,7000,2,?)`, uid, ts)
+	exec(t, db, `INSERT INTO bank_transactions (id,user_id,statement_id,account_id,line_no,transaction_date,description,debit,credit,fingerprint,created_at) VALUES
+		('bbt-1',?,'st-b','acc-b-bank',1,'2026-11-01','SALARY B',0,7000,'fp-bbt-1',?),
+		('bbt-2',?,'st-b','acc-b-bank',2,'2026-11-02','AMBIENT CAFE',1000,0,'fp-bbt-2',?)`, uid, ts, uid, ts)
+	exec(t, db, `INSERT INTO reconciliations (id,user_id,bank_transaction_id,transaction_id,status,match_type,amount_diff,created_at)
+		VALUES ('rb-1',?,'bbt-1','bx2','matched','manual',0,?)`, uid, ts)
+	return &fixture{svc: NewService(db), db: db, ctx: userCtx(uid), userID: uid, cat: cat}
 }
 
 var nov = Period{From: "2026-11-01", To: "2026-11-30"}
 
 func TestSummary(t *testing.T) {
-	s := seed(t)
-	got, err := s.Summary(context.Background(), nov)
+	f := seed(t)
+	got, err := f.svc.Summary(f.ctx, nov)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,10 +225,13 @@ func TestSummary(t *testing.T) {
 		if r.Status == "void" {
 			t.Fatal("void transaction in recent list")
 		}
+		if r.UserID != f.userID {
+			t.Fatalf("recent transaction %s belongs to %s", r.ID, r.UserID)
+		}
 	}
 
 	// October's previous window (Sep 2..Oct 1) catches the Oct 1 row only.
-	got, err = s.Summary(context.Background(), Period{From: "2026-10-02", To: "2026-10-31"})
+	got, err = f.svc.Summary(f.ctx, Period{From: "2026-10-02", To: "2026-10-31"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -145,7 +239,7 @@ func TestSummary(t *testing.T) {
 		t.Fatalf("october: expenses=%d previous=%+v change=%v", got.Expenses, got.Previous, got.ExpenseChangePct)
 	}
 	// A period with nothing before it has no change percentage.
-	got, err = s.Summary(context.Background(), Period{From: "2026-09-01", To: "2026-09-30"})
+	got, err = f.svc.Summary(f.ctx, Period{From: "2026-09-01", To: "2026-09-30"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -155,21 +249,21 @@ func TestSummary(t *testing.T) {
 }
 
 func TestCategories(t *testing.T) {
-	s := seed(t)
-	got, err := s.Categories(context.Background(), nov, FlowExpense)
+	f := seed(t)
+	got, err := f.svc.Categories(f.ctx, nov, FlowExpense)
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := []CategoryRow{
-		{CategoryID: ptr("cat-groceries"), Name: "Groceries", Icon: "shopping-basket", Color: "#22c55e", Amount: 4000, Count: 1, Pct: 44.4},
-		{CategoryID: ptr("cat-food"), Name: "Food", Icon: "utensils", Color: "#f97316", Amount: 2500, Count: 1, Pct: 27.8},
-		{CategoryID: ptr("cat-coffee"), Name: "Coffee", Icon: "coffee", Color: "#000000", Amount: 1500, Count: 1, Pct: 16.7},
+		{CategoryID: ptr(f.cat["Groceries"]), Name: "Groceries", Icon: "shopping-basket", Color: "#22c55e", Amount: 4000, Count: 1, Pct: 44.4},
+		{CategoryID: ptr(f.cat["Food"]), Name: "Food", Icon: "utensils", Color: "#f97316", Amount: 2500, Count: 1, Pct: 27.8},
+		{CategoryID: ptr(f.cat["Coffee"]), Name: "Coffee", Icon: "coffee", Color: "#000000", Amount: 1500, Count: 1, Pct: 16.7},
 		{CategoryID: nil, Name: "Uncategorised", Icon: "circle", Color: "#64748b", Amount: 1000, Count: 1, Pct: 11.1},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("expense:\n got %s\nwant %s", dump(got), dump(want))
 	}
-	got, err = s.Categories(context.Background(), nov, FlowIncome)
+	got, err = f.svc.Categories(f.ctx, nov, FlowIncome)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -177,23 +271,22 @@ func TestCategories(t *testing.T) {
 		got[1].Name != "Refund" || got[1].Amount != 500 || got[1].Pct != 1.0 {
 		t.Fatalf("income: %s", dump(got))
 	}
-	empty, err := s.Categories(context.Background(), Period{From: "2020-01-01", To: "2020-01-31"}, FlowExpense)
+	empty, err := f.svc.Categories(f.ctx, Period{From: "2020-01-01", To: "2020-01-31"}, FlowExpense)
 	if err != nil || len(empty) != 0 {
 		t.Fatalf("empty: %v %v", empty, err)
 	}
 }
 
 func TestCashFlow(t *testing.T) {
-	s := seed(t)
-	ctx := context.Background()
-	got, err := s.CashFlow(ctx, nov, GranMonth)
+	f := seed(t)
+	got, err := f.svc.CashFlow(f.ctx, nov, GranMonth)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if want := []CashFlowRow{{"2026-11", 50500, 9000, 41500}}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("month: %+v", got)
 	}
-	got, err = s.CashFlow(ctx, Period{From: "2026-11-01", To: "2026-11-05"}, GranDay)
+	got, err = f.svc.CashFlow(f.ctx, Period{From: "2026-11-01", To: "2026-11-05"}, GranDay)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -207,7 +300,7 @@ func TestCashFlow(t *testing.T) {
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("day: %+v", got)
 	}
-	got, err = s.CashFlow(ctx, Period{From: "2026-10-26", To: "2026-11-08"}, GranWeek)
+	got, err = f.svc.CashFlow(f.ctx, Period{From: "2026-10-26", To: "2026-11-08"}, GranWeek)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -215,7 +308,7 @@ func TestCashFlow(t *testing.T) {
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("week: %+v", got)
 	}
-	got, err = s.CashFlow(ctx, Period{From: "2026-09-01", To: "2026-12-31"}, GranMonth)
+	got, err = f.svc.CashFlow(f.ctx, Period{From: "2026-09-01", To: "2026-12-31"}, GranMonth)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -226,8 +319,8 @@ func TestCashFlow(t *testing.T) {
 }
 
 func TestMerchants(t *testing.T) {
-	s := seed(t)
-	got, err := s.Merchants(context.Background(), nov, FlowExpense)
+	f := seed(t)
+	got, err := f.svc.Merchants(f.ctx, nov, FlowExpense)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -235,7 +328,7 @@ func TestMerchants(t *testing.T) {
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("expense: %+v", got)
 	}
-	got, err = s.Merchants(context.Background(), nov, FlowIncome)
+	got, err = f.svc.Merchants(f.ctx, nov, FlowIncome)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -246,8 +339,8 @@ func TestMerchants(t *testing.T) {
 }
 
 func TestAccounts(t *testing.T) {
-	s := seed(t)
-	got, err := s.Accounts(context.Background(), nov)
+	f := seed(t)
+	got, err := f.svc.Accounts(f.ctx, nov)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -263,20 +356,20 @@ func TestAccounts(t *testing.T) {
 }
 
 func TestBudgets(t *testing.T) {
-	s := seed(t)
-	got, err := s.Budgets(context.Background(), nov)
+	f := seed(t)
+	got, err := f.svc.Budgets(f.ctx, nov)
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := []BudgetRow{
-		{BudgetID: "b-food", CategoryID: "cat-food", Name: "Food", Icon: "utensils", Color: "#f97316", Amount: 5000, Spent: 4000, Remaining: 1000, Pct: 80, Level: LevelWarn75},
-		{BudgetID: "b-groc", CategoryID: "cat-groceries", Name: "Groceries", Icon: "shopping-basket", Color: "#22c55e", Amount: 4000, Spent: 4000, Remaining: 0, Pct: 100, Level: LevelOver},
-		{BudgetID: "b-trans", CategoryID: "cat-transport", Name: "Transportation", Icon: "car", Color: "#3b82f6", Amount: 1000, Spent: 0, Remaining: 1000, Pct: 0, Level: LevelOK},
+		{BudgetID: "b-food", CategoryID: f.cat["Food"], Name: "Food", Icon: "utensils", Color: "#f97316", Amount: 5000, Spent: 4000, Remaining: 1000, Pct: 80, Level: LevelWarn75},
+		{BudgetID: "b-groc", CategoryID: f.cat["Groceries"], Name: "Groceries", Icon: "shopping-basket", Color: "#22c55e", Amount: 4000, Spent: 4000, Remaining: 0, Pct: 100, Level: LevelOver},
+		{BudgetID: "b-trans", CategoryID: f.cat["Transportation"], Name: "Transportation", Icon: "car", Color: "#3b82f6", Amount: 1000, Spent: 0, Remaining: 1000, Pct: 0, Level: LevelOK},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("\n got %s\nwant %s", dump(got), dump(want))
 	}
-	oct, err := s.Budgets(context.Background(), Period{From: "2026-10-01", To: "2026-10-31"})
+	oct, err := f.svc.Budgets(f.ctx, Period{From: "2026-10-01", To: "2026-10-31"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -286,8 +379,8 @@ func TestBudgets(t *testing.T) {
 }
 
 func TestReconciliation(t *testing.T) {
-	s := seed(t)
-	got, err := s.Reconciliation(context.Background(), "st-1")
+	f := seed(t)
+	got, err := f.svc.Reconciliation(f.ctx, "st-1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -331,16 +424,30 @@ func TestReconciliation(t *testing.T) {
 		t.Fatalf("balance: %+v", b)
 	}
 
-	_, err = s.Reconciliation(context.Background(), "nope")
+	_, err = f.svc.Reconciliation(f.ctx, "nope")
 	if ae, ok := apperr.As(err); !ok || ae.Status != 404 {
 		t.Fatalf("want 404, got %v", err)
+	}
+	// Another user's statement looks exactly like a missing one.
+	_, err = f.svc.Reconciliation(f.ctx, "st-b")
+	if ae, ok := apperr.As(err); !ok || ae.Status != 404 {
+		t.Fatalf("other user's statement: want 404, got %v", err)
+	}
+	_, err = f.svc.Reconciliation(userCtx(otherUser), "st-1")
+	if ae, ok := apperr.As(err); !ok || ae.Status != 404 {
+		t.Fatalf("statement from other user's context: want 404, got %v", err)
+	}
+	// No user on the context matches nothing rather than everything.
+	_, err = f.svc.Reconciliation(context.Background(), "st-1")
+	if ae, ok := apperr.As(err); !ok || ae.Status != 404 {
+		t.Fatalf("anonymous context: want 404, got %v", err)
 	}
 }
 
 func TestReconciliationUnverifiedWhenOpeningUnknown(t *testing.T) {
-	s := seed(t)
-	exec(t, s.db, `UPDATE bank_statements SET opening_balance = NULL WHERE id = 'st-1'`)
-	got, err := s.Reconciliation(context.Background(), "st-1")
+	f := seed(t)
+	exec(t, f.db, `UPDATE bank_statements SET opening_balance = NULL WHERE id = 'st-1'`)
+	got, err := f.svc.Reconciliation(f.ctx, "st-1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -350,8 +457,8 @@ func TestReconciliationUnverifiedWhenOpeningUnknown(t *testing.T) {
 }
 
 func TestExportCSV(t *testing.T) {
-	s := seed(t)
-	doc, err := s.Export(context.Background(), ExportRequest{Report: "categories", Period: nov, Type: FlowExpense})
+	f := seed(t)
+	doc, err := f.svc.Export(f.ctx, ExportRequest{Report: "categories", Period: nov, Type: FlowExpense})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -375,7 +482,7 @@ func TestExportCSV(t *testing.T) {
 		t.Fatalf("not parseable csv: %v", err)
 	}
 
-	doc, err = s.Export(context.Background(), ExportRequest{Report: "reconciliation", StatementID: "st-1"})
+	doc, err = f.svc.Export(f.ctx, ExportRequest{Report: "reconciliation", StatementID: "st-1"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -390,7 +497,7 @@ func TestExportCSV(t *testing.T) {
 			t.Fatalf("csv missing %q in:\n%s", needle, out)
 		}
 	}
-	doc, err = s.Export(context.Background(), ExportRequest{Report: "budgets", Month: nov})
+	doc, err = f.svc.Export(f.ctx, ExportRequest{Report: "budgets", Month: nov})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -402,9 +509,9 @@ func TestExportCSV(t *testing.T) {
 }
 
 func TestExportPDF(t *testing.T) {
-	s := seed(t)
+	f := seed(t)
 	for _, report := range []string{"summary", "categories", "cash-flow", "merchants", "accounts", "budgets", "reconciliation"} {
-		doc, err := s.Export(context.Background(), ExportRequest{Report: report, Period: nov, Type: FlowExpense, Granularity: GranDay, Month: nov, StatementID: "st-1"})
+		doc, err := f.svc.Export(f.ctx, ExportRequest{Report: report, Period: nov, Type: FlowExpense, Granularity: GranDay, Month: nov, StatementID: "st-1"})
 		if err != nil {
 			t.Fatalf("%s: %v", report, err)
 		}
@@ -427,6 +534,143 @@ func TestExportValidation(t *testing.T) {
 	}
 	if f, _ := ParseExportFormat(""); f != FormatCSV {
 		t.Fatal("default format should be csv")
+	}
+}
+
+// TestIsolation runs every report as otherUser, whose ledger shares the
+// database with the much larger ledger of seed(). Every number must come from
+// otherUser's rows alone (see seedOther for the hand-computed expectations).
+func TestIsolation(t *testing.T) {
+	a := seed(t)
+	b := &fixture{svc: a.svc, db: a.db, ctx: userCtx(otherUser), userID: otherUser, cat: categoryIDs(t, a.db, otherUser)}
+
+	sum, err := b.svc.Summary(b.ctx, nov)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sum.Income != 7000 || sum.Expenses != 1000 || sum.Net != 6000 || sum.TotalBalance != 25400 {
+		t.Fatalf("summary: %+v", sum)
+	}
+	if sum.Previous.Expenses != 600 || sum.ExpenseChangePct == nil || *sum.ExpenseChangePct != 66.7 {
+		t.Fatalf("summary previous: %+v change=%v", sum.Previous, sum.ExpenseChangePct)
+	}
+	// bbt-2 is the only unreconciled bank line; bx1 (Nov) and bx3 (Oct) are
+	// cleared manual rows on a bank account without a match; bx4 is pending.
+	if sum.UnreconciledBankCount != 1 || sum.UnmatchedManualCount != 2 || sum.PendingCount != 1 {
+		t.Fatalf("summary counts: %+v", sum)
+	}
+	if len(sum.RecentTransactions) != 4 {
+		t.Fatalf("recent: %d", len(sum.RecentTransactions))
+	}
+	for _, r := range sum.RecentTransactions {
+		if r.UserID != otherUser {
+			t.Fatalf("recent transaction %s belongs to %s", r.ID, r.UserID)
+		}
+	}
+
+	cats, err := b.svc.Categories(b.ctx, nov, FlowExpense)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []CategoryRow{{CategoryID: ptr(b.cat["Food"]), Name: "Food", Icon: "utensils", Color: "#f97316", Amount: 1000, Count: 1, Pct: 100}}
+	if !reflect.DeepEqual(cats, want) {
+		t.Fatalf("categories:\n got %s\nwant %s", dump(cats), dump(want))
+	}
+	if b.cat["Food"] == a.cat["Food"] {
+		t.Fatal("users must not share category ids")
+	}
+	inc, err := b.svc.Categories(b.ctx, nov, FlowIncome)
+	if err != nil || len(inc) != 1 || inc[0].Name != "Salary" || inc[0].Amount != 7000 {
+		t.Fatalf("income categories: %s %v", dump(inc), err)
+	}
+
+	flow, err := b.svc.CashFlow(b.ctx, Period{From: "2026-10-01", To: "2026-11-30"}, GranMonth)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if wantFlow := []CashFlowRow{{"2026-10", 0, 600, -600}, {"2026-11", 7000, 1000, 6000}}; !reflect.DeepEqual(flow, wantFlow) {
+		t.Fatalf("cash flow: %+v", flow)
+	}
+
+	merch, err := b.svc.Merchants(b.ctx, nov, FlowExpense)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if wantMerch := []MerchantRow{{"Ambient Cafe", 1000, 1}}; !reflect.DeepEqual(merch, wantMerch) {
+		t.Fatalf("merchants: %+v", merch)
+	}
+
+	accts, err := b.svc.Accounts(b.ctx, nov)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantAccts := []AccountRow{{AccountID: "acc-b-bank", Name: "BOB", Type: "bank", Currency: "BTN", OpeningBalance: 20000, Balance: 25400, Income: 7000, Expenses: 1000}}
+	if !reflect.DeepEqual(accts, wantAccts) {
+		t.Fatalf("accounts:\n got %s\nwant %s", dump(accts), dump(wantAccts))
+	}
+
+	budgets, err := b.svc.Budgets(b.ctx, nov)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantBudgets := []BudgetRow{{BudgetID: "b-b-food", CategoryID: b.cat["Food"], Name: "Food", Icon: "utensils", Color: "#f97316", Amount: 2000, Spent: 1000, Remaining: 1000, Pct: 50, Level: LevelOK}}
+	if !reflect.DeepEqual(budgets, wantBudgets) {
+		t.Fatalf("budgets:\n got %s\nwant %s", dump(budgets), dump(wantBudgets))
+	}
+
+	rec, err := b.svc.Reconciliation(b.ctx, "st-b")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rec.Statement.FileName != "nov-b.pdf" || rec.TotalDebits != 1000 || rec.TotalCredits != 7000 ||
+		rec.ManualExpenses != 1000 || rec.ManualIncome != 7000 || rec.Matched != 1 {
+		t.Fatalf("reconciliation: %+v", rec)
+	}
+	if len(rec.UnmatchedManual) != 1 || rec.UnmatchedManual[0].ID != "bx1" ||
+		len(rec.UnrecordedBank) != 1 || rec.UnrecordedBank[0].ID != "bbt-2" || len(rec.AmountDiscrepancies) != 0 {
+		t.Fatalf("reconciliation lists: manual=%+v bank=%+v disc=%+v", rec.UnmatchedManual, rec.UnrecordedBank, rec.AmountDiscrepancies)
+	}
+	if rec.Balance.ComputedClosing == nil || *rec.Balance.ComputedClosing != 26000 || !rec.Balance.Verified {
+		t.Fatalf("reconciliation balance: %+v", rec.Balance)
+	}
+
+	doc, err := b.svc.Export(b.ctx, ExportRequest{Report: "categories", Period: nov, Type: FlowExpense})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	if err := WriteCSV(&buf, doc); err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimRight(buf.String(), "\n"), "\n")
+	if wantLines := []string{"", "Category,Count,Amount,%", "Food,1,10.00,100.0"}; !reflect.DeepEqual(lines[3:], wantLines) {
+		t.Fatalf("export csv: %q", lines[3:])
+	}
+	doc, err = b.svc.Export(b.ctx, ExportRequest{Report: "summary", Period: nov})
+	if err != nil {
+		t.Fatal(err)
+	}
+	buf.Reset()
+	_ = WriteCSV(&buf, doc)
+	for _, needle := range []string{"Total balance,254.00", "Unreconciled bank transactions,1", "Unmatched manual transactions,2", "Pending transactions,1"} {
+		if !strings.Contains(buf.String(), needle) {
+			t.Fatalf("summary csv missing %q:\n%s", needle, buf.String())
+		}
+	}
+	if _, err := b.svc.Export(b.ctx, ExportRequest{Report: "reconciliation", StatementID: "st-1"}); err == nil {
+		t.Fatal("export of another user's statement must fail")
+	} else if ae, ok := apperr.As(err); !ok || ae.Status != 404 {
+		t.Fatalf("export of another user's statement: want 404, got %v", err)
+	}
+
+	// A context without a user sees an empty ledger, never a merged one.
+	empty, err := b.svc.Summary(context.Background(), nov)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if empty.Income != 0 || empty.Expenses != 0 || empty.TotalBalance != 0 || empty.UnreconciledBankCount != 0 ||
+		empty.UnmatchedManualCount != 0 || empty.PendingCount != 0 || len(empty.RecentTransactions) != 0 {
+		t.Fatalf("anonymous summary: %+v", empty)
 	}
 }
 

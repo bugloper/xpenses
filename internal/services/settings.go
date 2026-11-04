@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"strconv"
 
+	"github.com/bugloper/xpensiv/internal/auth"
 	apperr "github.com/bugloper/xpensiv/internal/errors"
 	"github.com/bugloper/xpensiv/internal/repositories"
 )
@@ -27,8 +28,20 @@ type SettingsService struct {
 	Repo repositories.SettingsRepo
 }
 
+// Defaults applied when a user has not set a key.
+var settingDefaults = map[string]string{SettingDateTolerance: "3", SettingDefaultCurrency: "BTN"}
+
 func (s *SettingsService) All(ctx context.Context) (map[string]string, error) {
-	return s.Repo.All(ctx, s.DB)
+	vals, err := s.Repo.All(ctx, s.DB, auth.UserID(ctx))
+	if err != nil {
+		return nil, err
+	}
+	for k, v := range settingDefaults {
+		if _, ok := vals[k]; !ok {
+			vals[k] = v
+		}
+	}
+	return vals, nil
 }
 
 func (s *SettingsService) Update(ctx context.Context, values map[string]string) (map[string]string, error) {
@@ -45,7 +58,7 @@ func (s *SettingsService) Update(ctx context.Context, values map[string]string) 
 		if len(v) > 200 {
 			return nil, apperr.Validation("validation failed", map[string]string{k: "is too long"})
 		}
-		if err := s.Repo.Set(ctx, s.DB, k, v); err != nil {
+		if err := s.Repo.Set(ctx, s.DB, auth.UserID(ctx), k, v); err != nil {
 			return nil, apperr.Internal(err)
 		}
 	}
@@ -54,7 +67,7 @@ func (s *SettingsService) Update(ctx context.Context, values map[string]string) 
 
 // DateTolerance returns the reconciliation date tolerance in days.
 func (s *SettingsService) DateTolerance(ctx context.Context) int {
-	v, err := s.Repo.Get(ctx, s.DB, SettingDateTolerance, "3")
+	v, err := s.Repo.Get(ctx, s.DB, auth.UserID(ctx), SettingDateTolerance, "3")
 	if err != nil {
 		return 3
 	}

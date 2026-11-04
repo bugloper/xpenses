@@ -1,82 +1,35 @@
 package server_test
 
 import (
-	"bytes"
-	"encoding/json"
-	"io"
-	"log/slog"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 
-	"github.com/bugloper/xpensiv/internal/config"
-	"github.com/bugloper/xpensiv/internal/database"
-	"github.com/bugloper/xpensiv/internal/server"
+	"github.com/bugloper/xpensiv/internal/testutil"
 )
 
 type env struct {
-	t   *testing.T
-	srv *httptest.Server
+	t *testing.T
+	*testutil.Client
 }
 
 func newEnv(t *testing.T) *env {
 	t.Helper()
-	db, err := database.OpenTest()
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { db.Close() })
-	cfg := config.Config{DefaultCurrency: "BTN", MaxUploadBytes: 1 << 20, DataDir: t.TempDir()}
-	log := slog.New(slog.NewTextHandler(io.Discard, nil))
-	e := server.New(cfg, log, server.NewDeps(cfg, db))
-	s := httptest.NewServer(e)
-	t.Cleanup(s.Close)
-	return &env{t: t, srv: s}
+	e := testutil.New(t)
+	return &env{t: t, Client: e.Setup("Owner", "owner@example.com")}
 }
 
 func (e *env) do(method, path string, body any) (int, map[string]any) {
-	e.t.Helper()
-	var r io.Reader
-	if body != nil {
-		b, _ := json.Marshal(body)
-		r = bytes.NewReader(b)
-	}
-	req, _ := http.NewRequest(method, e.srv.URL+"/api/v1"+path, r)
-	req.Header.Set("Content-Type", "application/json")
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		e.t.Fatal(err)
-	}
-	defer res.Body.Close()
-	out := map[string]any{}
-	raw, _ := io.ReadAll(res.Body)
-	if len(raw) > 0 {
-		if err := json.Unmarshal(raw, &out); err != nil {
-			e.t.Fatalf("bad json %s: %s", path, raw)
-		}
-	}
-	return res.StatusCode, out
+	return e.Do(method, path, body)
 }
 
-func data(m map[string]any) map[string]any { d, _ := m["data"].(map[string]any); return d }
+func data(m map[string]any) map[string]any { return testutil.Data(m) }
 
 func (e *env) createAccount(name, typ string, opening int64) string {
-	e.t.Helper()
-	st, body := e.do("POST", "/accounts", map[string]any{"name": name, "type": typ, "opening_balance": opening, "opening_balance_date": "2026-01-01"})
-	if st != 201 {
-		e.t.Fatalf("create account: %d %v", st, body)
-	}
-	return data(body)["id"].(string)
+	return e.CreateAccount(name, typ, opening)
 }
 
-func (e *env) balance(id string) int64 {
-	e.t.Helper()
-	st, body := e.do("GET", "/accounts/"+id, nil)
-	if st != 200 {
-		e.t.Fatalf("get account: %d %v", st, body)
-	}
-	return int64(data(body)["current_balance"].(float64))
-}
+func (e *env) balance(id string) int64 { return e.Balance(id) }
+
+func (e *env) cat(name string) string { return e.Category(name) }
 
 func TestHealth(t *testing.T) {
 	e := newEnv(t)
@@ -108,14 +61,14 @@ func TestBalanceCalculation(t *testing.T) {
 		body map[string]any
 		want int
 	}{
-		{"expense", map[string]any{"type": "expense", "amount": 2500, "account_id": bank, "category_id": "cat-food", "transaction_date": "2026-11-01"}, 201},
-		{"income", map[string]any{"type": "income", "amount": 50000, "account_id": bank, "category_id": "cat-salary", "transaction_date": "2026-11-01"}, 201},
-		{"refund", map[string]any{"type": "refund", "amount": 500, "account_id": bank, "category_id": "cat-refund", "transaction_date": "2026-11-02"}, 201},
+		{"expense", map[string]any{"type": "expense", "amount": 2500, "account_id": bank, "category_id": e.cat("Food"), "transaction_date": "2026-11-01"}, 201},
+		{"income", map[string]any{"type": "income", "amount": 50000, "account_id": bank, "category_id": e.cat("Salary"), "transaction_date": "2026-11-01"}, 201},
+		{"refund", map[string]any{"type": "refund", "amount": 500, "account_id": bank, "category_id": e.cat("Refund"), "transaction_date": "2026-11-02"}, 201},
 		{"transfer", map[string]any{"type": "transfer", "amount": 10000, "account_id": bank, "transfer_account_id": cash, "transaction_date": "2026-11-02"}, 201},
 		{"adjustment negative", map[string]any{"type": "adjustment", "amount": -300, "account_id": cash, "transaction_date": "2026-11-03"}, 201},
 		{"pending draft not counted", map[string]any{"type": "expense", "amount": 99999, "account_id": bank, "transaction_date": "2026-11-03", "status": "pending"}, 201},
 		{"void not counted", map[string]any{"type": "expense", "amount": 99999, "account_id": bank, "transaction_date": "2026-11-03", "status": "void"}, 201},
-		{"wrong category type rejected", map[string]any{"type": "expense", "amount": 100, "account_id": bank, "category_id": "cat-salary", "transaction_date": "2026-11-03"}, 422},
+		{"wrong category type rejected", map[string]any{"type": "expense", "amount": 100, "account_id": bank, "category_id": e.cat("Salary"), "transaction_date": "2026-11-03"}, 422},
 		{"transfer to self rejected", map[string]any{"type": "transfer", "amount": 100, "account_id": bank, "transfer_account_id": bank, "transaction_date": "2026-11-03"}, 422},
 		{"zero amount rejected", map[string]any{"type": "expense", "amount": 0, "account_id": bank, "transaction_date": "2026-11-03"}, 422},
 		{"bad date rejected", map[string]any{"type": "expense", "amount": 10, "account_id": bank, "transaction_date": "03/11/2026"}, 422},
@@ -146,8 +99,8 @@ func TestBalanceCalculation(t *testing.T) {
 func TestTransactionListFilterAndDelete(t *testing.T) {
 	e := newEnv(t)
 	bank := e.createAccount("BOB", "bank", 0)
-	_, b1 := e.do("POST", "/transactions", map[string]any{"type": "expense", "amount": 100, "account_id": bank, "category_id": "cat-food", "transaction_date": "2026-10-05", "payee": "Cafe", "tags": []string{"Work", "work"}})
-	e.do("POST", "/transactions", map[string]any{"type": "expense", "amount": 200, "account_id": bank, "category_id": "cat-fuel", "transaction_date": "2026-11-05"})
+	_, b1 := e.do("POST", "/transactions", map[string]any{"type": "expense", "amount": 100, "account_id": bank, "category_id": e.cat("Food"), "transaction_date": "2026-10-05", "payee": "Cafe", "tags": []string{"Work", "work"}})
+	e.do("POST", "/transactions", map[string]any{"type": "expense", "amount": 200, "account_id": bank, "category_id": e.cat("Fuel"), "transaction_date": "2026-11-05"})
 	id := data(b1)["id"].(string)
 	if tags := data(b1)["tags"].([]any); len(tags) != 1 || tags[0] != "work" {
 		t.Fatalf("tags normalised: %v", tags)
@@ -160,7 +113,7 @@ func TestTransactionListFilterAndDelete(t *testing.T) {
 	if st != 200 || len(body["data"].([]any)) != 1 {
 		t.Fatalf("search: %d %v", st, body)
 	}
-	st, body = e.do("GET", "/transactions?category_id=cat-fuel&per_page=1", nil)
+	st, body = e.do("GET", "/transactions?category_id="+e.cat("Fuel")+"&per_page=1", nil)
 	if st != 200 || body["meta"].(map[string]any)["total"].(float64) != 1 {
 		t.Fatalf("category filter: %d %v", st, body)
 	}
@@ -199,14 +152,14 @@ func TestOfflineClientIDIsIdempotent(t *testing.T) {
 
 func TestBudgets(t *testing.T) {
 	e := newEnv(t)
-	st, body := e.do("POST", "/budgets", map[string]any{"category_id": "cat-food", "amount": 500000})
+	st, body := e.do("POST", "/budgets", map[string]any{"category_id": e.cat("Food"), "amount": 500000})
 	if st != 201 {
 		t.Fatalf("create: %d %v", st, body)
 	}
-	if st, _ := e.do("POST", "/budgets", map[string]any{"category_id": "cat-food", "amount": 1}); st != 409 {
+	if st, _ := e.do("POST", "/budgets", map[string]any{"category_id": e.cat("Food"), "amount": 1}); st != 409 {
 		t.Fatalf("duplicate budget want 409 got %d", st)
 	}
-	if st, _ := e.do("POST", "/budgets", map[string]any{"category_id": "cat-salary", "amount": 1}); st != 422 {
+	if st, _ := e.do("POST", "/budgets", map[string]any{"category_id": e.cat("Salary"), "amount": 1}); st != 422 {
 		t.Fatalf("income budget want 422 got %d", st)
 	}
 	id := data(body)["id"].(string)
@@ -219,7 +172,7 @@ func TestRecurringGeneration(t *testing.T) {
 	e := newEnv(t)
 	bank := e.createAccount("BOB", "bank", 0)
 	st, body := e.do("POST", "/recurring", map[string]any{"name": "Internet", "type": "expense", "amount": 99900, "account_id": bank,
-		"category_id": "cat-telecom", "frequency": "monthly", "start_date": "2026-01-31", "generate_as": "cleared"})
+		"category_id": e.cat("Internet & Telecom"), "frequency": "monthly", "start_date": "2026-01-31", "generate_as": "cleared"})
 	if st != 201 {
 		t.Fatalf("create recurring: %d %v", st, body)
 	}

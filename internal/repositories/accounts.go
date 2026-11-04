@@ -25,13 +25,13 @@ const balanceExpr = `a.opening_balance
 	+ COALESCE((SELECT SUM(t.amount) FROM transactions t
 		WHERE t.transfer_account_id = a.id AND t.type = 'transfer' AND t.status = 'cleared'), 0)`
 
-const accountCols = `a.id, a.name, a.type, a.currency, a.opening_balance, a.opening_balance_date,
+const accountCols = `a.user_id, a.id, a.name, a.type, a.currency, a.opening_balance, a.opening_balance_date,
 	a.account_number, a.is_active, a.created_at, a.updated_at, ` + balanceExpr
 
 func scanAccount(s interface{ Scan(...any) error }) (*models.Account, error) {
 	var a models.Account
 	var active int
-	if err := s.Scan(&a.ID, &a.Name, &a.Type, &a.Currency, &a.OpeningBalance, &a.OpeningBalanceDate,
+	if err := s.Scan(&a.UserID, &a.ID, &a.Name, &a.Type, &a.Currency, &a.OpeningBalance, &a.OpeningBalanceDate,
 		&a.AccountNumber, &active, &a.CreatedAt, &a.UpdatedAt, &a.CurrentBalance); err != nil {
 		return nil, err
 	}
@@ -39,13 +39,13 @@ func scanAccount(s interface{ Scan(...any) error }) (*models.Account, error) {
 	return &a, nil
 }
 
-func (AccountRepo) List(ctx context.Context, db DBTX, includeInactive bool) ([]models.Account, error) {
-	q := `SELECT ` + accountCols + ` FROM accounts a`
+func (AccountRepo) List(ctx context.Context, db DBTX, userID string, includeInactive bool) ([]models.Account, error) {
+	q := `SELECT ` + accountCols + ` FROM accounts a WHERE a.user_id = ?`
 	if !includeInactive {
-		q += ` WHERE a.is_active = 1`
+		q += ` AND a.is_active = 1`
 	}
 	q += ` ORDER BY a.created_at, a.name`
-	rows, err := db.QueryContext(ctx, q)
+	rows, err := db.QueryContext(ctx, q, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -61,8 +61,8 @@ func (AccountRepo) List(ctx context.Context, db DBTX, includeInactive bool) ([]m
 	return out, rows.Err()
 }
 
-func (AccountRepo) Get(ctx context.Context, db DBTX, id string) (*models.Account, error) {
-	a, err := scanAccount(db.QueryRowContext(ctx, `SELECT `+accountCols+` FROM accounts a WHERE a.id = ?`, id))
+func (AccountRepo) Get(ctx context.Context, db DBTX, userID, id string) (*models.Account, error) {
+	a, err := scanAccount(db.QueryRowContext(ctx, `SELECT `+accountCols+` FROM accounts a WHERE a.id = ? AND a.user_id = ?`, id, userID))
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -71,22 +71,22 @@ func (AccountRepo) Get(ctx context.Context, db DBTX, id string) (*models.Account
 
 func (AccountRepo) Insert(ctx context.Context, db DBTX, a *models.Account) error {
 	_, err := db.ExecContext(ctx, `INSERT INTO accounts
-		(id, name, type, currency, opening_balance, opening_balance_date, account_number, is_active, created_at, updated_at)
-		VALUES (?,?,?,?,?,?,?,?,?,?)`,
-		a.ID, a.Name, a.Type, a.Currency, a.OpeningBalance, a.OpeningBalanceDate, a.AccountNumber, boolInt(a.IsActive), a.CreatedAt, a.UpdatedAt)
+		(user_id, id, name, type, currency, opening_balance, opening_balance_date, account_number, is_active, created_at, updated_at)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+		a.UserID, a.ID, a.Name, a.Type, a.Currency, a.OpeningBalance, a.OpeningBalanceDate, a.AccountNumber, boolInt(a.IsActive), a.CreatedAt, a.UpdatedAt)
 	return err
 }
 
 func (AccountRepo) Update(ctx context.Context, db DBTX, a *models.Account) error {
 	_, err := db.ExecContext(ctx, `UPDATE accounts SET name=?, type=?, currency=?, opening_balance=?,
-		opening_balance_date=?, account_number=?, is_active=?, updated_at=? WHERE id=?`,
-		a.Name, a.Type, a.Currency, a.OpeningBalance, a.OpeningBalanceDate, a.AccountNumber, boolInt(a.IsActive), a.UpdatedAt, a.ID)
+		opening_balance_date=?, account_number=?, is_active=?, updated_at=? WHERE id=? AND user_id=?`,
+		a.Name, a.Type, a.Currency, a.OpeningBalance, a.OpeningBalanceDate, a.AccountNumber, boolInt(a.IsActive), a.UpdatedAt, a.ID, a.UserID)
 	return err
 }
 
 // TotalBalance sums the balance of every active account.
-func (AccountRepo) TotalBalance(ctx context.Context, db DBTX) (int64, error) {
+func (AccountRepo) TotalBalance(ctx context.Context, db DBTX, userID string) (int64, error) {
 	var total sql.NullInt64
-	err := db.QueryRowContext(ctx, `SELECT SUM(`+balanceExpr+`) FROM accounts a WHERE a.is_active = 1`).Scan(&total)
+	err := db.QueryRowContext(ctx, `SELECT SUM(`+balanceExpr+`) FROM accounts a WHERE a.is_active = 1 AND a.user_id = ?`, userID).Scan(&total)
 	return total.Int64, err
 }

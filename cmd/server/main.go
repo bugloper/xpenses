@@ -57,11 +57,13 @@ func run() error {
 	deps := server.NewDeps(cfg, db)
 	e := server.New(cfg, log, deps, server.ExtraRegistrars(cfg, log, db, deps)...)
 
-	// Generate any due recurring transactions at startup and then once a day.
+	// Generate due recurring transactions (all users) and purge expired sessions
+	// at startup and then once a day.
 	go func() {
 		ticker := time.NewTicker(24 * time.Hour)
 		defer ticker.Stop()
 		for {
+			deps.Auth.Housekeeping(context.Background())
 			if res, err := deps.Recurring.Generate(context.Background(), ""); err != nil {
 				log.Warn("recurring generation failed", "err", err)
 			} else if res.Generated > 0 {

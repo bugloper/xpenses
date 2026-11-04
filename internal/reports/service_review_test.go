@@ -1,7 +1,6 @@
 package reports
 
 import (
-	"context"
 	"testing"
 
 	"github.com/bugloper/xpensiv/internal/database"
@@ -12,16 +11,19 @@ import (
 // over a period covering every transaction each account's balance is
 // opening + income − expenses + transfers_in − transfers_out. The ledger mixes
 // every type and status, including pending/void rows that must not count and
-// an inactive account that is excluded from both sides.
+// an inactive account that is excluded from both sides. A second user's
+// ledger sits in the same tables and must not reach either side.
 func TestBalanceInvariants(t *testing.T) {
 	db, err := database.OpenTest()
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
+	const uid = "u-inv"
+	newUser(t, db, uid)
 	acct := func(id, typ string, opening int64, active int) {
-		exec(t, db, `INSERT INTO accounts (id,name,type,currency,opening_balance,opening_balance_date,is_active,created_at,updated_at)
-			VALUES (?,?,?,'BTN',?,'2026-01-01',?,?,?)`, id, id, typ, opening, active, ts, ts)
+		exec(t, db, `INSERT INTO accounts (id,user_id,name,type,currency,opening_balance,opening_balance_date,is_active,created_at,updated_at)
+			VALUES (?,?,?,?,'BTN',?,'2026-01-01',?,?,?)`, id, uid, id, typ, opening, active, ts, ts)
 	}
 	acct("bank", "bank", 100000, 1)
 	acct("cash", "cash", 5000, 1)
@@ -29,8 +31,8 @@ func TestBalanceInvariants(t *testing.T) {
 	acct("old", "bank", 777, 0)
 
 	tx := func(id, typ string, amount int64, from string, to any, date, status string) {
-		exec(t, db, `INSERT INTO transactions (id,type,amount,currency,account_id,transfer_account_id,transaction_date,origin,status,created_at,updated_at)
-			VALUES (?,?,?,'BTN',?,?,?,'manual',?,?,?)`, id, typ, amount, from, to, date, status, ts, ts)
+		exec(t, db, `INSERT INTO transactions (id,user_id,type,amount,currency,account_id,transfer_account_id,transaction_date,origin,status,created_at,updated_at)
+			VALUES (?,?,?,?,'BTN',?,?,?,'manual',?,?,?)`, id, uid, typ, amount, from, to, date, status, ts, ts)
 	}
 	tx("t1", "expense", 2500, "bank", nil, "2026-11-01", "cleared")
 	tx("t2", "income", 50000, "bank", nil, "2026-11-01", "cleared")
@@ -46,13 +48,17 @@ func TestBalanceInvariants(t *testing.T) {
 	tx("t12", "transfer", 1000, "bank", "old", "2026-11-06", "cleared") // leaves the active set
 	tx("t13", "expense", 50, "old", nil, "2026-11-06", "cleared")
 
+	// Another user's activity in the same window.
+	other := seedOther(t, db)
+
 	s := NewService(db)
+	ctx := userCtx(uid)
 	all := Period{From: "2026-01-01", To: "2026-12-31"}
-	sum, err := s.Summary(context.Background(), all)
+	sum, err := s.Summary(ctx, all)
 	if err != nil {
 		t.Fatal(err)
 	}
-	rows, err := s.Accounts(context.Background(), all)
+	rows, err := s.Accounts(ctx, all)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,5 +83,21 @@ func TestBalanceInvariants(t *testing.T) {
 	// Transfers and adjustments never reach the income/expense summary.
 	if sum.Income != 50000+500 || sum.Expenses != 2500+1200+50 {
 		t.Fatalf("summary flows: income %d expenses %d", sum.Income, sum.Expenses)
+	}
+
+	// The same invariant holds for the other user, over their rows only.
+	osum, err := s.Summary(other.ctx, all)
+	if err != nil {
+		t.Fatal(err)
+	}
+	orows, err := s.Accounts(other.ctx, all)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(orows) != 1 || orows[0].Balance != 25400 || osum.TotalBalance != 25400 {
+		t.Fatalf("other user: summary %+v accounts %s", osum, dump(orows))
+	}
+	if osum.Income != 7000 || osum.Expenses != 1600 {
+		t.Fatalf("other user flows: income %d expenses %d", osum.Income, osum.Expenses)
 	}
 }

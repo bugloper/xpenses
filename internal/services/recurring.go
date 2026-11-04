@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bugloper/xpensiv/internal/auth"
 	"github.com/bugloper/xpensiv/internal/dto"
 	apperr "github.com/bugloper/xpensiv/internal/errors"
 	"github.com/bugloper/xpensiv/internal/models"
@@ -65,11 +66,11 @@ func addMonthsClamped(date time.Time, months int) time.Time {
 }
 
 func (s *RecurringService) List(ctx context.Context) ([]models.RecurringTransaction, error) {
-	return s.Repo.List(ctx, s.DB)
+	return s.Repo.List(ctx, s.DB, auth.UserID(ctx))
 }
 
 func (s *RecurringService) Get(ctx context.Context, id string) (*models.RecurringTransaction, error) {
-	r, err := s.Repo.Get(ctx, s.DB, id)
+	r, err := s.Repo.Get(ctx, s.DB, auth.UserID(ctx), id)
 	if err != nil {
 		return nil, apperr.Internal(err)
 	}
@@ -96,7 +97,7 @@ func (s *RecurringService) validate(ctx context.Context, r *models.RecurringTran
 		v.Date("end_date", *r.EndDate)
 	}
 	v.OneOf("generate_as", r.GenerateAs, models.StatusCleared, models.StatusPending)
-	a, err := s.Accounts.Get(ctx, s.DB, r.AccountID)
+	a, err := s.Accounts.Get(ctx, s.DB, r.UserID, r.AccountID)
 	if err != nil {
 		return apperr.Internal(err)
 	}
@@ -111,7 +112,7 @@ func (s *RecurringService) validate(ctx context.Context, r *models.RecurringTran
 	} else {
 		r.TransferAccountID = nil
 		if r.CategoryID != nil && *r.CategoryID != "" {
-			c, err := s.Categories.Get(ctx, s.DB, *r.CategoryID)
+			c, err := s.Categories.Get(ctx, s.DB, r.UserID, *r.CategoryID)
 			if err != nil {
 				return apperr.Internal(err)
 			}
@@ -137,7 +138,7 @@ func (s *RecurringService) Create(ctx context.Context, req dto.CreateRecurringRe
 		req.GenerateAs = models.StatusPending
 	}
 	r := &models.RecurringTransaction{
-		ID: NewID(), Name: strings.TrimSpace(req.Name), Type: req.Type, Amount: req.Amount, Currency: req.Currency,
+		UserID: auth.UserID(ctx), ID: NewID(), Name: strings.TrimSpace(req.Name), Type: req.Type, Amount: req.Amount, Currency: req.Currency,
 		AccountID: req.AccountID, TransferAccountID: req.TransferAccountID, CategoryID: req.CategoryID,
 		Description: strings.TrimSpace(req.Description), Payee: strings.TrimSpace(req.Payee), Frequency: req.Frequency,
 		Interval: req.Interval, StartDate: req.StartDate, EndDate: req.EndDate, NextRunDate: req.StartDate,
@@ -214,7 +215,7 @@ func (s *RecurringService) Delete(ctx context.Context, id string) error {
 	if _, err := s.Get(ctx, id); err != nil {
 		return err
 	}
-	if err := s.Repo.Delete(ctx, s.DB, id); err != nil {
+	if err := s.Repo.Delete(ctx, s.DB, auth.UserID(ctx), id); err != nil {
 		return apperr.Internal(err)
 	}
 	return nil
@@ -227,9 +228,10 @@ type RunResult struct {
 	IDs       []string `json:"transaction_ids"`
 }
 
-// Generate creates every due occurrence up to and including asOf (YYYY-MM-DD).
-// The unique index on (recurring_id, transaction_date) guarantees an
-// occurrence is never created twice even if two runs overlap.
+// Generate creates every due occurrence up to and including asOf (YYYY-MM-DD)
+// for the signed-in user, or for every user when ctx carries no user (the
+// background scheduler). The unique index on (recurring_id, transaction_date)
+// guarantees an occurrence is never created twice even if two runs overlap.
 func (s *RecurringService) Generate(ctx context.Context, asOf string) (*RunResult, error) {
 	if asOf == "" {
 		asOf = models.Today()
@@ -238,7 +240,7 @@ func (s *RecurringService) Generate(ctx context.Context, asOf string) (*RunResul
 	if err != nil {
 		return nil, apperr.BadRequest("as_of must be YYYY-MM-DD")
 	}
-	due, err := s.Repo.ListDue(ctx, s.DB, asOf)
+	due, err := s.Repo.ListDue(ctx, s.DB, auth.UserID(ctx), asOf)
 	if err != nil {
 		return nil, apperr.Internal(err)
 	}
@@ -280,7 +282,7 @@ func (s *RecurringService) Generate(ctx context.Context, asOf string) (*RunResul
 				rid := r.ID
 				now := models.NowUTC()
 				t := &models.Transaction{
-					ID: NewID(), Type: r.Type, Amount: r.Amount, Currency: r.Currency, AccountID: r.AccountID,
+					UserID: r.UserID, ID: NewID(), Type: r.Type, Amount: r.Amount, Currency: r.Currency, AccountID: r.AccountID,
 					TransferAccountID: r.TransferAccountID, CategoryID: r.CategoryID, Description: r.Description,
 					Payee: r.Payee, TransactionDate: dateStr, Origin: models.OriginManual, Status: r.GenerateAs,
 					RecurringID: &rid, CreatedAt: now, UpdatedAt: now,

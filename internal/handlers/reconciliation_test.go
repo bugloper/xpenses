@@ -1,73 +1,38 @@
 package handlers_test
 
 import (
-	"bytes"
 	"database/sql"
-	"encoding/json"
-	"io"
-	"log/slog"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 
-	"github.com/bugloper/xpensiv/internal/config"
-	"github.com/bugloper/xpensiv/internal/database"
-	"github.com/bugloper/xpensiv/internal/handlers"
-	"github.com/bugloper/xpensiv/internal/reconciliation"
-	"github.com/bugloper/xpensiv/internal/server"
+	"github.com/bugloper/xpensiv/internal/testutil"
 )
 
+// reconEnv is the full API seen through one user's session. Raw-SQL seeding
+// helpers write rows owned by that user.
 type reconEnv struct {
-	t   *testing.T
-	db  *sql.DB
-	srv *httptest.Server
+	*testutil.Env
+	c *testutil.Client
 }
 
 func newReconEnv(t *testing.T) *reconEnv {
 	t.Helper()
-	db, err := database.OpenTest()
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { db.Close() })
-	cfg := config.Config{DefaultCurrency: "BTN", MaxUploadBytes: 1 << 20, DataDir: t.TempDir()}
-	log := slog.New(slog.NewTextHandler(io.Discard, nil))
-	deps := server.NewDeps(cfg, db)
-	e := server.New(cfg, log, deps, handlers.NewReconciliationHandler(reconciliation.NewService(db, deps.Settings)))
-	s := httptest.NewServer(e)
-	t.Cleanup(s.Close)
-	return &reconEnv{t: t, db: db, srv: s}
+	env := testutil.New(t)
+	return &reconEnv{Env: env, c: env.Setup("Admin", "admin@example.com")}
 }
 
+// as returns the same server seen through another user's session.
+func (e *reconEnv) as(c *testutil.Client) *reconEnv { return &reconEnv{Env: e.Env, c: c} }
+
 func (e *reconEnv) do(method, path string, body any) (int, map[string]any) {
-	e.t.Helper()
-	var r io.Reader
-	if body != nil {
-		b, _ := json.Marshal(body)
-		r = bytes.NewReader(b)
-	}
-	req, _ := http.NewRequest(method, e.srv.URL+"/api/v1"+path, r)
-	req.Header.Set("Content-Type", "application/json")
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		e.t.Fatal(err)
-	}
-	defer res.Body.Close()
-	out := map[string]any{}
-	raw, _ := io.ReadAll(res.Body)
-	if len(raw) > 0 {
-		if err := json.Unmarshal(raw, &out); err != nil {
-			e.t.Fatalf("bad json %s: %s", path, raw)
-		}
-	}
-	return res.StatusCode, out
+	e.T.Helper()
+	return e.c.Do(method, path, body)
 }
 
 func (e *reconEnv) must(status int, method, path string, body any) map[string]any {
-	e.t.Helper()
+	e.T.Helper()
 	st, out := e.do(method, path, body)
 	if st != status {
-		e.t.Fatalf("%s %s: want %d got %d: %v", method, path, status, st, out)
+		e.T.Fatalf("%s %s: want %d got %d: %v", method, path, status, st, out)
 	}
 	return out
 }
@@ -85,54 +50,55 @@ func list(m map[string]any, key string) []map[string]any {
 }
 
 func (e *reconEnv) account(name, typ string, opening int64) string {
-	e.t.Helper()
-	body := e.must(201, "POST", "/accounts", map[string]any{"name": name, "type": typ, "opening_balance": opening, "opening_balance_date": "2026-01-01"})
-	return str(obj(body, "data"), "id")
+	e.T.Helper()
+	return e.c.CreateAccount(name, typ, opening)
 }
 
 func (e *reconEnv) balance(id string) int64 {
-	e.t.Helper()
-	return num(obj(e.must(200, "GET", "/accounts/"+id, nil), "data"), "current_balance")
+	e.T.Helper()
+	return e.c.Balance(id)
 }
 
 func (e *reconEnv) tx(body map[string]any) string {
-	e.t.Helper()
+	e.T.Helper()
 	return str(obj(e.must(201, "POST", "/transactions", body), "data"), "id")
 }
 
 func (e *reconEnv) statement(id, account, start, end string, debits, credits int64, n int) {
-	e.t.Helper()
-	_, err := e.db.Exec(`INSERT INTO bank_statements (id, provider, account_id, file_name, file_sha256, file_size, period_start, period_end,
+	e.T.Helper()
+	_, err := e.DB.Exec(`INSERT INTO bank_statements (user_id, id, provider, account_id, file_name, file_sha256, file_size, period_start, period_end,
 		opening_balance, closing_balance, total_debits, total_credits, transaction_count, balance_verified, imported_at)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, id, "bob", account, id+".pdf", "sha-"+id, 1000, start, end, 100000, 100000-debits+credits, debits, credits, n, 1, "2026-12-01T00:00:00Z")
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, e.c.UserID, id, "bob", account, id+".pdf", "sha-"+id, 1000, start, end, 100000, 100000-debits+credits, debits, credits, n, 1, "2026-12-01T00:00:00Z")
 	if err != nil {
-		e.t.Fatal(err)
+		e.T.Fatal(err)
 	}
 }
 
 func (e *reconEnv) bankTx(id, stmt, account string, line int, date, desc string, debit, credit int64) {
-	e.t.Helper()
-	_, err := e.db.Exec(`INSERT INTO bank_transactions (id, statement_id, account_id, line_no, transaction_date, description, reference, debit, credit, fingerprint, created_at)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?)`, id, stmt, account, line, date, desc, "", debit, credit, "fp-"+id, "2026-12-01T00:00:00Z")
+	e.T.Helper()
+	_, err := e.DB.Exec(`INSERT INTO bank_transactions (user_id, id, statement_id, account_id, line_no, transaction_date, description, reference, debit, credit, fingerprint, created_at)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`, e.c.UserID, id, stmt, account, line, date, desc, "", debit, credit, "fp-"+id, "2026-12-01T00:00:00Z")
 	if err != nil {
-		e.t.Fatal(err)
+		e.T.Fatal(err)
 	}
 }
 
+// recon reads the reconciliation row of a bank line straight from the
+// database (any owner), or nil.
 func (e *reconEnv) recon(bankID string) map[string]any {
-	e.t.Helper()
-	var status, matchType, rule string
+	e.T.Helper()
+	var status, matchType, rule, owner string
 	var txID sql.NullString
 	var amountDiff int64
-	err := e.db.QueryRow(`SELECT status, match_type, rule, transaction_id, amount_diff FROM reconciliations WHERE bank_transaction_id = ?`, bankID).
-		Scan(&status, &matchType, &rule, &txID, &amountDiff)
+	err := e.DB.QueryRow(`SELECT status, match_type, rule, transaction_id, amount_diff, user_id FROM reconciliations WHERE bank_transaction_id = ?`, bankID).
+		Scan(&status, &matchType, &rule, &txID, &amountDiff, &owner)
 	if err == sql.ErrNoRows {
 		return nil
 	}
 	if err != nil {
-		e.t.Fatal(err)
+		e.T.Fatal(err)
 	}
-	return map[string]any{"status": status, "match_type": matchType, "rule": rule, "transaction_id": txID.String, "amount_diff": float64(amountDiff)}
+	return map[string]any{"status": status, "match_type": matchType, "rule": rule, "transaction_id": txID.String, "amount_diff": float64(amountDiff), "user_id": owner}
 }
 
 func TestReconciliationFlow(t *testing.T) {
@@ -140,6 +106,7 @@ func TestReconciliationFlow(t *testing.T) {
 	bank := e.account("BOB", "bank", 100000)
 	cash := e.account("Wallet", "cash", 5000)
 	cc := e.account("Card", "credit_card", 0)
+	catFood, catSalary := e.c.Category("Food"), e.c.Category("Salary")
 
 	e.statement("st1", bank, "2026-11-01", "2026-11-30", 79300, 50000, 8)
 	e.bankTx("b1", "st1", bank, 1, "2026-11-04", "POS/AMBIENT CAFE THIMPHU/1", 1250, 0)
@@ -151,7 +118,7 @@ func TestReconciliationFlow(t *testing.T) {
 	e.bankTx("b7", "st1", bank, 7, "2026-11-22", "POS/XYZ/3", 3000, 0)
 	e.bankTx("b8", "st1", bank, 8, "2026-11-23", "POS/XYZ/4", 3000, 0)
 
-	m1 := e.tx(map[string]any{"type": "expense", "amount": 1250, "account_id": bank, "category_id": "cat-food", "payee": "Ambient Cafe", "transaction_date": "2026-11-04"})
+	m1 := e.tx(map[string]any{"type": "expense", "amount": 1250, "account_id": bank, "category_id": catFood, "payee": "Ambient Cafe", "transaction_date": "2026-11-04"})
 	m2 := e.tx(map[string]any{"type": "transfer", "amount": 20000, "account_id": bank, "transfer_account_id": cash, "transaction_date": "2026-11-09"})
 	m3 := e.tx(map[string]any{"type": "expense", "amount": 9800, "account_id": bank, "payee": "ABC Store", "transaction_date": "2026-11-20"})
 	m4 := e.tx(map[string]any{"type": "expense", "amount": 3000, "account_id": bank, "payee": "XYZ", "transaction_date": "2026-11-22"})
@@ -223,7 +190,7 @@ func TestReconciliationFlow(t *testing.T) {
 			t.Fatalf("auto-match: %v", d)
 		}
 		r1 := e.recon("b1")
-		if r1["status"] != "matched" || r1["match_type"] != "auto" || r1["rule"] != "exact_date" || r1["transaction_id"] != m1 {
+		if r1["status"] != "matched" || r1["match_type"] != "auto" || r1["rule"] != "exact_date" || r1["transaction_id"] != m1 || r1["user_id"] != e.c.UserID {
 			t.Fatalf("b1 reconciliation: %v", r1)
 		}
 		r2 := e.recon("b2")
@@ -243,14 +210,14 @@ func TestReconciliationFlow(t *testing.T) {
 
 	t.Run("create-transaction", func(t *testing.T) {
 		before := e.balance(bank)
-		e.must(422, "POST", "/reconciliation/create-transaction", map[string]any{"bank_transaction_id": "b3", "category_id": "cat-food"})
+		e.must(422, "POST", "/reconciliation/create-transaction", map[string]any{"bank_transaction_id": "b3", "category_id": catFood})
 		e.must(422, "POST", "/reconciliation/create-transaction", map[string]any{"bank_transaction_id": "b3", "category_id": "nope"})
 		e.must(404, "POST", "/reconciliation/create-transaction", map[string]any{"bank_transaction_id": "nope"})
-		d := obj(e.must(201, "POST", "/reconciliation/create-transaction", map[string]any{"bank_transaction_id": "b3", "category_id": "cat-salary", "notes": "nov"}), "data")
+		d := obj(e.must(201, "POST", "/reconciliation/create-transaction", map[string]any{"bank_transaction_id": "b3", "category_id": catSalary, "notes": "nov"}), "data")
 		tx := obj(d, "transaction")
 		if str(tx, "type") != "income" || num(tx, "amount") != 50000 || str(tx, "origin") != "imported" || str(tx, "status") != "cleared" ||
 			str(tx, "source_bank_transaction_id") != "b3" || str(tx, "transaction_date") != "2026-11-12" || str(tx, "payee") != "Salary Nov" ||
-			str(tx, "account_id") != bank || str(tx, "category_id") != "cat-salary" || str(tx, "reconciliation_status") != "matched" {
+			str(tx, "account_id") != bank || str(tx, "category_id") != catSalary || str(tx, "reconciliation_status") != "matched" {
 			t.Fatalf("created transaction: %v", tx)
 		}
 		if r := obj(d, "reconciliation"); str(r, "status") != "matched" || str(r, "rule") != "created" {
@@ -258,6 +225,10 @@ func TestReconciliationFlow(t *testing.T) {
 		}
 		if got := e.balance(bank); got != before+50000 {
 			t.Fatalf("balance want %d got %d", before+50000, got)
+		}
+		var owner string
+		if err := e.DB.QueryRow(`SELECT user_id FROM transactions WHERE id = ?`, str(tx, "id")).Scan(&owner); err != nil || owner != e.c.UserID {
+			t.Fatalf("created transaction owner: %q %v", owner, err)
 		}
 		e.must(409, "POST", "/reconciliation/create-transaction", map[string]any{"bank_transaction_id": "b3"})
 	})
@@ -392,8 +363,11 @@ func TestReconciliationFlow(t *testing.T) {
 			t.Fatalf("relink transfer: %v", d)
 		}
 		var n int
-		if err := e.db.QueryRow(`SELECT COUNT(*) FROM transactions`).Scan(&n); err != nil || n != 10 {
+		if err := e.DB.QueryRow(`SELECT COUNT(*) FROM transactions`).Scan(&n); err != nil || n != 10 {
 			t.Fatalf("transactions count want 10 got %d (%v)", n, err)
+		}
+		if err := e.DB.QueryRow(`SELECT COUNT(*) FROM reconciliations WHERE user_id <> ?`, e.c.UserID).Scan(&n); err != nil || n != 0 {
+			t.Fatalf("reconciliations stored under another user: %d (%v)", n, err)
 		}
 	})
 }
@@ -430,4 +404,154 @@ func TestReconciliationAdjustmentCredit(t *testing.T) {
 	if got := e.balance(bank); got != 105100 {
 		t.Fatalf("balance want 105100 got %d", got)
 	}
+}
+
+// Reconciliation is private per user: another user's statements, bank lines
+// and manual transactions are invisible (404), so no endpoint can ever link a
+// bank line to a transaction across users, and the overview only lists the
+// caller's statements.
+func TestReconciliationIsolation(t *testing.T) {
+	a := newReconEnv(t)
+	b := a.as(a.Register(a.c, "Bob", "bob@example.com"))
+
+	bankA := a.account("BOB", "bank", 100000)
+	cashA := a.account("Wallet", "cash", 5000)
+	a.statement("stA", bankA, "2026-11-01", "2026-11-30", 1250, 5000, 2)
+	a.bankTx("a1", "stA", bankA, 1, "2026-11-04", "POS/AMBIENT CAFE", 1250, 0)
+	a.bankTx("a2", "stA", bankA, 2, "2026-11-10", "MBOB/TRF/FROM/WALLET", 0, 5000)
+	mA := a.tx(map[string]any{"type": "expense", "amount": 1250, "account_id": bankA, "payee": "Ambient Cafe", "transaction_date": "2026-11-04"})
+
+	bankB := b.account("BOB", "bank", 100000)
+	cashB := b.account("Wallet", "cash", 5000)
+	b.statement("stB", bankB, "2026-11-01", "2026-11-30", 1250, 0, 1)
+	b.bankTx("b1", "stB", bankB, 1, "2026-11-04", "POS/AMBIENT CAFE", 1250, 0)
+	mB := b.tx(map[string]any{"type": "expense", "amount": 1250, "account_id": bankB, "payee": "Ambient Cafe", "transaction_date": "2026-11-04"})
+
+	t.Run("overview lists only the caller's statements", func(t *testing.T) {
+		for _, c := range []struct {
+			env               *reconEnv
+			stmt              string
+			manual, bankLines int64
+		}{{a, "stA", 1, 2}, {b, "stB", 1, 1}} {
+			d := obj(c.env.must(200, "GET", "/reconciliation", nil), "data")
+			sts := list(d, "statements")
+			if len(sts) != 1 || str(sts[0], "statement_id") != c.stmt {
+				t.Fatalf("overview for %s: %v", c.env.c.Email, sts)
+			}
+			if num(d, "unmatched_manual_count") != c.manual || num(d, "unreconciled_bank_count") != c.bankLines {
+				t.Fatalf("overview counts for %s: %v", c.env.c.Email, d)
+			}
+		}
+	})
+
+	t.Run("workspace of another user's statement is 404", func(t *testing.T) {
+		if st, body := b.do("GET", "/reconciliation/stA", nil); st != 404 || errCode(body) != "not_found" {
+			t.Fatalf("B workspace stA: %d %v", st, body)
+		}
+		if st, body := b.do("POST", "/reconciliation/auto-match", map[string]any{"statement_id": "stA"}); st != 404 || errCode(body) != "not_found" {
+			t.Fatalf("B auto-match stA: %d %v", st, body)
+		}
+		if a.recon("a1") != nil {
+			t.Fatal("B's auto-match must not touch A's lines")
+		}
+		a.must(404, "GET", "/reconciliation/stB", nil)
+	})
+
+	t.Run("workspaces never show the other user's rows", func(t *testing.T) {
+		d := obj(a.must(200, "GET", "/reconciliation/stA", nil), "data")
+		for _, l := range list(d, "bank_transactions") {
+			if id := str(l, "id"); id != "a1" && id != "a2" {
+				t.Fatalf("B's bank line in A's workspace: %v", l)
+			}
+			for _, s := range list(l, "suggestions") {
+				if str(s, "transaction_id") == mB {
+					t.Fatalf("B's transaction suggested to A: %v", s)
+				}
+			}
+		}
+		for _, m := range list(d, "manual_transactions") {
+			if str(m, "id") == mB {
+				t.Fatalf("B's transaction listed as A's candidate: %v", m)
+			}
+		}
+		d = obj(b.must(200, "GET", "/reconciliation/stB", nil), "data")
+		if lines := list(d, "bank_transactions"); len(lines) != 1 || str(lines[0], "id") != "b1" {
+			t.Fatalf("B's bank lines: %v", lines)
+		}
+		manual := list(d, "manual_transactions")
+		if len(manual) != 1 || str(manual[0], "id") != mB {
+			t.Fatalf("B's candidates: %v", manual)
+		}
+	})
+
+	t.Run("B cannot act on A's bank line", func(t *testing.T) {
+		for _, c := range []struct {
+			path string
+			body map[string]any
+		}{
+			{"/reconciliation/match", map[string]any{"bank_transaction_id": "a1", "transaction_id": mB}},
+			{"/reconciliation/match", map[string]any{"bank_transaction_id": "a1", "transaction_id": mA}},
+			{"/reconciliation/ignore", map[string]any{"bank_transaction_id": "a1"}},
+			{"/reconciliation/unmatch", map[string]any{"bank_transaction_id": "a1"}},
+			{"/reconciliation/transfer", map[string]any{"bank_transaction_id": "a2", "transfer_account_id": cashB}},
+			{"/reconciliation/transfer", map[string]any{"bank_transaction_id": "a2", "transfer_account_id": cashA}},
+			{"/reconciliation/create-transaction", map[string]any{"bank_transaction_id": "a2"}},
+			{"/reconciliation/adjustment", map[string]any{"bank_transaction_id": "a1", "transaction_id": mB}},
+		} {
+			if st, body := b.do("POST", c.path, c.body); st != 404 || errCode(body) != "not_found" {
+				t.Fatalf("B %s %v: %d %v", c.path, c.body, st, body)
+			}
+		}
+		if a.recon("a1") != nil || a.recon("a2") != nil {
+			t.Fatal("A's lines must stay unreconciled")
+		}
+		var n int
+		_ = a.DB.QueryRow(`SELECT COUNT(*) FROM transactions WHERE user_id = ?`, a.c.UserID).Scan(&n)
+		if n != 1 {
+			t.Fatalf("B's calls must not create transactions for A: %d", n)
+		}
+	})
+
+	t.Run("B cannot link own bank line to A's transaction", func(t *testing.T) {
+		b.must(404, "POST", "/reconciliation/match", map[string]any{"bank_transaction_id": "b1", "transaction_id": mA})
+		b.must(404, "POST", "/reconciliation/adjustment", map[string]any{"bank_transaction_id": "b1", "transaction_id": mA})
+		b.must(404, "POST", "/reconciliation/transfer", map[string]any{"bank_transaction_id": "b1", "transaction_id": mA})
+		// A's accounts and categories are not valid targets for B either.
+		b.must(422, "POST", "/reconciliation/transfer", map[string]any{"bank_transaction_id": "b1", "transfer_account_id": cashA})
+		b.must(422, "POST", "/reconciliation/create-transaction", map[string]any{"bank_transaction_id": "b1", "category_id": a.c.Category("Food")})
+		if b.recon("b1") != nil {
+			t.Fatal("b1 must stay unreconciled")
+		}
+	})
+
+	t.Run("A's match is invisible to B and B cannot undo it", func(t *testing.T) {
+		d := obj(a.must(201, "POST", "/reconciliation/match", map[string]any{"bank_transaction_id": "a1", "transaction_id": mA}), "data")
+		if str(d, "transaction_id") != mA {
+			t.Fatalf("A match: %v", d)
+		}
+		if r := a.recon("a1"); r == nil || r["user_id"] != a.c.UserID {
+			t.Fatalf("A's reconciliation owner: %v", r)
+		}
+		b.must(404, "POST", "/reconciliation/unmatch", map[string]any{"bank_transaction_id": "a1"})
+		b.must(404, "POST", "/reconciliation/ignore", map[string]any{"bank_transaction_id": "a1"})
+		if a.recon("a1") == nil {
+			t.Fatal("B's unmatch must not remove A's reconciliation")
+		}
+		// mA is now linked; for B it is still simply not found, never a conflict.
+		b.must(404, "POST", "/reconciliation/match", map[string]any{"bank_transaction_id": "b1", "transaction_id": mA})
+		// B's own workflow is unaffected.
+		b.must(201, "POST", "/reconciliation/match", map[string]any{"bank_transaction_id": "b1", "transaction_id": mB})
+		for _, c := range []struct {
+			env         *reconEnv
+			matched     int64
+			unrecorded  int64
+			unmatchedTx int64
+		}{{a, 1, 1, 0}, {b, 1, 0, 0}} {
+			d := obj(c.env.must(200, "GET", "/reconciliation", nil), "data")
+			s := list(d, "statements")[0]
+			if num(s, "matched") != c.matched || num(s, "unrecorded") != c.unrecorded || num(d, "unreconciled_bank_count") != c.unrecorded || num(d, "unmatched_manual_count") != c.unmatchedTx {
+				t.Fatalf("overview for %s: %v", c.env.c.Email, d)
+			}
+		}
+	})
 }

@@ -16,6 +16,11 @@ type Config struct {
 	StaticDir       string
 	CORSOrigin      string
 	DefaultCurrency string
+	// SecureCookies: auto | true | false. "auto" marks the session cookie Secure
+	// only when the request arrived over HTTPS.
+	SecureCookies string
+	// TrustedProxy: honour X-Forwarded-For / X-Forwarded-Proto from a reverse proxy.
+	TrustedProxy bool
 }
 
 // Load reads configuration from the environment, applying defaults.
@@ -28,6 +33,13 @@ func Load() (Config, error) {
 		StaticDir:       getenv("XPENSIV_STATIC_DIR", "./web/dist"),
 		CORSOrigin:      getenv("XPENSIV_CORS_ORIGIN", "http://localhost:5173"),
 		DefaultCurrency: getenv("XPENSIV_DEFAULT_CURRENCY", "BTN"),
+		SecureCookies:   getenv("XPENSIV_SECURE_COOKIES", "auto"),
+		TrustedProxy:    getenv("XPENSIV_TRUSTED_PROXY", "false") == "true",
+	}
+	switch cfg.SecureCookies {
+	case "auto", "true", "false":
+	default:
+		return cfg, fmt.Errorf("XPENSIV_SECURE_COOKIES must be auto, true or false")
 	}
 	if v := os.Getenv("XPENSIV_MAX_UPLOAD_BYTES"); v != "" {
 		n, err := strconv.ParseInt(v, 10, 64)

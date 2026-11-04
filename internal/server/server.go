@@ -15,6 +15,7 @@ import (
 	"github.com/labstack/echo/v4"
 	echomw "github.com/labstack/echo/v4/middleware"
 
+	"github.com/bugloper/xpensiv/internal/auth"
 	"github.com/bugloper/xpensiv/internal/config"
 	"github.com/bugloper/xpensiv/internal/handlers"
 	"github.com/bugloper/xpensiv/internal/middleware"
@@ -30,11 +31,13 @@ type Deps struct {
 	Recurring    *services.RecurringService
 	Settings     *services.SettingsService
 	Backup       *services.BackupService
+	Auth         *auth.Service
+	AuthMW       *auth.Middleware
 }
 
 // NewDeps constructs the service graph over db.
 func NewDeps(cfg config.Config, db *sql.DB) *Deps {
-	return &Deps{
+	d := &Deps{
 		Accounts:     &services.AccountService{DB: db, DefaultCurrency: cfg.DefaultCurrency},
 		Categories:   &services.CategoryService{DB: db},
 		Transactions: &services.TransactionService{DB: db, DefaultCurrency: cfg.DefaultCurrency},
@@ -43,6 +46,9 @@ func NewDeps(cfg config.Config, db *sql.DB) *Deps {
 		Settings:     &services.SettingsService{DB: db},
 		Backup:       &services.BackupService{DB: db, DBPath: cfg.DBPath(), BackupsDir: cfg.BackupsDir()},
 	}
+	d.Auth = auth.NewService(db)
+	d.AuthMW = &auth.Middleware{Svc: d.Auth, SecureCookies: cfg.SecureCookies, TrustedProxy: cfg.TrustedProxy, AllowedOrigin: cfg.CORSOrigin}
+	return d
 }
 
 // Registrar is implemented by every domain handler.
@@ -68,23 +74,38 @@ func New(cfg config.Config, log *slog.Logger, deps *Deps, extra ...Registrar) *e
 		}))
 	}
 
-	api := e.Group("/api/v1")
+	// Session resolution, CSRF and the auth/admin gate for every /api/v1 path.
+	// Installed at the top level on purpose: group middleware adds catch-all
+	// routes that turn 405s into 404s.
+	e.Use(deps.AuthMW.Protect())
+
+	api := e.Group(auth.APIPrefix)
 	api.GET("/health", func(c echo.Context) error {
 		return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 	})
+	authH := handlers.NewAuthHandler(deps.Auth, deps.AuthMW)
+	authH.RegisterPublic(api)
+
+	// Everything below requires a signed-in user and is scoped to that user
+	// (enforced by Protect; see auth.publicPaths / auth.adminOnly).
+	private := api
 	regs := []Registrar{
+		authH,
 		&handlers.AccountHandler{Svc: deps.Accounts},
 		&handlers.CategoryHandler{Svc: deps.Categories},
 		&handlers.TransactionHandler{Svc: deps.Transactions},
 		&handlers.BudgetHandler{Svc: deps.Budgets},
 		&handlers.RecurringHandler{Svc: deps.Recurring},
 		&handlers.SettingsHandler{Svc: deps.Settings},
-		&handlers.BackupHandler{Svc: deps.Backup, MaxUploadBytes: cfg.MaxUploadBytes},
 	}
 	regs = append(regs, extra...)
 	for _, r := range regs {
-		r.Register(api)
+		r.Register(private)
 	}
+
+	// Instance-wide operations (admin only, gated by path in Protect).
+	handlers.NewAdminHandler(deps.Auth).Register(api)
+	(&handlers.BackupHandler{Svc: deps.Backup, MaxUploadBytes: cfg.MaxUploadBytes}).Register(api)
 
 	if cfg.StaticDir != "" {
 		if _, err := os.Stat(filepath.Join(cfg.StaticDir, "index.html")); err == nil {

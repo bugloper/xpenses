@@ -1,0 +1,35 @@
+# Production overlay: Caddy terminates TLS (automatic Let's Encrypt) and proxies
+# to the app, which is no longer published on the host.
+#
+#   export XPENSIV_DOMAIN=xpensiv.example.com
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+services:
+  xpensiv:
+    ports: !reset []
+    expose:
+      - "8080"
+    environment:
+      XPENSIV_TRUSTED_PROXY: "true"
+      XPENSIV_SECURE_COOKIES: auto
+      XPENSIV_CORS_ORIGIN: ""
+
+  caddy:
+    image: caddy:2
+    container_name: xpensiv-caddy
+    restart: unless-stopped
+    depends_on:
+      - xpensiv
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      XPENSIV_DOMAIN: ${XPENSIV_DOMAIN:?set XPENSIV_DOMAIN to your DNS name}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  caddy-data:
+  caddy-config:

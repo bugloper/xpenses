@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/bugloper/xpensiv/internal/auth"
 	"github.com/bugloper/xpensiv/internal/dto"
 	apperr "github.com/bugloper/xpensiv/internal/errors"
 	"github.com/bugloper/xpensiv/internal/models"
@@ -27,11 +28,11 @@ type AccountService struct {
 func NewID() string { return uuid.NewString() }
 
 func (s *AccountService) List(ctx context.Context, includeInactive bool) ([]models.Account, error) {
-	return s.Repo.List(ctx, s.DB, includeInactive)
+	return s.Repo.List(ctx, s.DB, auth.UserID(ctx), includeInactive)
 }
 
 func (s *AccountService) Get(ctx context.Context, id string) (*models.Account, error) {
-	a, err := s.Repo.Get(ctx, s.DB, id)
+	a, err := s.Repo.Get(ctx, s.DB, auth.UserID(ctx), id)
 	if err != nil {
 		return nil, apperr.Internal(err)
 	}
@@ -60,7 +61,7 @@ func (s *AccountService) Create(ctx context.Context, req dto.CreateAccountReques
 	}
 	now := models.NowUTC()
 	a := &models.Account{
-		ID: NewID(), Name: req.Name, Type: req.Type, Currency: req.Currency,
+		UserID: auth.UserID(ctx), ID: NewID(), Name: req.Name, Type: req.Type, Currency: req.Currency,
 		OpeningBalance: req.OpeningBalance, OpeningBalanceDate: req.OpeningBalanceDate,
 		AccountNumber: strings.TrimSpace(req.AccountNumber), IsActive: true, CreatedAt: now, UpdatedAt: now,
 	}

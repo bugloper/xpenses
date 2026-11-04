@@ -2,26 +2,21 @@ package handlers_test
 
 import (
 	"bytes"
-	"context"
-	"database/sql"
 	"encoding/json"
 	"io"
 	"log/slog"
-	"mime/multipart"
-	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"regexp"
 	"testing"
 
-	"github.com/labstack/echo/v4"
-
+	"github.com/bugloper/xpensiv/internal/config"
 	"github.com/bugloper/xpensiv/internal/database"
-	"github.com/bugloper/xpensiv/internal/handlers"
 	"github.com/bugloper/xpensiv/internal/models"
-	"github.com/bugloper/xpensiv/internal/repositories"
+	"github.com/bugloper/xpensiv/internal/server"
 	"github.com/bugloper/xpensiv/internal/services"
+	"github.com/bugloper/xpensiv/internal/testutil"
 )
 
 const (
@@ -31,90 +26,59 @@ const (
 	fixtureRowCount  = 31
 )
 
+// stmtEnv is the full API with one signed-in user (the instance admin) and
+// one bank account of theirs.
 type stmtEnv struct {
-	t       *testing.T
-	db      *sql.DB
-	srv     *httptest.Server
+	*testutil.Env
+	c       *testutil.Client
 	dir     string
 	account string
 }
 
-func newStmtEnv(t *testing.T, maxUpload int64) *stmtEnv {
+func newStmtEnv(t *testing.T) *stmtEnv {
+	t.Helper()
+	return stmtEnvFrom(testutil.New(t))
+}
+
+// newStmtEnvWithLimit is newStmtEnv with a custom upload cap.
+func newStmtEnvWithLimit(t *testing.T, maxUpload int64) *stmtEnv {
 	t.Helper()
 	db, err := database.OpenTest()
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	dir := filepath.Join(t.TempDir(), "statements")
-	e := echo.New()
-	e.HTTPErrorHandler = handlers.ErrorHandler(slog.New(slog.NewTextHandler(io.Discard, nil)))
-	api := e.Group("/api/v1")
-	handlers.NewStatementHandler(services.NewStatementService(db, dir), maxUpload).Register(api)
-	(&handlers.TransactionHandler{Svc: &services.TransactionService{DB: db, DefaultCurrency: "BTN"}}).Register(api)
-	srv := httptest.NewServer(e)
+	cfg := config.Config{DefaultCurrency: "BTN", MaxUploadBytes: maxUpload, DataDir: t.TempDir(), SecureCookies: "false"}
+	log := slog.New(slog.NewTextHandler(io.Discard, nil))
+	deps := server.NewDeps(cfg, db)
+	srv := httptest.NewServer(server.New(cfg, log, deps, server.ExtraRegistrars(cfg, log, db, deps)...))
 	t.Cleanup(srv.Close)
-
-	now := models.NowUTC()
-	acct := &models.Account{ID: services.NewID(), Name: "BOB Savings", Type: "bank", Currency: "BTN", OpeningBalanceDate: "2026-01-01", IsActive: true, CreatedAt: now, UpdatedAt: now}
-	if err := (repositories.AccountRepo{}).Insert(context.Background(), db, acct); err != nil {
-		t.Fatal(err)
-	}
-	return &stmtEnv{t: t, db: db, srv: srv, dir: dir, account: acct.ID}
+	return stmtEnvFrom(&testutil.Env{T: t, Srv: srv, DB: db, Cfg: cfg, Deps: deps})
 }
 
+func stmtEnvFrom(env *testutil.Env) *stmtEnv {
+	c := env.Setup("Admin", "admin@example.com")
+	return &stmtEnv{Env: env, c: c, dir: env.Cfg.StatementsDir(), account: c.CreateAccount("BOB Savings", "bank", 0)}
+}
+
+// as returns the same server seen through another user's session.
+func (e *stmtEnv) as(c *testutil.Client, account string) *stmtEnv {
+	return &stmtEnv{Env: e.Env, c: c, dir: e.dir, account: account}
+}
+
+// upload posts a PDF to /statements/parse; a nil content omits the file part.
 func (e *stmtEnv) upload(fileName string, content []byte, fields map[string]string) (int, map[string]any) {
-	e.t.Helper()
-	var buf bytes.Buffer
-	w := multipart.NewWriter(&buf)
-	for k, v := range fields {
-		_ = w.WriteField(k, v)
+	e.T.Helper()
+	fileField := "file"
+	if content == nil {
+		fileField = ""
 	}
-	if content != nil {
-		part, err := w.CreateFormFile("file", fileName)
-		if err != nil {
-			e.t.Fatal(err)
-		}
-		_, _ = part.Write(content)
-	}
-	_ = w.Close()
-	req, _ := http.NewRequest(http.MethodPost, e.srv.URL+"/api/v1/statements/parse", &buf)
-	req.Header.Set("Content-Type", w.FormDataContentType())
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		e.t.Fatal(err)
-	}
-	defer res.Body.Close()
-	raw, _ := io.ReadAll(res.Body)
-	out := map[string]any{}
-	if len(raw) > 0 {
-		if err := json.Unmarshal(raw, &out); err != nil {
-			e.t.Fatalf("bad json: %s", raw)
-		}
-	}
-	return res.StatusCode, out
+	return e.c.Multipart("/statements/parse", fields, fileField, fileName, content)
 }
 
-func (e *stmtEnv) do(method, path string, body any) (int, map[string]any, []byte) {
-	e.t.Helper()
-	var r io.Reader
-	if body != nil {
-		b, _ := json.Marshal(body)
-		r = bytes.NewReader(b)
-	}
-	req, _ := http.NewRequest(method, e.srv.URL+"/api/v1"+path, r)
-	req.Header.Set("Content-Type", "application/json")
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		e.t.Fatal(err)
-	}
-	defer res.Body.Close()
-	raw, _ := io.ReadAll(res.Body)
-	out := map[string]any{}
-	if bytes.HasPrefix(bytes.TrimSpace(raw), []byte("{")) {
-		_ = json.Unmarshal(raw, &out)
-	}
-	return res.StatusCode, out, raw
+func (e *stmtEnv) do(method, path string, body any) (int, map[string]any) {
+	e.T.Helper()
+	return e.c.Do(method, path, body)
 }
 
 func readFile(t *testing.T, path string) []byte {
@@ -126,7 +90,7 @@ func readFile(t *testing.T, path string) []byte {
 	return b
 }
 
-func data(m map[string]any) map[string]any { d, _ := m["data"].(map[string]any); return d }
+func data(m map[string]any) map[string]any { return testutil.Data(m) }
 func errCode(m map[string]any) string {
 	e, _ := m["error"].(map[string]any)
 	c, _ := e["code"].(string)
@@ -149,8 +113,22 @@ func importBody(preview map[string]any, account string, extra map[string]any) ma
 	return body
 }
 
+// importFixture parses and imports the plain fixture, returning the statement id.
+func (e *stmtEnv) importFixture() string {
+	e.T.Helper()
+	st, body := e.upload("f.pdf", readFile(e.T, fixturePlain), map[string]string{"account_id": e.account})
+	if st != 200 {
+		e.T.Fatalf("parse: %d %v", st, body)
+	}
+	st, body = e.do("POST", "/statements/import", importBody(data(body), e.account, nil))
+	if st != 201 {
+		e.T.Fatalf("import: %d %v", st, body)
+	}
+	return data(body)["id"].(string)
+}
+
 func TestStatementParseImportFlow(t *testing.T) {
-	e := newStmtEnv(t, 1<<20)
+	e := newStmtEnv(t)
 	plain := readFile(t, fixturePlain)
 
 	// Parse.
@@ -199,7 +177,7 @@ func TestStatementParseImportFlow(t *testing.T) {
 	}
 
 	// Import.
-	st, body, _ = e.do("POST", "/statements/import", importBody(p, e.account, nil))
+	st, body = e.do("POST", "/statements/import", importBody(p, e.account, nil))
 	if st != 201 {
 		t.Fatalf("import: %d %v", st, body)
 	}
@@ -212,23 +190,35 @@ func TestStatementParseImportFlow(t *testing.T) {
 	if imported["file_sha256"] != p["file_sha256"] || imported["file_name"] != p["file_name"] || imported["account_number"] != "********7890" {
 		t.Fatalf("imported meta: %v", imported)
 	}
+	if _, ok := imported["user_id"]; ok {
+		t.Fatalf("user_id must not be serialised: %v", imported)
+	}
 	if _, err := os.Stat(filepath.Join(e.dir, id+".pdf")); err != nil {
 		t.Fatalf("audit copy missing: %v", err)
 	}
 	if left, _ := filepath.Glob(filepath.Join(e.dir, "pending", "*")); len(left) != 0 {
 		t.Fatalf("pending not cleaned: %v", left)
 	}
+	var owner string
+	if err := e.DB.QueryRow(`SELECT user_id FROM bank_statements WHERE id = ?`, id).Scan(&owner); err != nil || owner != e.c.UserID {
+		t.Fatalf("statement owner: %q %v", owner, err)
+	}
+	var foreign int
+	_ = e.DB.QueryRow(`SELECT COUNT(*) FROM bank_transactions WHERE statement_id = ? AND user_id <> ?`, id, e.c.UserID).Scan(&foreign)
+	if foreign != 0 {
+		t.Fatalf("%d bank rows stored under another user", foreign)
+	}
 
 	// Reads.
-	st, body, _ = e.do("GET", "/statements", nil)
+	st, body = e.do("GET", "/statements", nil)
 	if st != 200 || len(body["data"].([]any)) != 1 {
 		t.Fatalf("list: %d %v", st, body)
 	}
-	st, body, _ = e.do("GET", "/statements/"+id, nil)
+	st, body = e.do("GET", "/statements/"+id, nil)
 	if st != 200 || data(body)["id"] != id {
 		t.Fatalf("get: %d %v", st, body)
 	}
-	st, body, _ = e.do("GET", "/statements/"+id+"/transactions", nil)
+	st, body = e.do("GET", "/statements/"+id+"/transactions", nil)
 	if st != 200 {
 		t.Fatalf("transactions: %d %v", st, body)
 	}
@@ -251,15 +241,9 @@ func TestStatementParseImportFlow(t *testing.T) {
 	if first["description"] != "SALARY CREDIT OCT 2026 DRUK DEMO" || first["credit"].(float64) != 6500000 || first["reference"] != "SAL0001" {
 		t.Fatalf("first row: %v", first)
 	}
-	req, _ := http.NewRequest(http.MethodGet, e.srv.URL+"/api/v1/statements/"+id+"/file", nil)
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	raw, _ := io.ReadAll(res.Body)
-	res.Body.Close()
-	if res.StatusCode != 200 || res.Header.Get("Content-Type") != "application/pdf" || !bytes.Equal(raw, plain) {
-		t.Fatalf("file: %d %s len=%d", res.StatusCode, res.Header.Get("Content-Type"), len(raw))
+	fst, raw, hdr := e.c.Get("/statements/" + id + "/file")
+	if fst != 200 || hdr.Get("Content-Type") != "application/pdf" || !bytes.Equal(raw, plain) {
+		t.Fatalf("file: %d %s len=%d", fst, hdr.Get("Content-Type"), len(raw))
 	}
 
 	// Same bytes again -> sha256 duplicate and every row flagged.
@@ -277,21 +261,21 @@ func TestStatementParseImportFlow(t *testing.T) {
 			t.Fatalf("row should be duplicate: %v", r)
 		}
 	}
-	st, body, _ = e.do("POST", "/statements/import", importBody(p2, e.account, nil))
+	st, body = e.do("POST", "/statements/import", importBody(p2, e.account, nil))
 	if st != 409 || errCode(body) != "duplicate_statement" {
 		t.Fatalf("import dup: %d %v", st, body)
 	}
 	// skip_duplicates=false with existing rows is refused before anything is written.
-	st, body, _ = e.do("POST", "/statements/import", importBody(p2, e.account, map[string]any{"force": true, "skip_duplicates": false}))
+	st, body = e.do("POST", "/statements/import", importBody(p2, e.account, map[string]any{"force": true, "skip_duplicates": false}))
 	if st != 409 || errCode(body) != "duplicate_bank_transaction" {
 		t.Fatalf("import no-skip: %d %v", st, body)
 	}
-	st, body, _ = e.do("GET", "/statements", nil)
+	_, body = e.do("GET", "/statements", nil)
 	if len(body["data"].([]any)) != 1 {
 		t.Fatalf("refused import must not persist: %v", body)
 	}
 	// force -> second statement, all rows skipped.
-	st, body, _ = e.do("POST", "/statements/import", importBody(p2, e.account, map[string]any{"force": true}))
+	st, body = e.do("POST", "/statements/import", importBody(p2, e.account, map[string]any{"force": true}))
 	if st != 201 {
 		t.Fatalf("import force: %d %v", st, body)
 	}
@@ -314,7 +298,7 @@ func TestStatementParseImportFlow(t *testing.T) {
 		t.Fatalf("period duplicate: %v", data(body)["duplicate_statement"])
 	}
 	// Move the imported periods away: now only the fingerprints give it away.
-	if _, err := e.db.Exec(`UPDATE bank_statements SET period_start = '2025-01-01', period_end = '2025-01-31'`); err != nil {
+	if _, err := e.DB.Exec(`UPDATE bank_statements SET period_start = '2025-01-01', period_end = '2025-01-31' WHERE user_id = ?`, e.c.UserID); err != nil {
 		t.Fatal(err)
 	}
 	st, body = e.upload("enc.pdf", enc, map[string]string{"account_id": e.account, "password": fixturePassword})
@@ -327,34 +311,34 @@ func TestStatementParseImportFlow(t *testing.T) {
 	}
 
 	// Delete the first statement: its rows and file go, nothing else does.
-	st, _, _ = e.do("DELETE", "/statements/"+id, nil)
+	st, _ = e.do("DELETE", "/statements/"+id, nil)
 	if st != 204 {
 		t.Fatalf("delete: %d", st)
 	}
 	if _, err := os.Stat(filepath.Join(e.dir, id+".pdf")); !os.IsNotExist(err) {
 		t.Fatalf("audit copy should be removed: %v", err)
 	}
-	st, _, _ = e.do("GET", "/statements/"+id+"/transactions", nil)
+	st, _ = e.do("GET", "/statements/"+id+"/transactions", nil)
 	if st != 404 {
 		t.Fatalf("transactions after delete: %d", st)
 	}
-	st, _, _ = e.do("DELETE", "/statements/"+id, nil)
+	st, _ = e.do("DELETE", "/statements/"+id, nil)
 	if st != 404 {
 		t.Fatalf("second delete: %d", st)
 	}
 	var n int
-	_ = e.db.QueryRow(`SELECT COUNT(*) FROM bank_transactions`).Scan(&n)
+	_ = e.DB.QueryRow(`SELECT COUNT(*) FROM bank_transactions`).Scan(&n)
 	if n != 0 {
 		t.Fatalf("bank transactions left: %d", n)
 	}
-	st, body, _ = e.do("GET", "/statements", nil)
+	_, body = e.do("GET", "/statements", nil)
 	if len(body["data"].([]any)) != 1 {
 		t.Fatalf("forced statement should remain: %v", body)
 	}
 }
 
 func TestStatementParseErrors(t *testing.T) {
-	e := newStmtEnv(t, 1<<20)
+	e := newStmtEnv(t)
 	plain := readFile(t, fixturePlain)
 	enc := readFile(t, fixtureEncrypted)
 
@@ -389,7 +373,7 @@ func TestStatementParseErrors(t *testing.T) {
 }
 
 func TestStatementParseTooLarge(t *testing.T) {
-	e := newStmtEnv(t, 1024)
+	e := newStmtEnvWithLimit(t, 1024)
 	plain := readFile(t, fixturePlain)
 	st, body := e.upload("f.pdf", plain, map[string]string{"account_id": e.account})
 	if st != 413 || errCode(body) != "payload_too_large" {
@@ -403,7 +387,7 @@ func TestStatementParseTooLarge(t *testing.T) {
 }
 
 func TestStatementImportValidation(t *testing.T) {
-	e := newStmtEnv(t, 1<<20)
+	e := newStmtEnv(t)
 	plain := readFile(t, fixturePlain)
 	st, body := e.upload("f.pdf", plain, map[string]string{"account_id": e.account})
 	if st != 200 {
@@ -411,15 +395,15 @@ func TestStatementImportValidation(t *testing.T) {
 	}
 	p := data(body)
 
-	st, body, _ = e.do("POST", "/statements/import", map[string]any{"upload_token": "zzz", "account_id": e.account, "statement": p["statement"], "transactions": p["transactions"]})
+	st, body = e.do("POST", "/statements/import", map[string]any{"upload_token": "zzz", "account_id": e.account, "statement": p["statement"], "transactions": p["transactions"]})
 	if st != 422 || errCode(body) != "validation_error" {
 		t.Fatalf("bad token: %d %v", st, body)
 	}
-	st, body, _ = e.do("POST", "/statements/import", map[string]any{"upload_token": "0123456789abcdef0123456789abcdef", "account_id": e.account, "statement": p["statement"], "transactions": p["transactions"]})
+	st, body = e.do("POST", "/statements/import", map[string]any{"upload_token": "0123456789abcdef0123456789abcdef", "account_id": e.account, "statement": p["statement"], "transactions": p["transactions"]})
 	if st != 400 {
 		t.Fatalf("unknown token: %d %v", st, body)
 	}
-	st, body, _ = e.do("POST", "/statements/import", "not json")
+	st, body = e.do("POST", "/statements/import", "not json")
 	if st != 400 {
 		t.Fatalf("bad json: %d %v", st, body)
 	}
@@ -430,7 +414,7 @@ func TestStatementImportValidation(t *testing.T) {
 	bad["credit"] = 100
 	rows[1].(map[string]any)["transaction_date"] = "31-10-2026"
 	rows[2].(map[string]any)["debit"] = -5
-	st, body, _ = e.do("POST", "/statements/import", importBody(p, e.account, nil))
+	st, body = e.do("POST", "/statements/import", importBody(p, e.account, nil))
 	if st != 422 {
 		t.Fatalf("bad rows: %d %v", st, body)
 	}
@@ -441,24 +425,24 @@ func TestStatementImportValidation(t *testing.T) {
 		}
 	}
 	// Nothing was written and the token is still usable.
-	st, body, _ = e.do("GET", "/statements", nil)
+	_, body = e.do("GET", "/statements", nil)
 	if len(body["data"].([]any)) != 0 {
 		t.Fatalf("statements written on failed import: %v", body)
 	}
 
 	// Edited rows are accepted and fingerprints recomputed server-side.
-	st, body = e.upload("f.pdf", plain, map[string]string{"account_id": e.account})
+	_, body = e.upload("f.pdf", plain, map[string]string{"account_id": e.account})
 	p = data(body)
 	rows = p["transactions"].([]any)
 	edited := rows[0].(map[string]any)
 	edited["description"] = "EDITED DESCRIPTION"
 	oldFP := edited["fingerprint"].(string)
-	st, body, _ = e.do("POST", "/statements/import", importBody(p, e.account, map[string]any{"skip_duplicates": false}))
+	st, body = e.do("POST", "/statements/import", importBody(p, e.account, map[string]any{"skip_duplicates": false}))
 	if st != 201 {
 		t.Fatalf("import edited: %d %v", st, body)
 	}
 	id := data(body)["id"].(string)
-	st, body, _ = e.do("GET", "/statements/"+id+"/transactions", nil)
+	_, body = e.do("GET", "/statements/"+id+"/transactions", nil)
 	first := body["data"].([]any)[0].(map[string]any)
 	if first["description"] != "EDITED DESCRIPTION" || first["fingerprint"] == oldFP {
 		t.Fatalf("fingerprint not recomputed: %v", first)
@@ -466,27 +450,18 @@ func TestStatementImportValidation(t *testing.T) {
 }
 
 func TestStatementTransactionsShowMatches(t *testing.T) {
-	e := newStmtEnv(t, 1<<20)
-	plain := readFile(t, fixturePlain)
-	st, body := e.upload("f.pdf", plain, map[string]string{"account_id": e.account})
-	if st != 200 {
-		t.Fatalf("parse: %d %v", st, body)
-	}
-	st, body, _ = e.do("POST", "/statements/import", importBody(data(body), e.account, nil))
-	if st != 201 {
-		t.Fatalf("import: %d %v", st, body)
-	}
-	id := data(body)["id"].(string)
+	e := newStmtEnv(t)
+	id := e.importFixture()
 
 	// A manual transaction, matched to the first bank row by the (future)
 	// reconciliation domain; plus one ignored row.
-	st, body, _ = e.do("POST", "/transactions", map[string]any{"type": "income", "amount": 6500000, "account_id": e.account, "category_id": "cat-salary", "transaction_date": "2026-10-01", "description": "Salary"})
+	st, body := e.do("POST", "/transactions", map[string]any{"type": "income", "amount": 6500000, "account_id": e.account, "category_id": e.c.Category("Salary"), "transaction_date": "2026-10-01", "description": "Salary"})
 	if st != 201 {
 		t.Fatalf("create tx: %d %v", st, body)
 	}
 	txID := data(body)["id"].(string)
 	var bank1, bank2 string
-	rows, err := e.db.Query(`SELECT id FROM bank_transactions WHERE statement_id = ? ORDER BY line_no LIMIT 2`, id)
+	rows, err := e.DB.Query(`SELECT id FROM bank_transactions WHERE statement_id = ? ORDER BY line_no LIMIT 2`, id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -499,21 +474,21 @@ func TestStatementTransactionsShowMatches(t *testing.T) {
 	}
 	rows.Close()
 	now := models.NowUTC()
-	if _, err := e.db.Exec(`INSERT INTO reconciliations (id, bank_transaction_id, transaction_id, status, match_type, rule, confidence, created_at) VALUES (?,?,?,?,?,?,?,?)`,
-		services.NewID(), bank1, txID, "matched", "auto", "exact_date", 100, now); err != nil {
+	if _, err := e.DB.Exec(`INSERT INTO reconciliations (user_id, id, bank_transaction_id, transaction_id, status, match_type, rule, confidence, created_at) VALUES (?,?,?,?,?,?,?,?,?)`,
+		e.c.UserID, services.NewID(), bank1, txID, "matched", "auto", "exact_date", 100, now); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := e.db.Exec(`INSERT INTO reconciliations (id, bank_transaction_id, transaction_id, status, match_type, note, created_at) VALUES (?,?,NULL,?,?,?,?)`,
-		services.NewID(), bank2, "ignored", "manual", "bank fee", now); err != nil {
+	if _, err := e.DB.Exec(`INSERT INTO reconciliations (user_id, id, bank_transaction_id, transaction_id, status, match_type, note, created_at) VALUES (?,?,?,NULL,?,?,?,?)`,
+		e.c.UserID, services.NewID(), bank2, "ignored", "manual", "bank fee", now); err != nil {
 		t.Fatal(err)
 	}
 
-	st, body, _ = e.do("GET", "/statements/"+id, nil)
+	_, body = e.do("GET", "/statements/"+id, nil)
 	s := data(body)
 	if s["matched_count"].(float64) != 1 || s["ignored_count"].(float64) != 1 || s["unmatched_count"].(float64) != fixtureRowCount-2 {
 		t.Fatalf("counts: %v", s)
 	}
-	st, body, _ = e.do("GET", "/statements/"+id+"/transactions", nil)
+	_, body = e.do("GET", "/statements/"+id+"/transactions", nil)
 	list := body["data"].([]any)
 	r0 := list[0].(map[string]any)
 	if r0["status"] != "matched" || r0["transaction"] == nil || r0["transaction"].(map[string]any)["id"] != txID || r0["reconciliation"].(map[string]any)["rule"] != "exact_date" {
@@ -525,19 +500,133 @@ func TestStatementTransactionsShowMatches(t *testing.T) {
 	}
 
 	// Deleting the statement cascades the reconciliation but keeps the manual transaction.
-	st, _, _ = e.do("DELETE", "/statements/"+id, nil)
+	st, _ = e.do("DELETE", "/statements/"+id, nil)
 	if st != 204 {
 		t.Fatalf("delete: %d", st)
 	}
-	st, body, _ = e.do("GET", "/transactions/"+txID, nil)
+	st, body = e.do("GET", "/transactions/"+txID, nil)
 	if st != 200 || data(body)["reconciliation_status"] != nil { // omitempty: absent when unmatched
 		t.Fatalf("manual transaction after delete: %d %v", st, body)
 	}
 	var n int
-	_ = e.db.QueryRow(`SELECT COUNT(*) FROM reconciliations`).Scan(&n)
+	_ = e.DB.QueryRow(`SELECT COUNT(*) FROM reconciliations`).Scan(&n)
 	if n != 0 {
 		t.Fatalf("reconciliations left: %d", n)
 	}
+}
+
+// Statements are private to the user who imported them: another user cannot
+// list, read, download or delete them, cannot import into the owner's
+// account, and the owner's rows never flag the other user's upload of the
+// same PDF as a duplicate.
+func TestStatementIsolation(t *testing.T) {
+	a := newStmtEnv(t)
+	plain := readFile(t, fixturePlain)
+	id := a.importFixture()
+
+	bob := a.Register(a.c, "Bob", "bob@example.com")
+	b := a.as(bob, bob.CreateAccount("Bob's BOB", "bank", 0))
+
+	t.Run("B cannot see A's statement", func(t *testing.T) {
+		if st, body := b.do("GET", "/statements", nil); st != 200 || len(body["data"].([]any)) != 0 {
+			t.Fatalf("B list: %d %v", st, body)
+		}
+		for _, path := range []string{"/statements/" + id, "/statements/" + id + "/transactions"} {
+			if st, body := b.do("GET", path, nil); st != 404 || errCode(body) != "not_found" {
+				t.Fatalf("B GET %s: %d %v", path, st, body)
+			}
+		}
+		if st, _, _ := bob.Get("/statements/" + id + "/file"); st != 404 {
+			t.Fatalf("B file: %d", st)
+		}
+		if st, body := b.do("DELETE", "/statements/"+id, nil); st != 404 || errCode(body) != "not_found" {
+			t.Fatalf("B delete: %d %v", st, body)
+		}
+		if st, body := a.do("GET", "/statements/"+id, nil); st != 200 || data(body)["transaction_count"].(float64) != fixtureRowCount {
+			t.Fatalf("A's statement must survive B's delete: %d %v", st, body)
+		}
+		if _, err := os.Stat(filepath.Join(a.dir, id+".pdf")); err != nil {
+			t.Fatalf("A's audit copy must survive B's delete: %v", err)
+		}
+	})
+
+	t.Run("B cannot parse or import into A's account", func(t *testing.T) {
+		st, body := b.upload("f.pdf", plain, map[string]string{"account_id": a.account})
+		if st != 422 || errCode(body) != "validation_error" {
+			t.Fatalf("B parse into A's account: %d %v", st, body)
+		}
+		st, body = b.upload("f.pdf", plain, map[string]string{"account_id": b.account})
+		if st != 200 {
+			t.Fatalf("B parse: %d %v", st, body)
+		}
+		st, body = b.do("POST", "/statements/import", importBody(data(body), a.account, nil))
+		if st != 422 || errCode(body) != "validation_error" {
+			t.Fatalf("B import into A's account: %d %v", st, body)
+		}
+		if st, body := a.do("GET", "/statements", nil); st != 200 || len(body["data"].([]any)) != 1 {
+			t.Fatalf("A must still own exactly one statement: %d %v", st, body)
+		}
+	})
+
+	var bID string
+	t.Run("A's rows do not mark B's identical upload as duplicate", func(t *testing.T) {
+		st, body := b.upload("same.pdf", plain, map[string]string{"account_id": b.account})
+		if st != 200 {
+			t.Fatalf("B parse: %d %v", st, body)
+		}
+		p := data(body)
+		if p["duplicate_statement"] != nil {
+			t.Fatalf("A's statement leaked into B's duplicate check: %v", p["duplicate_statement"])
+		}
+		for _, r := range p["transactions"].([]any) {
+			if r.(map[string]any)["is_duplicate"].(bool) {
+				t.Fatalf("A's fingerprints leaked into B's preview: %v", r)
+			}
+		}
+		st, body = b.do("POST", "/statements/import", importBody(p, b.account, nil))
+		if st != 201 {
+			t.Fatalf("B import: %d %v", st, body)
+		}
+		imported := data(body)
+		bID = imported["id"].(string)
+		if imported["transaction_count"].(float64) != fixtureRowCount || imported["skipped_duplicates"].(float64) != 0 {
+			t.Fatalf("B's import must store every row: %v", imported)
+		}
+		var owner string
+		if err := a.DB.QueryRow(`SELECT user_id FROM bank_statements WHERE id = ?`, bID).Scan(&owner); err != nil || owner != bob.UserID {
+			t.Fatalf("B's statement owner: %q %v", owner, err)
+		}
+	})
+
+	t.Run("each user lists only their own", func(t *testing.T) {
+		for _, c := range []struct {
+			env  *stmtEnv
+			want string
+		}{{a, id}, {b, bID}} {
+			st, body := c.env.do("GET", "/statements", nil)
+			l := body["data"].([]any)
+			if st != 200 || len(l) != 1 || l[0].(map[string]any)["id"] != c.want {
+				t.Fatalf("list for %s: %d %v", c.env.c.Email, st, body)
+			}
+		}
+		if st, _ := a.do("GET", "/statements/"+bID, nil); st != 404 {
+			t.Fatalf("A GET B's statement: %d", st)
+		}
+	})
+
+	t.Run("deleting own statement leaves the other user's intact", func(t *testing.T) {
+		if st, _ := b.do("DELETE", "/statements/"+bID, nil); st != 204 {
+			t.Fatalf("B delete own: %d", st)
+		}
+		if st, body := a.do("GET", "/statements/"+id+"/transactions", nil); st != 200 || len(body["data"].([]any)) != fixtureRowCount {
+			t.Fatalf("A's rows after B's delete: %d %v", st, body)
+		}
+		var n int
+		_ = a.DB.QueryRow(`SELECT COUNT(*) FROM bank_transactions WHERE user_id = ?`, bob.UserID).Scan(&n)
+		if n != 0 {
+			t.Fatalf("B's rows left: %d", n)
+		}
+	})
 }
 
 // pdfWithoutTable is a minimal single-page PDF whose only text is prose.

@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"testing"
+
+	"github.com/bugloper/xpensiv/internal/auth"
 )
 
 // Errors raised by Echo itself (unknown route, wrong method, body limit) must
@@ -25,9 +27,10 @@ func TestEchoErrorsUseContractCodes(t *testing.T) {
 		t.Fatalf("wrong method: %d %v", st, body)
 	}
 	// BodyLimit is MaxUploadBytes*12 = 12 MiB in newEnv.
-	req, _ := http.NewRequest("POST", e.srv.URL+"/api/v1/transactions", bytes.NewReader(make([]byte, 13<<20)))
+	req, _ := http.NewRequest("POST", e.Env.Srv.URL+"/api/v1/transactions", bytes.NewReader(make([]byte, 13<<20)))
 	req.Header.Set("Content-Type", "application/json")
-	res, err := http.DefaultClient.Do(req)
+	req.Header.Set(auth.ClientHeader, "test")
+	res, err := e.HTTP.Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -2,14 +2,17 @@ package repositories
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 
 	"github.com/bugloper/xpensiv/internal/models"
 )
 
+// SettingsRepo stores per-user key/value settings.
 type SettingsRepo struct{}
 
-func (SettingsRepo) All(ctx context.Context, db DBTX) (map[string]string, error) {
-	rows, err := db.QueryContext(ctx, `SELECT key, value FROM settings`)
+func (SettingsRepo) All(ctx context.Context, db DBTX, userID string) (map[string]string, error) {
+	rows, err := db.QueryContext(ctx, `SELECT key, value FROM settings WHERE user_id = ?`, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -25,20 +28,20 @@ func (SettingsRepo) All(ctx context.Context, db DBTX) (map[string]string, error)
 	return out, rows.Err()
 }
 
-func (SettingsRepo) Get(ctx context.Context, db DBTX, key, def string) (string, error) {
+func (SettingsRepo) Get(ctx context.Context, db DBTX, userID, key, def string) (string, error) {
 	var v string
-	err := db.QueryRowContext(ctx, `SELECT value FROM settings WHERE key = ?`, key).Scan(&v)
+	err := db.QueryRowContext(ctx, `SELECT value FROM settings WHERE user_id = ? AND key = ?`, userID, key).Scan(&v)
+	if errors.Is(err, sql.ErrNoRows) {
+		return def, nil
+	}
 	if err != nil {
-		if err.Error() == "sql: no rows in result set" {
-			return def, nil
-		}
 		return def, err
 	}
 	return v, nil
 }
 
-func (SettingsRepo) Set(ctx context.Context, db DBTX, key, value string) error {
-	_, err := db.ExecContext(ctx, `INSERT INTO settings (key, value, updated_at) VALUES (?,?,?)
-		ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`, key, value, models.NowUTC())
+func (SettingsRepo) Set(ctx context.Context, db DBTX, userID, key, value string) error {
+	_, err := db.ExecContext(ctx, `INSERT INTO settings (user_id, key, value, updated_at) VALUES (?,?,?,?)
+		ON CONFLICT(user_id, key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`, userID, key, value, models.NowUTC())
 	return err
 }

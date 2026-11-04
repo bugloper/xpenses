@@ -13,6 +13,8 @@ services:
       XPENSIV_LOG_LEVEL: info
       XPENSIV_MAX_UPLOAD_BYTES: "10485760"
       XPENSIV_DEFAULT_CURRENCY: BTN
+      XPENSIV_SECURE_COOKIES: auto
+      XPENSIV_TRUSTED_PROXY: "false"
 
 volumes:
   xpensiv-data:

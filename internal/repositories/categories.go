@@ -10,13 +10,13 @@ import (
 
 type CategoryRepo struct{}
 
-const categoryCols = `id, name, icon, color, type, parent_id, is_active, is_system, sort_order, created_at, updated_at`
+const categoryCols = `user_id, id, name, icon, color, type, parent_id, is_active, is_system, sort_order, created_at, updated_at`
 
 func scanCategory(s interface{ Scan(...any) error }) (*models.Category, error) {
 	var c models.Category
 	var parent sql.NullString
 	var active, system int
-	if err := s.Scan(&c.ID, &c.Name, &c.Icon, &c.Color, &c.Type, &parent, &active, &system, &c.SortOrder, &c.CreatedAt, &c.UpdatedAt); err != nil {
+	if err := s.Scan(&c.UserID, &c.ID, &c.Name, &c.Icon, &c.Color, &c.Type, &parent, &active, &system, &c.SortOrder, &c.CreatedAt, &c.UpdatedAt); err != nil {
 		return nil, err
 	}
 	c.ParentID = strPtr(parent)
@@ -25,13 +25,13 @@ func scanCategory(s interface{ Scan(...any) error }) (*models.Category, error) {
 	return &c, nil
 }
 
-func (CategoryRepo) List(ctx context.Context, db DBTX, includeInactive bool) ([]models.Category, error) {
-	q := `SELECT ` + categoryCols + ` FROM categories`
+func (CategoryRepo) List(ctx context.Context, db DBTX, userID string, includeInactive bool) ([]models.Category, error) {
+	q := `SELECT ` + categoryCols + ` FROM categories WHERE user_id = ?`
 	if !includeInactive {
-		q += ` WHERE is_active = 1`
+		q += ` AND is_active = 1`
 	}
 	q += ` ORDER BY type, sort_order, name`
-	rows, err := db.QueryContext(ctx, q)
+	rows, err := db.QueryContext(ctx, q, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -47,8 +47,8 @@ func (CategoryRepo) List(ctx context.Context, db DBTX, includeInactive bool) ([]
 	return out, rows.Err()
 }
 
-func (CategoryRepo) Get(ctx context.Context, db DBTX, id string) (*models.Category, error) {
-	c, err := scanCategory(db.QueryRowContext(ctx, `SELECT `+categoryCols+` FROM categories WHERE id = ?`, id))
+func (CategoryRepo) Get(ctx context.Context, db DBTX, userID, id string) (*models.Category, error) {
+	c, err := scanCategory(db.QueryRowContext(ctx, `SELECT `+categoryCols+` FROM categories WHERE id = ? AND user_id = ?`, id, userID))
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -57,14 +57,14 @@ func (CategoryRepo) Get(ctx context.Context, db DBTX, id string) (*models.Catego
 
 func (CategoryRepo) Insert(ctx context.Context, db DBTX, c *models.Category) error {
 	_, err := db.ExecContext(ctx, `INSERT INTO categories
-		(id, name, icon, color, type, parent_id, is_active, is_system, sort_order, created_at, updated_at)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-		c.ID, c.Name, c.Icon, c.Color, c.Type, nullStr(c.ParentID), boolInt(c.IsActive), boolInt(c.IsSystem), c.SortOrder, c.CreatedAt, c.UpdatedAt)
+		(user_id, id, name, icon, color, type, parent_id, is_active, is_system, sort_order, created_at, updated_at)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+		c.UserID, c.ID, c.Name, c.Icon, c.Color, c.Type, nullStr(c.ParentID), boolInt(c.IsActive), boolInt(c.IsSystem), c.SortOrder, c.CreatedAt, c.UpdatedAt)
 	return err
 }
 
 func (CategoryRepo) Update(ctx context.Context, db DBTX, c *models.Category) error {
-	_, err := db.ExecContext(ctx, `UPDATE categories SET name=?, icon=?, color=?, parent_id=?, is_active=?, sort_order=?, updated_at=? WHERE id=?`,
-		c.Name, c.Icon, c.Color, nullStr(c.ParentID), boolInt(c.IsActive), c.SortOrder, c.UpdatedAt, c.ID)
+	_, err := db.ExecContext(ctx, `UPDATE categories SET name=?, icon=?, color=?, parent_id=?, is_active=?, sort_order=?, updated_at=? WHERE id=? AND user_id=?`,
+		c.Name, c.Icon, c.Color, nullStr(c.ParentID), boolInt(c.IsActive), c.SortOrder, c.UpdatedAt, c.ID, c.UserID)
 	return err
 }

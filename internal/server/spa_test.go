@@ -48,7 +48,8 @@ func TestSPAServing(t *testing.T) {
 		{"/reconciliation/some-id", "app", "text/html", "no-cache", 200},
 		{"/manifest.webmanifest", "{}", "application/manifest+json", "no-cache", 200},
 		{"/assets/app-abc.js", "1", "javascript", "immutable", 200},
-		{"/api/v1/does-not-exist", "not_found", "application/json", "no-store", 404},
+		// Anonymous: the auth gate answers before routing resolves, never the SPA.
+		{"/api/v1/does-not-exist", "unauthenticated", "application/json", "no-store", 401},
 	}
 	for _, c := range cases {
 		res, body := get(c.path)

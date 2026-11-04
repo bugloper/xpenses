@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"strings"
 
+	"github.com/bugloper/xpensiv/internal/auth"
 	"github.com/bugloper/xpensiv/internal/dto"
 	apperr "github.com/bugloper/xpensiv/internal/errors"
 	"github.com/bugloper/xpensiv/internal/models"
@@ -19,7 +20,7 @@ type BudgetService struct {
 }
 
 func (s *BudgetService) List(ctx context.Context) ([]models.Budget, error) {
-	return s.Repo.List(ctx, s.DB)
+	return s.Repo.List(ctx, s.DB, auth.UserID(ctx))
 }
 
 func (s *BudgetService) Create(ctx context.Context, req dto.CreateBudgetRequest) (*models.Budget, error) {
@@ -29,7 +30,7 @@ func (s *BudgetService) Create(ctx context.Context, req dto.CreateBudgetRequest)
 		v.Add("amount", "must not be negative")
 	}
 	if req.CategoryID != "" {
-		c, err := s.Categories.Get(ctx, s.DB, req.CategoryID)
+		c, err := s.Categories.Get(ctx, s.DB, auth.UserID(ctx), req.CategoryID)
 		if err != nil {
 			return nil, apperr.Internal(err)
 		}
@@ -43,7 +44,7 @@ func (s *BudgetService) Create(ctx context.Context, req dto.CreateBudgetRequest)
 		return nil, err
 	}
 	now := models.NowUTC()
-	b := &models.Budget{ID: NewID(), CategoryID: req.CategoryID, Amount: req.Amount, CreatedAt: now, UpdatedAt: now}
+	b := &models.Budget{UserID: auth.UserID(ctx), ID: NewID(), CategoryID: req.CategoryID, Amount: req.Amount, CreatedAt: now, UpdatedAt: now}
 	if err := s.Repo.Insert(ctx, s.DB, b); err != nil {
 		if strings.Contains(err.Error(), "UNIQUE") {
 			return nil, apperr.Conflict("a budget already exists for this category")
@@ -54,7 +55,7 @@ func (s *BudgetService) Create(ctx context.Context, req dto.CreateBudgetRequest)
 }
 
 func (s *BudgetService) Update(ctx context.Context, id string, req dto.UpdateBudgetRequest) (*models.Budget, error) {
-	b, err := s.Repo.Get(ctx, s.DB, id)
+	b, err := s.Repo.Get(ctx, s.DB, auth.UserID(ctx), id)
 	if err != nil {
 		return nil, apperr.Internal(err)
 	}
@@ -75,14 +76,14 @@ func (s *BudgetService) Update(ctx context.Context, id string, req dto.UpdateBud
 }
 
 func (s *BudgetService) Delete(ctx context.Context, id string) error {
-	b, err := s.Repo.Get(ctx, s.DB, id)
+	b, err := s.Repo.Get(ctx, s.DB, auth.UserID(ctx), id)
 	if err != nil {
 		return apperr.Internal(err)
 	}
 	if b == nil {
 		return apperr.NotFound("budget")
 	}
-	if err := s.Repo.Delete(ctx, s.DB, id); err != nil {
+	if err := s.Repo.Delete(ctx, s.DB, auth.UserID(ctx), id); err != nil {
 		return apperr.Internal(err)
 	}
 	return nil

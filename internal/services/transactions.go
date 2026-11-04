@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"strings"
 
+	"github.com/bugloper/xpensiv/internal/auth"
 	"github.com/bugloper/xpensiv/internal/dto"
 	apperr "github.com/bugloper/xpensiv/internal/errors"
 	"github.com/bugloper/xpensiv/internal/models"
@@ -29,6 +30,7 @@ func (s *TransactionService) List(ctx context.Context, f dto.TransactionFilter) 
 	if f.PerPage < 1 || f.PerPage > 200 {
 		f.PerPage = 50
 	}
+	f.UserID = auth.UserID(ctx)
 	v := validators.Errors{}
 	v.Date("date_from", f.DateFrom)
 	v.Date("date_to", f.DateTo)
@@ -46,7 +48,7 @@ func (s *TransactionService) List(ctx context.Context, f dto.TransactionFilter) 
 }
 
 func (s *TransactionService) Get(ctx context.Context, id string) (*models.Transaction, error) {
-	t, err := s.Repo.Get(ctx, s.DB, id)
+	t, err := s.Repo.Get(ctx, s.DB, auth.UserID(ctx), id)
 	if err != nil {
 		return nil, apperr.Internal(err)
 	}
@@ -80,7 +82,7 @@ func (s *TransactionService) validate(ctx context.Context, db repositories.DBTX,
 	}
 	v.Currency("currency", t.Currency)
 
-	acct, err := s.Accounts.Get(ctx, db, t.AccountID)
+	acct, err := s.Accounts.Get(ctx, db, t.UserID, t.AccountID)
 	if err != nil {
 		return apperr.Internal(err)
 	}
@@ -95,7 +97,7 @@ func (s *TransactionService) validate(ctx context.Context, db repositories.DBTX,
 		} else if *t.TransferAccountID == t.AccountID {
 			v.Add("transfer_account_id", "must differ from the source account")
 		} else {
-			dest, err := s.Accounts.Get(ctx, db, *t.TransferAccountID)
+			dest, err := s.Accounts.Get(ctx, db, t.UserID, *t.TransferAccountID)
 			if err != nil {
 				return apperr.Internal(err)
 			}
@@ -111,7 +113,7 @@ func (s *TransactionService) validate(ctx context.Context, db repositories.DBTX,
 	default:
 		t.TransferAccountID = nil
 		if t.CategoryID != nil && *t.CategoryID != "" {
-			c, err := s.Categories.Get(ctx, db, *t.CategoryID)
+			c, err := s.Categories.Get(ctx, db, t.UserID, *t.CategoryID)
 			if err != nil {
 				return apperr.Internal(err)
 			}
@@ -136,7 +138,7 @@ func (s *TransactionService) validate(ctx context.Context, db repositories.DBTX,
 func (s *TransactionService) Create(ctx context.Context, req dto.CreateTransactionRequest) (*models.Transaction, bool, error) {
 	// Idempotent replay for the offline queue.
 	if req.ClientID != nil && *req.ClientID != "" {
-		existing, err := s.Repo.GetByClientID(ctx, s.DB, *req.ClientID)
+		existing, err := s.Repo.GetByClientID(ctx, s.DB, auth.UserID(ctx), *req.ClientID)
 		if err != nil {
 			return nil, false, apperr.Internal(err)
 		}
@@ -150,7 +152,7 @@ func (s *TransactionService) Create(ctx context.Context, req dto.CreateTransacti
 	}
 	now := models.NowUTC()
 	t := &models.Transaction{
-		ID: NewID(), Type: req.Type, Amount: req.Amount, Currency: req.Currency, AccountID: req.AccountID,
+		UserID: auth.UserID(ctx), ID: NewID(), Type: req.Type, Amount: req.Amount, Currency: req.Currency, AccountID: req.AccountID,
 		TransferAccountID: req.TransferAccountID, CategoryID: req.CategoryID,
 		Description: strings.TrimSpace(req.Description), Payee: strings.TrimSpace(req.Payee),
 		TransactionDate: req.TransactionDate, Notes: strings.TrimSpace(req.Notes),
@@ -166,7 +168,7 @@ func (s *TransactionService) Create(ctx context.Context, req dto.CreateTransacti
 		if err := s.Repo.Insert(ctx, tx, t); err != nil {
 			return apperr.Internal(err)
 		}
-		return s.Repo.SetTags(ctx, tx, t.ID, req.Tags, NewID)
+		return s.Repo.SetTags(ctx, tx, t.UserID, t.ID, req.Tags, NewID)
 	})
 	if err != nil {
 		return nil, false, err
@@ -235,7 +237,7 @@ func (s *TransactionService) Update(ctx context.Context, id string, req dto.Upda
 			return apperr.Internal(err)
 		}
 		if req.Tags != nil {
-			return s.Repo.SetTags(ctx, tx, t.ID, *req.Tags, NewID)
+			return s.Repo.SetTags(ctx, tx, t.UserID, t.ID, *req.Tags, NewID)
 		}
 		return nil
 	})
@@ -251,7 +253,7 @@ func (s *TransactionService) Delete(ctx context.Context, id string) error {
 	}
 	// Reconciliation rows referencing the transaction are removed by ON DELETE CASCADE,
 	// which keeps the bank transaction itself intact (it simply becomes unmatched again).
-	if err := s.Repo.Delete(ctx, s.DB, id); err != nil {
+	if err := s.Repo.Delete(ctx, s.DB, auth.UserID(ctx), id); err != nil {
 		return apperr.Internal(err)
 	}
 	return nil

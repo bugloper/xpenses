@@ -125,8 +125,11 @@ func IsEncrypted(data []byte) bool {
 	return len(data) >= len(backupMagic) && string(data[:len(backupMagic)]) == backupMagic
 }
 
-// restoreTables lists every data table in dependency order (parents first).
+// restoreTables lists every table in dependency order (parents first). A
+// restore replaces the whole instance, users and sessions included, so the
+// admin who triggered it must sign in again afterwards.
 var restoreTables = []string{
+	"users", "sessions", "login_attempts", "invites", "app_settings",
 	"accounts", "categories", "recurring_transactions", "transactions", "tags", "transaction_tags",
 	"bank_statements", "bank_transactions", "reconciliations", "budgets", "settings",
 }

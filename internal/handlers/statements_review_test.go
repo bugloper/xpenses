@@ -7,14 +7,14 @@ import "testing"
 // (which reads the statement totals) and the reconciliation report (which sums
 // the lines) agree.
 func TestStatementImportTotalsExcludeSkippedRows(t *testing.T) {
-	e := newStmtEnv(t, 1<<20)
+	e := newStmtEnv(t)
 	plain := readFile(t, fixturePlain)
 
 	st, body := e.upload("a.pdf", plain, map[string]string{"account_id": e.account})
 	if st != 200 {
 		t.Fatalf("parse: %d %v", st, body)
 	}
-	if st, body, _ = e.do("POST", "/statements/import", importBody(data(body), e.account, nil)); st != 201 {
+	if st, body = e.do("POST", "/statements/import", importBody(data(body), e.account, nil)); st != 201 {
 		t.Fatalf("import: %d %v", st, body)
 	}
 
@@ -30,7 +30,7 @@ func TestStatementImportTotalsExcludeSkippedRows(t *testing.T) {
 	first["description"] = first["description"].(string) + " (corrected)"
 	wantDebit, wantCredit := int64(first["debit"].(float64)), int64(first["credit"].(float64))
 
-	st, body, _ = e.do("POST", "/statements/import", importBody(p, e.account, map[string]any{"force": true}))
+	st, body = e.do("POST", "/statements/import", importBody(p, e.account, map[string]any{"force": true}))
 	if st != 201 {
 		t.Fatalf("forced import: %d %v", st, body)
 	}
@@ -43,7 +43,7 @@ func TestStatementImportTotalsExcludeSkippedRows(t *testing.T) {
 		t.Fatalf("totals must cover stored rows only: want %d/%d got %v/%v", wantDebit, wantCredit, s["total_debits"], s["total_credits"])
 	}
 	var sumD, sumC int64
-	if err := e.db.QueryRow(`SELECT COALESCE(SUM(debit),0), COALESCE(SUM(credit),0) FROM bank_transactions WHERE statement_id = ?`, id).Scan(&sumD, &sumC); err != nil {
+	if err := e.DB.QueryRow(`SELECT COALESCE(SUM(debit),0), COALESCE(SUM(credit),0) FROM bank_transactions WHERE statement_id = ?`, id).Scan(&sumD, &sumC); err != nil {
 		t.Fatal(err)
 	}
 	if sumD != wantDebit || sumC != wantCredit {
@@ -52,7 +52,7 @@ func TestStatementImportTotalsExcludeSkippedRows(t *testing.T) {
 	// The row-level fingerprint is recomputed server-side: a client-supplied
 	// value must not be trusted, so the stored one differs from the preview's.
 	var fp string
-	if err := e.db.QueryRow(`SELECT fingerprint FROM bank_transactions WHERE statement_id = ?`, id).Scan(&fp); err != nil {
+	if err := e.DB.QueryRow(`SELECT fingerprint FROM bank_transactions WHERE statement_id = ?`, id).Scan(&fp); err != nil {
 		t.Fatal(err)
 	}
 	if fp == first["fingerprint"].(string) {

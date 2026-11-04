@@ -43,7 +43,10 @@ func TestBackupAndRestore(t *testing.T) {
 	if err := database.Migrate(ctx, db); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(`INSERT INTO accounts (id,name,type,currency,opening_balance,opening_balance_date,created_at,updated_at) VALUES ('a1','Keep','cash','BTN',100,'2026-01-01','x','x')`); err != nil {
+	if _, err := db.Exec(`INSERT INTO users (id,email,name,password_hash,role,created_at,updated_at) VALUES ('u1','u@example.com','U','x','admin','x','x')`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO accounts (user_id,id,name,type,currency,opening_balance,opening_balance_date,created_at,updated_at) VALUES ('u1','a1','Keep','cash','BTN',100,'2026-01-01','x','x')`); err != nil {
 		t.Fatal(err)
 	}
 	svc := &BackupService{DB: db, DBPath: dbPath, BackupsDir: filepath.Join(dir, "backups")}
@@ -71,8 +74,8 @@ func TestBackupAndRestore(t *testing.T) {
 		t.Fatalf("restore did not revert: %q %v", name, err)
 	}
 	var n int
-	_ = db.QueryRow(`SELECT COUNT(*) FROM categories`).Scan(&n)
-	if n != 24 {
-		t.Fatalf("categories after restore: %d", n)
+	_ = db.QueryRow(`SELECT COUNT(*) FROM users`).Scan(&n)
+	if n != 1 {
+		t.Fatalf("users after restore: %d", n)
 	}
 }

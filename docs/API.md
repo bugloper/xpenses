@@ -4,6 +4,13 @@ Base path: `/api/v1`. All bodies are JSON unless stated. All monetary values are
 **integer minor units** (chhertum for BTN: `Nu. 12.50` is `1250`). Dates are
 `YYYY-MM-DD` local calendar dates. Timestamps are RFC3339 UTC.
 
+## Authentication
+
+Every endpoint below except `/health` and `/auth/*` requires a session cookie; mutating requests
+also need the `X-Xpensiv-Client` header. See `docs/AUTH.md`. All data is scoped to the signed-in
+user: ids belonging to another user behave as if they did not exist (`404`). `/backup` and
+`/restore` require the `admin` role.
+
 ## Envelopes
 
 - Single resource / object: `{"data": ...}`

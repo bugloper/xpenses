@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"strings"
 
+	"github.com/bugloper/xpensiv/internal/auth"
 	"github.com/bugloper/xpensiv/internal/dto"
 	apperr "github.com/bugloper/xpensiv/internal/errors"
 	"github.com/bugloper/xpensiv/internal/models"
@@ -18,11 +19,11 @@ type CategoryService struct {
 }
 
 func (s *CategoryService) List(ctx context.Context, includeInactive bool) ([]models.Category, error) {
-	return s.Repo.List(ctx, s.DB, includeInactive)
+	return s.Repo.List(ctx, s.DB, auth.UserID(ctx), includeInactive)
 }
 
 func (s *CategoryService) Get(ctx context.Context, id string) (*models.Category, error) {
-	c, err := s.Repo.Get(ctx, s.DB, id)
+	c, err := s.Repo.Get(ctx, s.DB, auth.UserID(ctx), id)
 	if err != nil {
 		return nil, apperr.Internal(err)
 	}
@@ -46,7 +47,7 @@ func (s *CategoryService) Create(ctx context.Context, req dto.CreateCategoryRequ
 		req.Icon = "circle"
 	}
 	if req.ParentID != nil && *req.ParentID != "" {
-		p, err := s.Repo.Get(ctx, s.DB, *req.ParentID)
+		p, err := s.Repo.Get(ctx, s.DB, auth.UserID(ctx), *req.ParentID)
 		if err != nil {
 			return nil, apperr.Internal(err)
 		}
@@ -60,7 +61,7 @@ func (s *CategoryService) Create(ctx context.Context, req dto.CreateCategoryRequ
 		return nil, err
 	}
 	now := models.NowUTC()
-	c := &models.Category{ID: NewID(), Name: req.Name, Icon: req.Icon, Color: req.Color, Type: req.Type,
+	c := &models.Category{UserID: auth.UserID(ctx), ID: NewID(), Name: req.Name, Icon: req.Icon, Color: req.Color, Type: req.Type,
 		ParentID: req.ParentID, IsActive: true, SortOrder: 100, CreatedAt: now, UpdatedAt: now}
 	if err := s.Repo.Insert(ctx, s.DB, c); err != nil {
 		if strings.Contains(err.Error(), "UNIQUE") {
@@ -94,7 +95,7 @@ func (s *CategoryService) Update(ctx context.Context, id string, req dto.UpdateC
 		} else if *req.ParentID == id {
 			v.Add("parent_id", "cannot be its own parent")
 		} else {
-			p, err := s.Repo.Get(ctx, s.DB, *req.ParentID)
+			p, err := s.Repo.Get(ctx, s.DB, auth.UserID(ctx), *req.ParentID)
 			if err != nil {
 				return nil, apperr.Internal(err)
 			}

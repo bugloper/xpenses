@@ -12,7 +12,7 @@ import (
 
 type TransactionRepo struct{}
 
-const txCols = `t.id, t.type, t.amount, t.currency, t.account_id, a.name, t.transfer_account_id, COALESCE(ta.name,''),
+const txCols = `t.user_id, t.id, t.type, t.amount, t.currency, t.account_id, a.name, t.transfer_account_id, COALESCE(ta.name,''),
 	t.category_id, COALESCE(c.name,''), COALESCE(c.icon,''), COALESCE(c.color,''),
 	t.description, t.payee, t.transaction_date, t.notes, t.origin, t.status, t.recurring_id,
 	t.source_bank_transaction_id, t.client_id, t.created_at, t.updated_at,
@@ -27,7 +27,7 @@ const txFrom = ` FROM transactions t
 func scanTx(s interface{ Scan(...any) error }) (*models.Transaction, error) {
 	var t models.Transaction
 	var transferID, catID, recID, srcID, clientID, bankTxID sql.NullString
-	if err := s.Scan(&t.ID, &t.Type, &t.Amount, &t.Currency, &t.AccountID, &t.AccountName, &transferID, &t.TransferAccountName,
+	if err := s.Scan(&t.UserID, &t.ID, &t.Type, &t.Amount, &t.Currency, &t.AccountID, &t.AccountName, &transferID, &t.TransferAccountName,
 		&catID, &t.CategoryName, &t.CategoryIcon, &t.CategoryColor,
 		&t.Description, &t.Payee, &t.TransactionDate, &t.Notes, &t.Origin, &t.Status, &recID,
 		&srcID, &clientID, &t.CreatedAt, &t.UpdatedAt, &bankTxID, &t.ReconciliationStatus); err != nil {
@@ -51,8 +51,9 @@ var sortColumns = map[string]string{
 }
 
 func buildFilter(f dto.TransactionFilter) (string, []any) {
-	var where []string
-	var args []any
+	// user_id is always applied; an empty id matches nothing.
+	where := []string{`t.user_id = ?`}
+	args := []any{f.UserID}
 	if f.Search != "" {
 		like := "%" + strings.ToLower(f.Search) + "%"
 		where = append(where, `(LOWER(t.description) LIKE ? OR LOWER(t.payee) LIKE ? OR LOWER(t.notes) LIKE ? OR LOWER(COALESCE(c.name,'')) LIKE ?)`)
@@ -90,9 +91,6 @@ func buildFilter(f dto.TransactionFilter) (string, []any) {
 	}
 	if f.Unmatched {
 		where = append(where, `r.id IS NULL`)
-	}
-	if len(where) == 0 {
-		return "", args
 	}
 	return " WHERE " + strings.Join(where, " AND "), args
 }
@@ -163,8 +161,8 @@ func attachTags(ctx context.Context, db DBTX, txs []models.Transaction) error {
 	return rows.Err()
 }
 
-func (TransactionRepo) Get(ctx context.Context, db DBTX, id string) (*models.Transaction, error) {
-	t, err := scanTx(db.QueryRowContext(ctx, `SELECT `+txCols+txFrom+` WHERE t.id = ?`, id))
+func (TransactionRepo) Get(ctx context.Context, db DBTX, userID, id string) (*models.Transaction, error) {
+	t, err := scanTx(db.QueryRowContext(ctx, `SELECT `+txCols+txFrom+` WHERE t.id = ? AND t.user_id = ?`, id, userID))
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -178,8 +176,8 @@ func (TransactionRepo) Get(ctx context.Context, db DBTX, id string) (*models.Tra
 	return &one[0], nil
 }
 
-func (TransactionRepo) GetByClientID(ctx context.Context, db DBTX, clientID string) (*models.Transaction, error) {
-	t, err := scanTx(db.QueryRowContext(ctx, `SELECT `+txCols+txFrom+` WHERE t.client_id = ?`, clientID))
+func (TransactionRepo) GetByClientID(ctx context.Context, db DBTX, userID, clientID string) (*models.Transaction, error) {
+	t, err := scanTx(db.QueryRowContext(ctx, `SELECT `+txCols+txFrom+` WHERE t.client_id = ? AND t.user_id = ?`, clientID, userID))
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -188,10 +186,10 @@ func (TransactionRepo) GetByClientID(ctx context.Context, db DBTX, clientID stri
 
 func (TransactionRepo) Insert(ctx context.Context, db DBTX, t *models.Transaction) error {
 	_, err := db.ExecContext(ctx, `INSERT INTO transactions
-		(id, type, amount, currency, account_id, transfer_account_id, category_id, description, payee,
+		(user_id, id, type, amount, currency, account_id, transfer_account_id, category_id, description, payee,
 		 transaction_date, notes, origin, status, recurring_id, source_bank_transaction_id, client_id, created_at, updated_at)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		t.ID, t.Type, t.Amount, t.Currency, t.AccountID, nullStr(t.TransferAccountID), nullStr(t.CategoryID),
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		t.UserID, t.ID, t.Type, t.Amount, t.Currency, t.AccountID, nullStr(t.TransferAccountID), nullStr(t.CategoryID),
 		t.Description, t.Payee, t.TransactionDate, t.Notes, t.Origin, t.Status, nullStr(t.RecurringID),
 		nullStr(t.SourceBankTransactionID), nullStr(t.ClientID), t.CreatedAt, t.UpdatedAt)
 	return err
@@ -199,19 +197,19 @@ func (TransactionRepo) Insert(ctx context.Context, db DBTX, t *models.Transactio
 
 func (TransactionRepo) Update(ctx context.Context, db DBTX, t *models.Transaction) error {
 	_, err := db.ExecContext(ctx, `UPDATE transactions SET type=?, amount=?, currency=?, account_id=?, transfer_account_id=?,
-		category_id=?, description=?, payee=?, transaction_date=?, notes=?, status=?, updated_at=? WHERE id=?`,
+		category_id=?, description=?, payee=?, transaction_date=?, notes=?, status=?, updated_at=? WHERE id=? AND user_id=?`,
 		t.Type, t.Amount, t.Currency, t.AccountID, nullStr(t.TransferAccountID), nullStr(t.CategoryID),
-		t.Description, t.Payee, t.TransactionDate, t.Notes, t.Status, t.UpdatedAt, t.ID)
+		t.Description, t.Payee, t.TransactionDate, t.Notes, t.Status, t.UpdatedAt, t.ID, t.UserID)
 	return err
 }
 
-func (TransactionRepo) Delete(ctx context.Context, db DBTX, id string) error {
-	_, err := db.ExecContext(ctx, `DELETE FROM transactions WHERE id = ?`, id)
+func (TransactionRepo) Delete(ctx context.Context, db DBTX, userID, id string) error {
+	_, err := db.ExecContext(ctx, `DELETE FROM transactions WHERE id = ? AND user_id = ?`, id, userID)
 	return err
 }
 
 // SetTags replaces the tag set of a transaction, creating tags as needed.
-func (TransactionRepo) SetTags(ctx context.Context, db DBTX, txID string, tags []string, newID func() string) error {
+func (TransactionRepo) SetTags(ctx context.Context, db DBTX, userID, txID string, tags []string, newID func() string) error {
 	if _, err := db.ExecContext(ctx, `DELETE FROM transaction_tags WHERE transaction_id = ?`, txID); err != nil {
 		return err
 	}
@@ -223,10 +221,10 @@ func (TransactionRepo) SetTags(ctx context.Context, db DBTX, txID string, tags [
 		}
 		seen[name] = true
 		var tagID string
-		err := db.QueryRowContext(ctx, `SELECT id FROM tags WHERE name = ?`, name).Scan(&tagID)
+		err := db.QueryRowContext(ctx, `SELECT id FROM tags WHERE user_id = ? AND name = ?`, userID, name).Scan(&tagID)
 		if errors.Is(err, sql.ErrNoRows) {
 			tagID = newID()
-			if _, err := db.ExecContext(ctx, `INSERT INTO tags (id, name) VALUES (?,?)`, tagID, name); err != nil {
+			if _, err := db.ExecContext(ctx, `INSERT INTO tags (id, user_id, name) VALUES (?,?,?)`, tagID, userID, name); err != nil {
 				return err
 			}
 		} else if err != nil {
@@ -246,12 +244,12 @@ func (TransactionRepo) SetTags(ctx context.Context, db DBTX, txID string, tags [
 // statement's account and period (± tolerance) and also counts pending drafts
 // and imported-origin rows that lost their link. The two numbers are not
 // expected to agree.
-func (TransactionRepo) CountUnmatchedManual(ctx context.Context, db DBTX) (int, error) {
+func (TransactionRepo) CountUnmatchedManual(ctx context.Context, db DBTX, userID string) (int, error) {
 	var n int
 	err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM transactions t
 		JOIN accounts a ON a.id = t.account_id
 		LEFT JOIN reconciliations r ON r.transaction_id = t.id
-		WHERE t.status = 'cleared' AND t.origin = 'manual' AND r.id IS NULL
-		AND a.type IN ('bank','savings','credit_card')`).Scan(&n)
+		WHERE t.user_id = ? AND t.status = 'cleared' AND t.origin = 'manual' AND r.id IS NULL
+		AND a.type IN ('bank','savings','credit_card')`, userID).Scan(&n)
 	return n, err
 }

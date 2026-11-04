@@ -1,10 +1,60 @@
--- Xpensiv initial schema.
+-- Xpensiv initial schema. Every data table carries user_id: data is isolated per user.
 -- Money is stored as INTEGER minor units (e.g. chhertum for BTN). Never REAL.
 -- Timestamps (created_at/updated_at) are UTC RFC3339 strings.
 -- Financial dates (transaction_date, period_start, ...) are local calendar dates: 'YYYY-MM-DD'.
 
+CREATE TABLE users (
+    id            TEXT PRIMARY KEY,
+    email         TEXT NOT NULL UNIQUE,          -- stored lower-cased
+    name          TEXT NOT NULL,
+    password_hash TEXT NOT NULL,                 -- argon2id PHC string
+    role          TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('admin','user')),
+    is_active     INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0,1)),
+    last_login_at TEXT,
+    created_at    TEXT NOT NULL,
+    updated_at    TEXT NOT NULL
+);
+
+CREATE TABLE sessions (
+    id           TEXT PRIMARY KEY,               -- sha256(token) hex; the token itself is never stored
+    user_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at   TEXT NOT NULL,
+    last_seen_at TEXT NOT NULL,
+    expires_at   TEXT NOT NULL,                  -- absolute lifetime
+    user_agent   TEXT NOT NULL DEFAULT '',
+    ip           TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX idx_sessions_user ON sessions(user_id);
+
+CREATE TABLE login_attempts (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    key          TEXT NOT NULL,                  -- 'email:<email>' or 'ip:<ip>'
+    attempted_at TEXT NOT NULL
+);
+CREATE INDEX idx_login_attempts_key ON login_attempts(key, attempted_at);
+
+CREATE TABLE invites (
+    id          TEXT PRIMARY KEY,
+    token_hash  TEXT NOT NULL UNIQUE,
+    email       TEXT NOT NULL DEFAULT '',
+    created_by  TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at  TEXT NOT NULL,
+    expires_at  TEXT NOT NULL,
+    used_at     TEXT,
+    used_by     TEXT REFERENCES users(id) ON DELETE SET NULL
+);
+
+-- Instance-wide settings managed by the admin (per-user settings live in `settings`).
+CREATE TABLE app_settings (
+    key        TEXT PRIMARY KEY,
+    value      TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+INSERT INTO app_settings (key, value, updated_at) VALUES ('registration_open', '0', strftime('%Y-%m-%dT%H:%M:%SZ','now'));
+
 CREATE TABLE accounts (
     id                   TEXT PRIMARY KEY,
+    user_id              TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     name                 TEXT NOT NULL,
     type                 TEXT NOT NULL CHECK (type IN ('bank','cash','mobile_wallet','credit_card','savings')),
     currency             TEXT NOT NULL DEFAULT 'BTN',
@@ -18,6 +68,7 @@ CREATE TABLE accounts (
 
 CREATE TABLE categories (
     id         TEXT PRIMARY KEY,
+    user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     name       TEXT NOT NULL,
     icon       TEXT NOT NULL DEFAULT 'circle',
     color      TEXT NOT NULL DEFAULT '#64748b',
@@ -28,11 +79,13 @@ CREATE TABLE categories (
     sort_order INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
-    UNIQUE (name, type)
+    UNIQUE (user_id, name, type)
 );
+CREATE INDEX idx_categories_user ON categories(user_id);
 
 CREATE TABLE recurring_transactions (
     id                  TEXT PRIMARY KEY,
+    user_id             TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     name                TEXT NOT NULL,
     type                TEXT NOT NULL CHECK (type IN ('expense','income','transfer')),
     amount              INTEGER NOT NULL CHECK (amount > 0),
@@ -56,6 +109,7 @@ CREATE TABLE recurring_transactions (
 
 CREATE TABLE transactions (
     id                  TEXT PRIMARY KEY,
+    user_id             TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     type                TEXT NOT NULL CHECK (type IN ('expense','income','transfer','refund','adjustment')),
     -- Positive for every type except 'adjustment', which is signed (negative reduces the balance).
     amount              INTEGER NOT NULL,
@@ -79,7 +133,7 @@ CREATE TABLE transactions (
     CHECK (type = 'adjustment' OR amount > 0),
     CHECK (type <> 'transfer' OR (transfer_account_id IS NOT NULL AND transfer_account_id <> account_id))
 );
-CREATE INDEX idx_transactions_date ON transactions(transaction_date);
+CREATE INDEX idx_transactions_user_date ON transactions(user_id, transaction_date);
 CREATE INDEX idx_transactions_account ON transactions(account_id, transaction_date);
 CREATE INDEX idx_transactions_transfer_account ON transactions(transfer_account_id);
 CREATE INDEX idx_transactions_category ON transactions(category_id);
@@ -87,11 +141,13 @@ CREATE INDEX idx_transactions_type_status ON transactions(type, status);
 -- Prevents the recurring generator from creating the same occurrence twice.
 CREATE UNIQUE INDEX idx_transactions_recurring_once ON transactions(recurring_id, transaction_date) WHERE recurring_id IS NOT NULL;
 -- Offline clients send a client-generated id so retried syncs are idempotent.
-CREATE UNIQUE INDEX idx_transactions_client_id ON transactions(client_id) WHERE client_id IS NOT NULL;
+CREATE UNIQUE INDEX idx_transactions_client_id ON transactions(user_id, client_id) WHERE client_id IS NOT NULL;
 
 CREATE TABLE tags (
-    id   TEXT PRIMARY KEY,
-    name TEXT NOT NULL UNIQUE
+    id      TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name    TEXT NOT NULL,
+    UNIQUE (user_id, name)
 );
 
 CREATE TABLE transaction_tags (
@@ -102,6 +158,7 @@ CREATE TABLE transaction_tags (
 
 CREATE TABLE bank_statements (
     id                TEXT PRIMARY KEY,
+    user_id           TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     provider          TEXT NOT NULL,
     account_id        TEXT NOT NULL REFERENCES accounts(id),
     file_name         TEXT NOT NULL,
@@ -126,6 +183,7 @@ CREATE INDEX idx_bank_statements_sha ON bank_statements(file_sha256);
 
 CREATE TABLE bank_transactions (
     id               TEXT PRIMARY KEY,
+    user_id          TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     statement_id     TEXT NOT NULL REFERENCES bank_statements(id) ON DELETE CASCADE,
     account_id       TEXT NOT NULL REFERENCES accounts(id),
     line_no          INTEGER NOT NULL,
@@ -146,6 +204,7 @@ CREATE INDEX idx_bank_transactions_account_date ON bank_transactions(account_id,
 
 CREATE TABLE reconciliations (
     id                  TEXT PRIMARY KEY,
+    user_id             TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     bank_transaction_id TEXT NOT NULL UNIQUE REFERENCES bank_transactions(id) ON DELETE CASCADE,
     transaction_id      TEXT REFERENCES transactions(id) ON DELETE CASCADE,
     status              TEXT NOT NULL CHECK (status IN ('matched','ignored','transfer')),
@@ -163,18 +222,18 @@ CREATE UNIQUE INDEX idx_reconciliations_transaction ON reconciliations(transacti
 
 CREATE TABLE budgets (
     id          TEXT PRIMARY KEY,
+    user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     category_id TEXT NOT NULL UNIQUE REFERENCES categories(id) ON DELETE CASCADE,
     amount      INTEGER NOT NULL CHECK (amount >= 0),
     created_at  TEXT NOT NULL,
     updated_at  TEXT NOT NULL
 );
 
+-- Per-user settings; defaults are applied in code when a key is absent.
 CREATE TABLE settings (
-    key        TEXT PRIMARY KEY,
+    user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    key        TEXT NOT NULL,
     value      TEXT NOT NULL,
-    updated_at TEXT NOT NULL
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, key)
 );
-
-INSERT INTO settings (key, value, updated_at) VALUES
-    ('reconciliation.date_tolerance_days', '3', strftime('%Y-%m-%dT%H:%M:%SZ','now')),
-    ('default_currency', 'BTN', strftime('%Y-%m-%dT%H:%M:%SZ','now'));

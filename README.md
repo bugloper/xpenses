@@ -1,7 +1,7 @@
 # Xpensiv
 
 Personal expense tracker and Bank of Bhutan (BOB) statement reconciliation app.
-Single user, local-first, installable as a PWA, with offline expense entry.
+Multi-user with fully isolated data, installable as a PWA, with offline expense entry.
 
 - **Backend:** Go, Echo v4, SQLite (`modernc.org/sqlite`, no CGO), embedded SQL migrations.
 - **Frontend:** React, TypeScript, Vite, TanStack Router/Query, Tailwind, shadcn/ui, Recharts, `vite-plugin-pwa`.
@@ -16,7 +16,15 @@ Single user, local-first, installable as a PWA, with offline expense entry.
 - Reconciliation workspace: deterministic suggested matches, confirm/reject, manual match, ignore, mark as transfer, create from bank line, adjustments. Fully reversible.
 - Reports (monthly, daily, weekly, category, merchant, income vs expense, accounts, budgets, reconciliation) with CSV and PDF export.
 - PWA: installable, offline shell, offline transaction queue with sync indicator, update notifications.
-- Backup/restore (optionally AES-256-GCM encrypted).
+- Backup/restore (optionally AES-256-GCM encrypted), admin only.
+- Accounts: first-run owner setup, Argon2id passwords, cookie sessions, login throttling, invite-only or open registration, admin user management. Every user sees only their own data.
+
+## First run and accounts
+
+1. Open the app. With no users yet it shows **Set up Xpensiv**: create the owner account (you become the `admin`).
+2. Registration is closed by default. To let someone else in, go to **Admin → Invites** and send them the one-time link, or switch **Registration** on for open sign-up.
+3. Every user gets their own accounts, categories (defaults seeded on sign-up), transactions, statements, budgets and settings. The admin can disable, promote or delete users (deleting a user deletes all their data) but cannot see their data.
+4. Passwords are hashed with Argon2id. Sessions are HttpOnly, SameSite=Strict cookies (Secure over HTTPS), idle timeout 30 days, absolute 180 days. Ten failed logins per email (or thirty per IP) in 15 minutes pause sign-in. See `docs/AUTH.md` for the full contract.
 
 ## Development setup
 
@@ -61,12 +69,29 @@ Configuration is via environment variables (see `.env.example`):
 | `XPENSIV_STATIC_DIR` | `./web/dist` | Built frontend to serve (empty = API only) |
 | `XPENSIV_CORS_ORIGIN` | `http://localhost:5173` | Dev-server origin allowed for CORS (set empty in production) |
 | `XPENSIV_DEFAULT_CURRENCY` | `BTN` | Currency for new accounts |
+| `XPENSIV_SECURE_COOKIES` | `auto` | `auto` marks the session cookie Secure only over HTTPS; `true`/`false` force it |
+| `XPENSIV_TRUSTED_PROXY` | `false` | `true` only behind your own reverse proxy: trusts `X-Forwarded-For`/`X-Forwarded-Proto` |
 
 ### Docker
 
 ```sh
 docker compose up -d --build     # http://127.0.0.1:8080, data in the xpensiv-data volume
 ```
+
+### Deploying on a server (HTTPS)
+
+`docker-compose.prod.yml` adds a Caddy reverse proxy that obtains and renews a Let's Encrypt
+certificate automatically. Point a DNS name at the server, then:
+
+```sh
+export XPENSIV_DOMAIN=xpensiv.example.com
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+```
+
+Caddy terminates TLS on 80/443 and forwards to the app, which is not published on the host.
+The app runs with `XPENSIV_TRUSTED_PROXY=true` (so login throttling sees real client IPs and
+session cookies are marked Secure) and `XPENSIV_CORS_ORIGIN=` (same-origin only). The PWA, the
+offline queue and the install prompt all require HTTPS, which this setup provides.
 
 ## Importing a BOB statement
 
@@ -80,7 +105,7 @@ The parser is header-driven and tolerant of layout variations (see `internal/pdf
 
 ## Backup and restore
 
-- **Backup:** Settings → Backup, or `GET /api/v1/backup` (`?passphrase=...` or header `X-Backup-Passphrase` to receive an encrypted `.db.enc`). Snapshots are produced with `VACUUM INTO`, so they are consistent even while the app is running, and are written with `0600` permissions.
+- **Backup (admin only):** Settings → Backup, or `GET /api/v1/backup` (`?passphrase=...` or header `X-Backup-Passphrase` to receive an encrypted `.db.enc`). Snapshots are produced with `VACUUM INTO`, so they are consistent even while the app is running, and are written with `0600` permissions.
 - **Restore:** Settings → Restore (upload the `.db` or `.db.enc` plus passphrase), or `POST /api/v1/restore` (multipart `file`, `passphrase`). The current database is snapshotted to `data/backups/` first, then the snapshot's tables are copied in inside one transaction. The backup must be from the same schema version.
 - **Manual:** stop the server and copy `data/xpensiv.db` (also copy `-wal`/`-shm` if present) and `data/statements/`.
 
@@ -88,13 +113,16 @@ Encrypted backups use PBKDF2-SHA256 (200k iterations) + AES-256-GCM.
 
 ## Security notes
 
-This app holds personal financial data and has **no authentication layer**: anyone who can reach the port can read and change everything.
+This app holds personal financial data.
 
-- By default it listens on `127.0.0.1` only. Keep it that way on shared networks.
-- If you expose it on a LAN (`XPENSIV_ADDR=0.0.0.0:8080`) or the internet, put it behind a reverse proxy that terminates TLS and adds authentication (e.g. Caddy/nginx with basic auth, Tailscale, or a VPN). PWA installation requires HTTPS or `localhost`.
+- Always serve it over HTTPS when it leaves your machine: session cookies are only marked `Secure` on HTTPS, and browsers refuse service workers and PWA installation on plain HTTP (except `localhost`). Use `docker-compose.prod.yml` or your own TLS proxy.
+- Set `XPENSIV_TRUSTED_PROXY=true` only when a proxy you control sits in front; otherwise clients could spoof `X-Forwarded-For` and evade login throttling.
+- Set `XPENSIV_CORS_ORIGIN=` (empty) in production. The Vite dev origin is only needed for `make dev`.
+- CSRF: mutating API calls must carry the `X-Xpensiv-Client` header and, when present, an `Origin` matching the host; cookies are `SameSite=Strict`.
 - No third-party analytics, fonts, or external API calls. PDFs are parsed locally.
-- Logs contain method/path/status/request id only — never amounts, descriptions, account numbers or passwords.
-- Set `XPENSIV_CORS_ORIGIN=` (empty) in production.
+- Logs contain method/path/status/request id only — never amounts, descriptions, account numbers, emails or passwords.
+- The database file is `0600`, backups `0600`, and backup/restore is restricted to the admin because a snapshot contains every user's data.
+- Rate limiting is per process; if you ever run several replicas, put a shared limiter in the proxy.
 
 ## Project layout
 
@@ -108,8 +136,10 @@ internal/repositories parameterized SQL
 internal/pdf          PDF text extraction + statement parsers (BOB)
 internal/reconciliation matching engine + reconciliation service
 internal/reports      report queries + CSV/PDF export
-internal/models, dto, validators, errors, middleware, server
+internal/auth          users, sessions, invites, middleware (per-user scoping)
+internal/models, dto, validators, errors, middleware, server, testutil
 web/                  React PWA
 testdata/statements   synthetic statement fixtures (no real data)
-docs/API.md           REST contract
+docs/API.md           REST contract (data endpoints)
+docs/AUTH.md          authentication / multi-user contract
 ```

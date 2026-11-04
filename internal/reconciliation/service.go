@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"strings"
 
+	"github.com/bugloper/xpensiv/internal/auth"
 	"github.com/bugloper/xpensiv/internal/dto"
 	apperr "github.com/bugloper/xpensiv/internal/errors"
 	"github.com/bugloper/xpensiv/internal/models"
@@ -127,15 +128,16 @@ type (
 )
 
 func (s *Service) Overview(ctx context.Context) (*Overview, error) {
-	statements, err := s.repo.ListOverview(ctx, s.db)
+	uid := auth.UserID(ctx)
+	statements, err := s.repo.ListOverview(ctx, s.db, uid)
 	if err != nil {
 		return nil, apperr.Internal(err)
 	}
-	unmatched, err := s.txRepo.CountUnmatchedManual(ctx, s.db)
+	unmatched, err := s.txRepo.CountUnmatchedManual(ctx, s.db, uid)
 	if err != nil {
 		return nil, apperr.Internal(err)
 	}
-	unreconciled, err := s.repo.CountUnreconciledBank(ctx, s.db)
+	unreconciled, err := s.repo.CountUnreconciledBank(ctx, s.db, uid)
 	if err != nil {
 		return nil, apperr.Internal(err)
 	}
@@ -154,27 +156,29 @@ type statementContext struct {
 
 // load reads everything for a statement. tol is passed in rather than read
 // here because SettingsService queries through its own *sql.DB, which would
-// deadlock against a transaction on a single-connection database.
+// deadlock against a transaction on a single-connection database. Another
+// user's statement is indistinguishable from a missing one (404).
 func (s *Service) load(ctx context.Context, db repositories.DBTX, statementID string, tol int) (*statementContext, error) {
-	st, err := s.repo.GetStatement(ctx, db, statementID)
+	uid := auth.UserID(ctx)
+	st, err := s.repo.GetStatement(ctx, db, uid, statementID)
 	if err != nil {
 		return nil, apperr.Internal(err)
 	}
 	if st == nil {
 		return nil, apperr.NotFound("statement")
 	}
-	acct, err := s.accounts.Get(ctx, db, st.AccountID)
+	acct, err := s.accounts.Get(ctx, db, uid, st.AccountID)
 	if err != nil {
 		return nil, apperr.Internal(err)
 	}
 	if acct == nil {
 		return nil, apperr.NotFound("account")
 	}
-	bank, err := s.repo.ListBankTransactions(ctx, db, st.ID)
+	bank, err := s.repo.ListBankTransactions(ctx, db, uid, st.ID)
 	if err != nil {
 		return nil, apperr.Internal(err)
 	}
-	existing, err := s.repo.ListByStatement(ctx, db, st.ID)
+	existing, err := s.repo.ListByStatement(ctx, db, uid, st.ID)
 	if err != nil {
 		return nil, apperr.Internal(err)
 	}
@@ -204,6 +208,7 @@ func (s *Service) candidates(ctx context.Context, db repositories.DBTX, st *mode
 	}
 	var out []models.Transaction
 	for {
+		f.UserID = auth.UserID(ctx)
 		page, total, err := s.txRepo.List(ctx, db, f)
 		if err != nil {
 			return nil, apperr.Internal(err)
@@ -252,7 +257,7 @@ func (s *Service) Workspace(ctx context.Context, statementID string) (*Workspace
 				t := byTx[*r.TransactionID]
 				if t == nil {
 					// Linked transaction sits outside the candidate window (manual match).
-					if t, err = s.txRepo.Get(ctx, s.db, *r.TransactionID); err != nil {
+					if t, err = s.txRepo.Get(ctx, s.db, auth.UserID(ctx), *r.TransactionID); err != nil {
 						return nil, apperr.Internal(err)
 					}
 				}
@@ -315,7 +320,8 @@ func (s *Service) AutoMatch(ctx context.Context, req AutoMatchRequest) (int, err
 		for _, m := range res.AutoMatches {
 			txID := m.Suggestion.TransactionID
 			r := &models.Reconciliation{
-				ID: services.NewID(), BankTransactionID: m.BankTransactionID, TransactionID: &txID,
+				UserID: auth.UserID(ctx),
+				ID:     services.NewID(), BankTransactionID: m.BankTransactionID, TransactionID: &txID,
 				Status: linkStatus(m.Suggestion.Transaction), MatchType: "auto", Rule: m.Suggestion.Rule, Confidence: m.Suggestion.Confidence,
 				AmountDiff: m.Suggestion.AmountDiff, DateDiffDays: m.Suggestion.DateDiffDays, CreatedAt: models.NowUTC(),
 			}
@@ -329,19 +335,21 @@ func (s *Service) AutoMatch(ctx context.Context, req AutoMatchRequest) (int, err
 	return n, err
 }
 
-// bankLine loads a bank transaction that has no reconciliation yet.
+// bankLine loads one of the user's bank transactions that has no
+// reconciliation yet. Another user's line is a 404, never a conflict.
 func (s *Service) bankLine(ctx context.Context, db repositories.DBTX, id string) (*models.BankTransaction, error) {
 	if id == "" {
 		return nil, apperr.Validation("validation failed", map[string]string{"bank_transaction_id": "is required"})
 	}
-	b, err := s.repo.GetBankTransaction(ctx, db, id)
+	uid := auth.UserID(ctx)
+	b, err := s.repo.GetBankTransaction(ctx, db, uid, id)
 	if err != nil {
 		return nil, apperr.Internal(err)
 	}
 	if b == nil {
 		return nil, apperr.NotFound("bank transaction")
 	}
-	r, err := s.repo.GetByBankTransaction(ctx, db, id)
+	r, err := s.repo.GetByBankTransaction(ctx, db, uid, id)
 	if err != nil {
 		return nil, apperr.Internal(err)
 	}
@@ -351,12 +359,14 @@ func (s *Service) bankLine(ctx context.Context, db repositories.DBTX, id string)
 	return b, nil
 }
 
-// manualLine loads a manual transaction that is not yet linked to a bank line.
+// manualLine loads one of the user's manual transactions that is not yet
+// linked to a bank line. Another user's transaction is a 404.
 func (s *Service) manualLine(ctx context.Context, db repositories.DBTX, id string) (*models.Transaction, error) {
 	if id == "" {
 		return nil, apperr.Validation("validation failed", map[string]string{"transaction_id": "is required"})
 	}
-	t, err := s.txRepo.Get(ctx, db, id)
+	uid := auth.UserID(ctx)
+	t, err := s.txRepo.Get(ctx, db, uid, id)
 	if err != nil {
 		return nil, apperr.Internal(err)
 	}
@@ -366,7 +376,7 @@ func (s *Service) manualLine(ctx context.Context, db repositories.DBTX, id strin
 	if t.Status == models.StatusVoid {
 		return nil, apperr.Validation("validation failed", map[string]string{"transaction_id": "transaction is void"})
 	}
-	r, err := s.repo.GetByTransaction(ctx, db, id)
+	r, err := s.repo.GetByTransaction(ctx, db, uid, id)
 	if err != nil {
 		return nil, apperr.Internal(err)
 	}
@@ -415,7 +425,8 @@ func (s *Service) Match(ctx context.Context, req MatchRequest) (*models.Reconcil
 		}
 		dd, _ := DateDiffDays(b.TransactionDate, t.TransactionDate)
 		out = &models.Reconciliation{
-			ID: services.NewID(), BankTransactionID: b.ID, TransactionID: &t.ID, Status: linkStatus(t),
+			UserID: auth.UserID(ctx),
+			ID:     services.NewID(), BankTransactionID: b.ID, TransactionID: &t.ID, Status: linkStatus(t),
 			MatchType: "manual", Rule: "manual", Confidence: 100, AmountDiff: BankSide(b).Amount - ms.Amount,
 			DateDiffDays: dd, Note: strings.TrimSpace(req.Note), CreatedAt: models.NowUTC(),
 		}
@@ -434,15 +445,16 @@ func (s *Service) Unmatch(ctx context.Context, req BankLineRequest) error {
 	if req.BankTransactionID == "" {
 		return apperr.Validation("validation failed", map[string]string{"bank_transaction_id": "is required"})
 	}
+	uid := auth.UserID(ctx)
 	return repositories.WithTx(ctx, s.db, func(tx *sql.Tx) error {
-		b, err := s.repo.GetBankTransaction(ctx, tx, req.BankTransactionID)
+		b, err := s.repo.GetBankTransaction(ctx, tx, uid, req.BankTransactionID)
 		if err != nil {
 			return apperr.Internal(err)
 		}
 		if b == nil {
 			return apperr.NotFound("bank transaction")
 		}
-		if err := s.repo.DeleteByBankTransaction(ctx, tx, b.ID); err != nil {
+		if err := s.repo.DeleteByBankTransaction(ctx, tx, uid, b.ID); err != nil {
 			return apperr.Internal(err)
 		}
 		return nil
@@ -457,7 +469,8 @@ func (s *Service) Ignore(ctx context.Context, req BankLineRequest) (*models.Reco
 			return err
 		}
 		out = &models.Reconciliation{
-			ID: services.NewID(), BankTransactionID: b.ID, Status: models.ReconIgnored, MatchType: "manual",
+			UserID: auth.UserID(ctx),
+			ID:     services.NewID(), BankTransactionID: b.ID, Status: models.ReconIgnored, MatchType: "manual",
 			Rule: "ignored", Note: strings.TrimSpace(req.Note), CreatedAt: models.NowUTC(),
 		}
 		if err := s.repo.Insert(ctx, tx, out); err != nil {
@@ -503,14 +516,14 @@ func (s *Service) MarkTransfer(ctx context.Context, req TransferRequest) (*Trans
 			if req.TransferAccountID == b.AccountID {
 				return apperr.Validation("validation failed", map[string]string{"transfer_account_id": "must differ from the statement account"})
 			}
-			other, err := s.accounts.Get(ctx, tx, req.TransferAccountID)
+			other, err := s.accounts.Get(ctx, tx, auth.UserID(ctx), req.TransferAccountID)
 			if err != nil {
 				return apperr.Internal(err)
 			}
 			if other == nil {
 				return apperr.Validation("validation failed", map[string]string{"transfer_account_id": "account not found"})
 			}
-			stmtAcct, err := s.accounts.Get(ctx, tx, b.AccountID)
+			stmtAcct, err := s.accounts.Get(ctx, tx, auth.UserID(ctx), b.AccountID)
 			if err != nil {
 				return apperr.Internal(err)
 			}
@@ -521,7 +534,7 @@ func (s *Service) MarkTransfer(ctx context.Context, req TransferRequest) (*Trans
 			if !bs.IsDebit {
 				from, to = req.TransferAccountID, b.AccountID
 			}
-			t := s.newImported(b, stmtAcct.Currency)
+			t := s.newImported(ctx, b, stmtAcct.Currency)
 			t.Type = models.TxTransfer
 			t.Amount = bs.Amount
 			t.AccountID = from
@@ -532,7 +545,8 @@ func (s *Service) MarkTransfer(ctx context.Context, req TransferRequest) (*Trans
 			txID = t.ID
 		}
 		out = &models.Reconciliation{
-			ID: services.NewID(), BankTransactionID: b.ID, TransactionID: &txID, Status: models.ReconTransfer,
+			UserID: auth.UserID(ctx),
+			ID:     services.NewID(), BankTransactionID: b.ID, TransactionID: &txID, Status: models.ReconTransfer,
 			MatchType: "manual", Rule: "transfer", Confidence: 100, AmountDiff: amountDiff, DateDiffDays: dd, CreatedAt: models.NowUTC(),
 		}
 		if err := s.repo.Insert(ctx, tx, out); err != nil {
@@ -543,19 +557,21 @@ func (s *Service) MarkTransfer(ctx context.Context, req TransferRequest) (*Trans
 	if err != nil {
 		return nil, err
 	}
-	t, err := s.txRepo.Get(ctx, s.db, txID)
+	t, err := s.txRepo.Get(ctx, s.db, auth.UserID(ctx), txID)
 	if err != nil {
 		return nil, apperr.Internal(err)
 	}
 	return &TransferResult{Reconciliation: out, Transaction: t}, nil
 }
 
-// newImported builds the skeleton of a transaction derived from a bank line.
-func (s *Service) newImported(b *models.BankTransaction, currency string) *models.Transaction {
+// newImported builds the skeleton of a transaction derived from a bank line,
+// owned by the signed-in user.
+func (s *Service) newImported(ctx context.Context, b *models.BankTransaction, currency string) *models.Transaction {
 	now := models.NowUTC()
 	id := b.ID
 	return &models.Transaction{
-		ID: services.NewID(), Currency: currency, AccountID: b.AccountID, Description: strings.TrimSpace(b.Description),
+		UserID: auth.UserID(ctx),
+		ID:     services.NewID(), Currency: currency, AccountID: b.AccountID, Description: strings.TrimSpace(b.Description),
 		Payee: CleanDescription(b.Description), TransactionDate: b.TransactionDate, Origin: models.OriginImported,
 		Status: models.StatusCleared, SourceBankTransactionID: &id, CreatedAt: now, UpdatedAt: now,
 	}
@@ -582,20 +598,20 @@ func (s *Service) CreateTransaction(ctx context.Context, req CreateTransactionRe
 		if bs.Amount == 0 {
 			return apperr.Validation("validation failed", map[string]string{"bank_transaction_id": "bank transaction has no amount"})
 		}
-		acct, err := s.accounts.Get(ctx, tx, b.AccountID)
+		acct, err := s.accounts.Get(ctx, tx, auth.UserID(ctx), b.AccountID)
 		if err != nil {
 			return apperr.Internal(err)
 		}
 		if acct == nil {
 			return apperr.NotFound("account")
 		}
-		t := s.newImported(b, acct.Currency)
+		t := s.newImported(ctx, b, acct.Currency)
 		t.Type, t.Amount = models.TxIncome, bs.Amount
 		if bs.IsDebit {
 			t.Type = models.TxExpense
 		}
 		if req.CategoryID != "" {
-			c, err := s.categories.Get(ctx, tx, req.CategoryID)
+			c, err := s.categories.Get(ctx, tx, auth.UserID(ctx), req.CategoryID)
 			if err != nil {
 				return apperr.Internal(err)
 			}
@@ -623,7 +639,8 @@ func (s *Service) CreateTransaction(ctx context.Context, req CreateTransactionRe
 		}
 		txID = t.ID
 		out = &models.Reconciliation{
-			ID: services.NewID(), BankTransactionID: b.ID, TransactionID: &txID, Status: models.ReconMatched,
+			UserID: auth.UserID(ctx),
+			ID:     services.NewID(), BankTransactionID: b.ID, TransactionID: &txID, Status: models.ReconMatched,
 			MatchType: "manual", Rule: "created", Confidence: 100, CreatedAt: models.NowUTC(),
 		}
 		if err := s.repo.Insert(ctx, tx, out); err != nil {
@@ -634,7 +651,7 @@ func (s *Service) CreateTransaction(ctx context.Context, req CreateTransactionRe
 	if err != nil {
 		return nil, err
 	}
-	t, err := s.txRepo.Get(ctx, s.db, txID)
+	t, err := s.txRepo.Get(ctx, s.db, auth.UserID(ctx), txID)
 	if err != nil {
 		return nil, apperr.Internal(err)
 	}
@@ -667,14 +684,14 @@ func (s *Service) Adjustment(ctx context.Context, req MatchRequest) (*Adjustment
 		if diff == 0 {
 			return apperr.Validation("validation failed", map[string]string{"transaction_id": "amounts are equal; use match instead"})
 		}
-		acct, err := s.accounts.Get(ctx, tx, b.AccountID)
+		acct, err := s.accounts.Get(ctx, tx, auth.UserID(ctx), b.AccountID)
 		if err != nil {
 			return apperr.Internal(err)
 		}
 		if acct == nil {
 			return apperr.NotFound("account")
 		}
-		adj := s.newImported(b, acct.Currency)
+		adj := s.newImported(ctx, b, acct.Currency)
 		adj.Type = models.TxAdjustment
 		adj.Origin = models.OriginAdjustment
 		adj.Amount = diff
@@ -690,7 +707,8 @@ func (s *Service) Adjustment(ctx context.Context, req MatchRequest) (*Adjustment
 		adjID = adj.ID
 		dd, _ := DateDiffDays(b.TransactionDate, t.TransactionDate)
 		out = &models.Reconciliation{
-			ID: services.NewID(), BankTransactionID: b.ID, TransactionID: &t.ID, Status: models.ReconMatched,
+			UserID: auth.UserID(ctx),
+			ID:     services.NewID(), BankTransactionID: b.ID, TransactionID: &t.ID, Status: models.ReconMatched,
 			MatchType: "manual", Rule: "adjustment", Confidence: 100, AmountDiff: diff, DateDiffDays: dd,
 			Note: strings.TrimSpace(req.Note), CreatedAt: models.NowUTC(),
 		}
@@ -702,11 +720,11 @@ func (s *Service) Adjustment(ctx context.Context, req MatchRequest) (*Adjustment
 	if err != nil {
 		return nil, err
 	}
-	t, err := s.txRepo.Get(ctx, s.db, req.TransactionID)
+	t, err := s.txRepo.Get(ctx, s.db, auth.UserID(ctx), req.TransactionID)
 	if err != nil {
 		return nil, apperr.Internal(err)
 	}
-	adj, err := s.txRepo.Get(ctx, s.db, adjID)
+	adj, err := s.txRepo.Get(ctx, s.db, auth.UserID(ctx), adjID)
 	if err != nil {
 		return nil, apperr.Internal(err)
 	}
