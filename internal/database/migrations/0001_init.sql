@@ -118,10 +118,11 @@ CREATE TABLE bank_statements (
     transaction_count INTEGER NOT NULL DEFAULT 0,
     balance_verified  INTEGER NOT NULL DEFAULT 0 CHECK (balance_verified IN (0,1)),
     notes             TEXT NOT NULL DEFAULT '',
-    imported_at       TEXT NOT NULL,
-    UNIQUE (file_sha256)
+    imported_at       TEXT NOT NULL
 );
 CREATE INDEX idx_bank_statements_account ON bank_statements(account_id, period_start);
+-- Not unique: the import endpoint rejects an identical file unless the user forces it.
+CREATE INDEX idx_bank_statements_sha ON bank_statements(file_sha256);
 
 CREATE TABLE bank_transactions (
     id               TEXT PRIMARY KEY,

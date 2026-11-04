@@ -1,0 +1,52 @@
+                                               BANK OF BHUTAN LIMITED
+                                                       Statement of Account
+       Account Holder : TASHI WANGMO                             Account No : 201234567890
+       Currency : Nu.                                            Statement Period : 01-10-2026 to 31-10-2026
+       Branch : Thimphu Main (synthetic)                         Opening Balance : 100,000.00
+       Txn Date    Value Date  Description                           Ref No               Debit      Credit         Balance
+                               Opening Balance                                                                   100,000.00
+       01-10-2026  01-10-2026  SALARY CREDIT OCT 2026 DRUK DEMO      SAL0001                      65,000.00      165,000.00
+       02-10-2026  02-10-2026  MBOB/TRF/ TO 2010XXXX0001 RENT        MB100201         15,000.00                  150,000.00
+       03-10-2026  03-10-2026  POS PURCHASE EIGHT ELEVEN STORE       POS77001          1,845.50                  148,154.50
+                               THIMPHU BHUTAN (wrapped line)
+       04-10-2026  04-10-2026  ATM WDL BOB ATM NORZIN LAM            ATM55012          5,000.00                  143,154.50
+       05-10-2026  05-10-2026  BPC ELECTRICITY BILL SEPT             BPC00981          1,234.75                  141,919.75
+       06-10-2026  06-10-2026  MBOB/TRF/ FROM 2010XXXX0002 LUNCH     MB100345                        450.00      142,369.75
+       07-10-2026  07-10-2026  TASHICELL POSTPAID                    TC004411            999.00                  141,370.75
+       08-10-2026  08-10-2026  POS PURCHASE MY MART CHANGZAMTOG      POS77002          2,340.00                  139,030.75
+       09-10-2026  09-10-2026  INTEREST CREDIT                       INT00001                        123.45      139,154.20
+       10-10-2026  10-10-2026  MBOB/QR/ KARMA GENERAL SHOP           QR000123            650.00                  138,504.20
+       11-10-2026  11-10-2026  MBOB/TRF/ TO 1010XXXX0003 SAVINGS     MB100400         10,000.00                  128,504.20
+       12-10-2026  12-10-2026  FUEL BOD PUMP OLAKHA                  POS77003          2,500.00                  126,004.20
+       13-10-2026  13-10-2026  MBOB/QR/ AMBIENT CAFE                 QR000124            420.00                  125,584.20
+       14-10-2026  14-10-2026  BHUTAN TELECOM BROADBAND              BT000555          1,499.00                  124,085.20
+       15-10-2026  15-10-2026  MBOB/TRF/ FROM 2010XXXX0004 REFUND    MB100512                      1,845.50      125,930.70
+       16-10-2026  16-10-2026  POS PURCHASE 8 ELEVEN MOTITHANG       POS77004            765.00                  125,165.70
+       17-10-2026  17-10-2026  MBOB/QR/ ZOMBALA RESTAURANT           QR000125            580.00                  124,585.70
+       18-10-2026  18-10-2026  CHEQUE DEPOSIT 004412                 CHQ004412                     3,500.00      128,085.70
+                                                            Page 1 of 2
+                                        This is a computer generated statement and does not require a signature.
+
+                                               BANK OF BHUTAN LIMITED
+                                                       Statement of Account
+       Account Holder : TASHI WANGMO                             Account No : 201234567890
+       Currency : Nu.                                            Statement Period : 01-10-2026 to 31-10-2026
+       Branch : Thimphu Main (synthetic)                         Opening Balance : 100,000.00
+       Txn Date    Value Date  Description                            Ref No              Debit      Credit         Balance
+       19-10-2026  19-10-2026  MBOB/TRF/ TO 2010XXXX0005 TUITION      MB100600         8,000.00                   120,085.70
+       20-10-2026  20-10-2026  POS PURCHASE DRUK PHARMACY             POS77005           320.00                   119,765.70
+       21-10-2026  21-10-2026  MBOB/QR/ GREEN GROCERS                 QR000126           888.00                   118,877.70
+       22-10-2026  22-10-2026  SMS BANKING CHARGES                    CHG00001            25.00                   118,852.70
+       23-10-2026  23-10-2026  MBOB/TRF/ FROM 2010XXXX0006 GIFT       MB100777                      5,000.00      123,852.70
+       24-10-2026  24-10-2026  POS PURCHASE BOOK WORLD                POS77006           450.00                   123,402.70
+       25-10-2026  25-10-2026  MBOB/QR/ FOLK HERITAGE CAFE            QR000127           360.00                   123,042.70
+       26-10-2026  26-10-2026  ATM WDL BOB ATM PARO                   ATM55013         3,000.00                   120,042.70
+       27-10-2026  27-10-2026  MBOB/TRF/ TO 2010XXXX0007 LOAN EMI     MB100801        12,500.00                   107,542.70
+       28-10-2026  28-10-2026  POS PURCHASE KARMA FEED                POS77007           290.00                   107,252.70
+       29-10-2026  29-10-2026  MBOB/QR/ CITY BUS RECHARGE             QR000128           100.00                   107,152.70
+       30-10-2026  30-10-2026  MBOB/TRF/ FROM 2010XXXX0008 SPLIT      MB100900                      1,200.00      108,352.70
+       31-10-2026  31-10-2026  ACCOUNT MAINTENANCE FEE                CHG00002            50.00                   108,302.70
+                               Closing Balance                                                                    108,302.70
+                               Total                                                  68,816.25    77,118.95
+                                                            Page 2 of 2
+                                        This is a computer generated statement and does not require a signature.

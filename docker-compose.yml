@@ -1,0 +1,18 @@
+services:
+  xpensiv:
+    build: .
+    container_name: xpensiv
+    restart: unless-stopped
+    # Bound to localhost on the host. Change to "8080:8080" only if you
+    # understand the implications (see README "Security").
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - xpensiv-data:/data
+    environment:
+      XPENSIV_LOG_LEVEL: info
+      XPENSIV_MAX_UPLOAD_BYTES: "10485760"
+      XPENSIV_DEFAULT_CURRENCY: BTN
+
+volumes:
+  xpensiv-data:
