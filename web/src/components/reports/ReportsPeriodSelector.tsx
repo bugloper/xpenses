@@ -27,7 +27,7 @@ export function ReportsPeriodSelector({
           className={cn(
             'h-9 shrink-0 rounded-full border px-3.5 text-sm font-medium transition-colors',
             preset === p.value
-              ? 'border-primary bg-primary/10 text-primary'
+              ? 'border-foreground bg-foreground text-background'
               : 'border-border text-muted-foreground hover:bg-muted hover:text-foreground',
           )}
         >
@@ -40,7 +40,7 @@ export function ReportsPeriodSelector({
         onChange={(r) => (r ? onChange('custom', r) : onChange('month', reportPresetRange('month')))}
         className={cn(
           'h-9 shrink-0 rounded-full',
-          preset === 'custom' && 'border-primary bg-primary/10 text-primary',
+          preset === 'custom' && 'border-foreground bg-foreground text-background',
         )}
       />
       <span className="sr-only">{rangeLabel(range)}</span>

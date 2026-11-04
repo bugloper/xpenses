@@ -441,7 +441,7 @@ export function RecurringSection() {
           className="py-6"
         />
       ) : (
-        <ul className="bg-card ring-foreground/10 divide-y rounded-2xl ring-1">
+        <ul className="bg-card border divide-y rounded-[1.25rem]">
           {list.map((r) => (
             <li key={r.id} className="flex items-center gap-3 px-4 py-3">
               <div className="min-w-0 flex-1">

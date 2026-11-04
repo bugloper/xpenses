@@ -43,7 +43,7 @@ export function CategoriesTab({
           { value: 'income', label: 'Income', tone: 'income' },
         ]}
       />
-      <section className="bg-card ring-foreground/10 rounded-2xl p-4 ring-1">
+      <section className="bg-card border rounded-[1.25rem] p-4">
         {q.isPending ? (
           <Skeleton className="h-64 w-full rounded-xl" />
         ) : q.error ? (

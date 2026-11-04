@@ -159,7 +159,7 @@ function GroupCard({
 }) {
   const { parent, children } = group
   return (
-    <li className="bg-card ring-foreground/10 rounded-2xl ring-1">
+    <li className="bg-card border rounded-[1.25rem]">
       <div className="flex items-center gap-3 p-3">
         <button
           type="button"

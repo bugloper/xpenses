@@ -87,7 +87,7 @@ export function OverviewTab({
           </Tile>
         </div>
       )}
-      <section className="bg-card ring-foreground/10 flex flex-col gap-3 rounded-2xl p-4 ring-1">
+      <section className="bg-card border flex flex-col gap-3 rounded-[1.25rem] p-4">
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-sm font-medium">Income vs expenses</h2>
           <Segmented
@@ -141,7 +141,7 @@ function Tile({
   children: React.ReactNode
 }) {
   return (
-    <div className="bg-card ring-foreground/10 rounded-2xl p-3 ring-1">
+    <div className="bg-card border rounded-[1.25rem] p-3">
       <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
         <span
           className={cn(

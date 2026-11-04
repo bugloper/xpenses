@@ -19,7 +19,7 @@ test('set, edit and remove a monthly budget from the Budgets page', async ({ pag
 
   const row = page.getByRole('button', { name: 'Edit Eating out budget' })
   await expect(row).toBeVisible()
-  await expect(row).toContainText('5,000.00')
+  await expect(row).toContainText('Nu. 5,000')
 
   // Edit: the amount is prefilled, the category already chosen.
   await row.click()
@@ -29,7 +29,7 @@ test('set, edit and remove a monthly budget from the Budgets page', async ({ pag
   await page.getByLabel('Amount').fill('6500')
   await page.getByRole('button', { name: 'Save budget' }).click()
   await expect(page.getByText('Budget updated')).toBeVisible()
-  await expect(row).toContainText('6,500.00')
+  await expect(row).toContainText('Nu. 6,500')
 
   // Remove.
   await row.click()

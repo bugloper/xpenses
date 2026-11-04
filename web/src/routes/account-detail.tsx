@@ -47,7 +47,7 @@ function AccountDetailPage() {
           <ArrowLeft data-icon="inline-start" /> Accounts
         </Link>
       </Button>
-      <div className="bg-card ring-foreground/10 flex flex-col gap-4 rounded-2xl p-5 ring-1">
+      <div className="bg-card border flex flex-col gap-4 rounded-[1.25rem] p-5">
         <div className="flex items-center gap-3">
           <AccountIcon type={a.type} />
           <div className="min-w-0 flex-1">

@@ -19,15 +19,17 @@ function readStoredTheme(): Theme {
   } catch {
     // storage unavailable (private mode); fall through
   }
-  return 'dark'
+  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
 }
 
 function applyTheme(theme: Theme) {
   const root = document.documentElement
   root.classList.toggle('dark', theme === 'dark')
   root.style.colorScheme = theme
-  const meta = document.querySelector('meta[name="theme-color"]')
-  if (meta) meta.setAttribute('content', theme === 'dark' ? '#0b0f0e' : '#ffffff')
+  for (const meta of document.querySelectorAll('meta[name="theme-color"]')) {
+    meta.removeAttribute('media')
+    meta.setAttribute('content', theme === 'dark' ? '#111318' : '#f7f7f9')
+  }
 }
 
 // Theme provider without next-themes: that library injects a <script> during
@@ -53,7 +55,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 export function useTheme(): ThemeContextValue {
   const ctx = useContext(ThemeContext)
   if (!ctx) {
-    return { theme: 'dark', setTheme: () => {}, toggle: () => {} }
+    return { theme: 'light', setTheme: () => {}, toggle: () => {} }
   }
   return ctx
 }

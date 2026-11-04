@@ -70,7 +70,7 @@ export function BudgetsTab({
       ) : q.error ? (
         <ErrorState error={q.error} onRetry={() => void q.refetch()} compact />
       ) : rows.length === 0 ? (
-        <div className="bg-card ring-foreground/10 rounded-2xl ring-1">
+        <div className="bg-card border rounded-[1.25rem]">
           <EmptyState
             icon={Target}
             title="No budgets set"
@@ -85,7 +85,7 @@ export function BudgetsTab({
         </div>
       ) : (
         <>
-          <div className="bg-card ring-foreground/10 flex items-center justify-between gap-3 rounded-2xl px-4 py-3 text-sm ring-1">
+          <div className="bg-card border flex items-center justify-between gap-3 rounded-[1.25rem] px-4 py-3 text-sm">
             <span className="text-muted-foreground">Total</span>
             <span className="tabular">
               <Money
@@ -100,7 +100,7 @@ export function BudgetsTab({
               </span>
             </span>
           </div>
-          <ul className="bg-card ring-foreground/10 divide-y rounded-2xl px-4 ring-1">
+          <ul className="bg-card border divide-y rounded-[1.25rem] px-4">
             {rows.map((b) => {
               const lvl = LEVEL[b.level] ?? LEVEL.ok
               const width = Math.max(0, Math.min(100, b.pct))

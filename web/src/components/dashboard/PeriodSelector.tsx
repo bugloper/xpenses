@@ -29,8 +29,8 @@ export function PeriodSelector({
           className={cn(
             'h-9 shrink-0 rounded-full border px-3.5 text-sm font-medium transition-colors',
             preset === p.value
-              ? 'border-primary bg-primary/10 text-primary'
-              : 'border-border text-muted-foreground hover:bg-muted hover:text-foreground',
+              ? 'border-foreground bg-foreground text-background'
+              : 'border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground',
           )}
         >
           {p.label}
@@ -42,7 +42,7 @@ export function PeriodSelector({
         onChange={(r) => (r ? onChange('custom', r) : onChange('month', presetRange('month')))}
         className={cn(
           'h-9 shrink-0 rounded-full',
-          preset === 'custom' && 'border-primary bg-primary/10 text-primary',
+          preset === 'custom' && 'border-foreground bg-foreground text-background',
         )}
       />
       <span className="sr-only">{rangeLabel(range)}</span>

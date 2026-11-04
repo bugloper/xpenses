@@ -93,7 +93,7 @@ function BudgetsPage() {
         />
       ) : (
         <>
-          <div className="bg-card ring-foreground/10 flex items-center justify-between gap-3 rounded-2xl px-4 py-3 text-sm ring-1">
+          <div className="bg-card border flex items-center justify-between gap-3 rounded-[1.25rem] px-4 py-3 text-sm">
             <span className="text-muted-foreground">Total</span>
             <span className="tabular">
               <Money
@@ -108,7 +108,7 @@ function BudgetsPage() {
               </span>
             </span>
           </div>
-          <ul className="bg-card ring-foreground/10 divide-y rounded-2xl px-2 ring-1" aria-label="Budgets">
+          <ul className="bg-card border divide-y rounded-[1.25rem] px-2" aria-label="Budgets">
             {rows.map((b) => {
               const lvl = LEVEL[b.level] ?? LEVEL.ok
               const width = Math.max(0, Math.min(100, b.pct))

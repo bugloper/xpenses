@@ -38,10 +38,13 @@ export type FormatMoneyOptions = {
   bare?: boolean
 }
 
-/** `formatMoney(123456, 'BTN') === 'Nu. 1,234.56'`, `formatMoney(-8540) === '-Nu. 85.40'`. */
+/**
+ * `formatMoney(123456, 'BTN') === 'Nu. 1,234.56'`, `formatMoney(-8540) === '-Nu. 85.40'`.
+ * Whole amounts drop the decimals: `formatMoney(500000) === 'Nu. 5,000'`.
+ */
 export function formatMoney(minor: number, currency: string = 'BTN', opts: FormatMoneyOptions = {}): string {
   const { negative, whole, fraction } = splitMinor(minor)
-  const number = `${groupThousands(whole)}.${fraction}`
+  const number = fraction === '00' ? groupThousands(whole) : `${groupThousands(whole)}.${fraction}`
   const body = opts.bare ? number : `${currencySymbol(currency)} ${number}`
   const sign = opts.sign ?? 'auto'
   const isZero = Math.trunc(minor) === 0

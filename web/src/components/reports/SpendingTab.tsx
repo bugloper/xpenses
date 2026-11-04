@@ -72,7 +72,7 @@ export function SpendingTab({
           loading={q.isPending}
         />
       </div>
-      <section className="bg-card ring-foreground/10 flex flex-col gap-3 rounded-2xl p-4 ring-1">
+      <section className="bg-card border flex flex-col gap-3 rounded-[1.25rem] p-4">
         <h2 className="text-sm font-medium">
           {granularity === 'day' ? 'Daily spending' : 'Weekly spending'}
         </h2>
@@ -99,7 +99,7 @@ export function SpendingTab({
 
 function Stat({ label, value, loading }: { label: string; value: React.ReactNode; loading: boolean }) {
   return (
-    <div className="bg-card ring-foreground/10 flex flex-col rounded-2xl px-3 py-2.5 ring-1">
+    <div className="bg-card border flex flex-col rounded-[1.25rem] px-3 py-2.5">
       <span className="text-muted-foreground text-[11px]">{label}</span>
       {loading ? <Skeleton className="mt-1 h-5 w-20" /> : <span className="tabular text-sm">{value}</span>}
     </div>

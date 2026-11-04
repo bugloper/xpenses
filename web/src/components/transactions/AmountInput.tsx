@@ -26,7 +26,7 @@ export const AmountInput = forwardRef<HTMLInputElement, Props>(function AmountIn
   return (
     <div
       className={cn(
-        'bg-muted/60 flex items-baseline justify-center gap-2 rounded-2xl px-4 py-5',
+        'bg-muted/60 flex items-baseline justify-center gap-2 rounded-[1.25rem] px-4 py-5',
         invalid && 'ring-destructive/50 ring-2',
       )}
     >

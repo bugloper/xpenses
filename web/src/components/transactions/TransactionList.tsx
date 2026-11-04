@@ -63,13 +63,13 @@ export function TransactionList({
       {groups.map((g) => (
         <section key={g.date} className="flex flex-col gap-1">
           <div className="text-muted-foreground flex items-center justify-between px-2 text-xs">
-            <span className="font-medium">{formatDayHeading(g.date)}</span>
+            <span className="font-semibold tracking-wide uppercase">{formatDayHeading(g.date)}</span>
             <span className="tabular flex items-center gap-2">
               {g.income > 0 && <Money minor={g.income} currency={currency} tone="income" sign="always" />}
               {g.expense > 0 && <Money minor={-g.expense} currency={currency} tone="expense" />}
             </span>
           </div>
-          <div className="bg-card ring-foreground/10 flex flex-col rounded-2xl p-1 ring-1">
+          <div className="bg-card divide-y overflow-hidden rounded-[1.25rem] border">
             {g.rows.map((row) => (
               <TransactionRow
                 key={row.tx.id}

@@ -16,13 +16,13 @@ export function AccountsTab({ range }: { range: DateRange }) {
   const rows = q.data
   if (rows.length === 0)
     return (
-      <div className="bg-card ring-foreground/10 rounded-2xl ring-1">
+      <div className="bg-card border rounded-[1.25rem]">
         <EmptyState icon={Wallet} title="No accounts yet" className="py-8" />
       </div>
     )
   if (desktop)
     return (
-      <div className="bg-card ring-foreground/10 overflow-x-auto rounded-2xl ring-1">
+      <div className="bg-card border overflow-x-auto rounded-[1.25rem]">
         <Table>
           <TableHeader>
             <TableRow>
@@ -80,7 +80,7 @@ export function AccountsTab({ range }: { range: DateRange }) {
       {rows.map((a) => (
         <li
           key={a.account_id}
-          className="bg-card ring-foreground/10 flex flex-col gap-2 rounded-2xl p-4 ring-1"
+          className="bg-card border flex flex-col gap-2 rounded-[1.25rem] p-4"
         >
           <Link to="/accounts/$id" params={{ id: a.account_id }} className="flex items-center gap-3">
             <AccountIcon type={a.type} />

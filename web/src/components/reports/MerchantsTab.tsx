@@ -35,7 +35,7 @@ export function MerchantsTab({
           { value: 'income', label: 'Received from', tone: 'income' },
         ]}
       />
-      <section className="bg-card ring-foreground/10 rounded-2xl p-2 ring-1">
+      <section className="bg-card border rounded-[1.25rem] p-2">
         {q.isPending ? (
           <ListSkeleton rows={6} className="p-2" />
         ) : q.error ? (

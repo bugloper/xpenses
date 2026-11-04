@@ -25,7 +25,7 @@ function AddPage() {
   return (
     <div className="mx-auto flex max-w-xl flex-col gap-5">
       <PageHeader title="Add transaction" description="Quick entry. Works offline." />
-      <div className="bg-card ring-foreground/10 rounded-2xl p-4 ring-1 sm:p-6">
+      <div className="bg-card border rounded-[1.25rem] p-4 sm:p-6">
         <TransactionForm
           initial={initial}
           mode="create"

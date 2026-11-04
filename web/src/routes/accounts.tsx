@@ -65,7 +65,7 @@ function AccountsPage() {
           </>
         }
       />
-      <div className="bg-card ring-foreground/10 rounded-2xl p-5 ring-1">
+      <div className="bg-card border rounded-[1.25rem] p-5">
         <p className="text-muted-foreground text-sm">Total across active accounts</p>
         <Money
           minor={total}
@@ -93,7 +93,7 @@ function AccountsPage() {
           {accounts.map((a) => (
             <li
               key={a.id}
-              className="bg-card ring-foreground/10 hover:bg-muted/40 flex items-center gap-3 rounded-2xl p-3 ring-1 transition-colors"
+              className="bg-card border hover:bg-muted/40 flex items-center gap-3 rounded-[1.25rem] p-3 transition-colors"
             >
               <Link
                 to="/accounts/$id"

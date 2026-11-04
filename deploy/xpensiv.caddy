@@ -1,3 +1,5 @@
+# Xpensiv's site on the VM's shared Caddy (README "Deploying on a server").
+# XPENSIV_DOMAIN is set in the proxy's .env.
 {$XPENSIV_DOMAIN} {
 	encode zstd gzip
 	# Restore uploads are capped by the app (XPENSIV_MAX_UPLOAD_BYTES × 10).

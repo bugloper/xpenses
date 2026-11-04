@@ -79,7 +79,7 @@ export function TransactionRow({
           currency={tx.currency}
           tone={tone}
           sign={isTransfer && !perspectiveAccountId ? 'never' : 'always'}
-          className={cn('text-sm font-semibold', tx.status === 'void' && 'line-through opacity-60')}
+          className={cn('text-[0.9375rem] font-semibold', tx.status === 'void' && 'line-through opacity-60')}
         />
         {tx.category_name && !isTransfer && tx.payee && (
           <span className="text-muted-foreground text-[11px]">{tx.category_name}</span>
@@ -88,7 +88,7 @@ export function TransactionRow({
     </>
   )
   const cls =
-    'flex w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left transition-colors hover:bg-muted/60'
+    'flex min-h-15 w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 sm:px-5'
   if (pending) {
     return (
       <button type="button" className={cls} onClick={() => onClick?.(tx)}>

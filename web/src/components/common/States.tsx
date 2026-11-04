@@ -19,13 +19,13 @@ export function EmptyState({
   className?: string
 }) {
   return (
-    <div className={cn('flex flex-col items-center justify-center gap-2 px-6 py-12 text-center', className)}>
-      <span className="bg-muted text-muted-foreground flex size-12 items-center justify-center rounded-2xl">
+    <div className={cn('flex flex-col items-center justify-center px-6 py-10 text-center', className)}>
+      <span className="bg-muted text-muted-foreground mb-3 flex size-11 items-center justify-center rounded-xl">
         <Icon className="size-5" />
       </span>
-      <p className="mt-1 font-medium">{title}</p>
-      {description && <p className="text-muted-foreground max-w-xs text-sm">{description}</p>}
-      {action && <div className="mt-2">{action}</div>}
+      <p className="text-sm font-semibold">{title}</p>
+      {description && <p className="text-muted-foreground mt-1 max-w-sm text-sm">{description}</p>}
+      {action && <div className="mt-4">{action}</div>}
     </div>
   )
 }
@@ -62,7 +62,7 @@ export function ErrorState({
         className,
       )}
     >
-      <span className="bg-destructive/10 text-destructive flex size-10 items-center justify-center rounded-2xl">
+      <span className="bg-destructive/10 text-destructive flex size-10 items-center justify-center rounded-xl">
         <Icon className="size-5" />
       </span>
       <p className="font-medium">{heading}</p>

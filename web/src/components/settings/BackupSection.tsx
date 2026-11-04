@@ -54,7 +54,7 @@ export function BackupSection() {
 
   return (
     <div className="grid gap-4 sm:grid-cols-2">
-      <div className="bg-card ring-foreground/10 flex flex-col gap-3 rounded-2xl p-4 ring-1">
+      <div className="bg-card border flex flex-col gap-3 rounded-[1.25rem] p-4">
         <h3 className="font-medium">Download backup</h3>
         <Field>
           <FieldLabel htmlFor="backup-pass">Passphrase (optional)</FieldLabel>
@@ -71,7 +71,7 @@ export function BackupSection() {
           <Download data-icon="inline-start" /> {busy === 'download' ? 'Preparing…' : 'Download'}
         </Button>
       </div>
-      <div className="bg-card ring-foreground/10 flex flex-col gap-3 rounded-2xl p-4 ring-1">
+      <div className="bg-card border flex flex-col gap-3 rounded-[1.25rem] p-4">
         <h3 className="font-medium">Restore backup</h3>
         <Field>
           <FieldLabel htmlFor="restore-file">Backup file</FieldLabel>

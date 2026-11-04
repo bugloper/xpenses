@@ -49,7 +49,7 @@ function TransactionDetailPage() {
           <ArrowLeft data-icon="inline-start" /> Transactions
         </Link>
       </Button>
-      <div className="bg-card ring-foreground/10 flex flex-col items-center gap-3 rounded-2xl p-6 text-center ring-1">
+      <div className="bg-card border flex flex-col items-center gap-3 rounded-[1.25rem] p-6 text-center">
         <CategoryIcon
           icon={tx.category_icon}
           color={tx.category_color}
@@ -80,7 +80,7 @@ function TransactionDetailPage() {
           )}
         </div>
       </div>
-      <div className="bg-card ring-foreground/10 divide-y rounded-2xl px-4 ring-1">
+      <div className="bg-card border divide-y rounded-[1.25rem] px-4">
         <Row label="Date" value={formatShortDate(tx.transaction_date)} />
         <Row
           label={isTransfer ? 'From' : 'Account'}

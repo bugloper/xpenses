@@ -78,7 +78,7 @@ export function AccountSection() {
   if (!user) return null
   return (
     <div className="flex flex-col gap-4">
-      <div className="bg-card ring-foreground/10 divide-y rounded-2xl px-4 ring-1">
+      <div className="bg-card border divide-y rounded-[1.25rem] px-4">
         <div className="flex items-center gap-2 py-4">
           <p className="text-sm font-medium">Signed in as {user.name}</p>
           <RoleBadge user={user} />
@@ -86,7 +86,7 @@ export function AccountSection() {
         {/* Keyed on the server value so an external rename resets the draft. */}
         <ProfileRows key={user.name} name={user.name} email={user.email} />
       </div>
-      <div className="bg-card ring-foreground/10 rounded-2xl p-4 ring-1">
+      <div className="bg-card border rounded-[1.25rem] p-4">
         <h3 className="mb-3 text-sm font-medium">Change password</h3>
         <ChangePasswordForm />
       </div>

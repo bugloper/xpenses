@@ -85,33 +85,62 @@ docker compose up -d --build     # http://127.0.0.1:8080, data in the xpensiv-da
 
 ### Deploying on a server (HTTPS)
 
-`docker-compose.prod.yml` adds a Caddy reverse proxy that obtains and renews a Let's Encrypt
-certificate automatically. Point a DNS name at the server, then:
+On the server, one Caddy serves every app on the machine: it terminates TLS on 80/443 with
+certificates from Let's Encrypt, and reaches each app over a shared Docker network called `edge`.
+Each app ships its own site file — this one's is `deploy/xpensiv.caddy` — so redeploying one app
+never touches another's. `docker-compose.prod.yml` keeps the app off the host's ports and puts it
+on `edge`. The app runs with `XPENSIV_TRUSTED_PROXY=true` (so login throttling sees real client
+IPs and session cookies are marked Secure) and `XPENSIV_CORS_ORIGIN=` (same-origin only). The
+PWA, the offline queue and the install prompt all require HTTPS, which this setup provides.
+
+**Once per server**, the network and the proxy at `/opt/proxy`:
 
 ```sh
-export XPENSIV_DOMAIN=xpensiv.example.com
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+docker network create edge
+mkdir -p /opt/proxy/sites
+cat > /opt/proxy/Caddyfile <<'CADDY'
+import sites/*.caddy
+CADDY
+cat > /opt/proxy/docker-compose.yml <<'COMPOSE'
+services:
+  caddy:
+    image: caddy:2
+    container_name: caddy
+    restart: unless-stopped
+    ports: ["80:80", "443:443", "443:443/udp"]
+    env_file: .env
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./sites:/etc/caddy/sites:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks: [edge]
+networks:
+  edge:
+    external: true
+volumes:
+  caddy-data:
+  caddy-config:
+COMPOSE
+echo 'XPENSIV_DOMAIN=xpensiv.example.com' > /opt/proxy/.env
+cd /opt/proxy && docker compose up -d
 ```
 
-Caddy terminates TLS on 80/443 and forwards to the app, which is not published on the host.
-The app runs with `XPENSIV_TRUSTED_PROXY=true` (so login throttling sees real client IPs and
-session cookies are marked Secure) and `XPENSIV_CORS_ORIGIN=` (same-origin only). The PWA, the
-offline queue and the install prompt all require HTTPS, which this setup provides.
+The proxy's `.env` holds every app's domain. **No domain yet?** Use an [sslip.io](https://sslip.io)
+name for the server's public IP, e.g. `XPENSIV_DOMAIN=203.0.113.10.sslip.io`. It resolves to that
+IP without any DNS setup and Let's Encrypt issues a normal certificate for it. When you later get
+a real domain, change it in `/opt/proxy/.env` and restart the proxy (`docker compose up -d
+--force-recreate`); Caddy fetches the new certificate itself.
 
-**No domain yet?** Use a [sslip.io](https://sslip.io) name for the server's public IP, e.g.
-`XPENSIV_DOMAIN=203.0.113.10.sslip.io`. It resolves to that IP without any DNS setup and Let's
-Encrypt issues a normal certificate for it. Put the variable in a `.env` file next to the compose
-files so `docker compose` picks it up on every run. When you later get a real domain, change
-`XPENSIV_DOMAIN` and run the same `up -d` command; Caddy fetches the new certificate itself.
-
-To redeploy after a change, replace the source on the server and rebuild. Clear the old tree
-first (keeping `.env`): extracting over it would leave behind files that were deleted from the
-repo, and a stale file can break the build.
+**To deploy or redeploy**, replace the source on the server and rebuild, then hand the proxy the
+site file. Clear the old tree first (keeping `.env`): extracting over it would leave behind files
+that were deleted from the repo, and a stale file can break the build.
 
 ```sh
-ssh myserver 'find /opt/xpensiv -mindepth 1 -maxdepth 1 ! -name .env -exec rm -rf {} +'
+ssh myserver 'mkdir -p /opt/xpensiv && find /opt/xpensiv -mindepth 1 -maxdepth 1 ! -name .env -exec rm -rf {} +'
 git archive HEAD | ssh myserver 'tar -x -C /opt/xpensiv'
 ssh myserver 'cd /opt/xpensiv && docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build'
+ssh myserver 'cp /opt/xpensiv/deploy/xpensiv.caddy /opt/proxy/sites/ && docker exec caddy caddy reload --config /etc/caddy/Caddyfile'
 ```
 
 Data lives in the `xpensiv-data` volume and survives rebuilds.
@@ -132,7 +161,7 @@ This app holds personal financial data.
 - Set `XPENSIV_TRUSTED_PROXY=true` only when a proxy you control sits in front; otherwise clients could spoof `X-Forwarded-For` and evade login throttling.
 - Set `XPENSIV_CORS_ORIGIN=` (empty) in production. The Vite dev origin is only needed for `make dev`.
 - CSRF: mutating API calls must carry the `X-Xpensiv-Client` header and, when present, an `Origin` matching the host; cookies are `SameSite=Strict`.
-- No third-party analytics, fonts, or external API calls.
+- No third-party analytics or external API calls. The Inter typeface is loaded from Google Fonts; swap the `<link>` in `web/index.html` for a self-hosted copy if that matters to you.
 - Logs contain method/path/status/request id only — never amounts, descriptions, account numbers, emails or passwords.
 - The database file is `0600`, backups `0600`, and backup/restore is restricted to the admin because a snapshot contains every user's data.
 - Rate limiting is per process; if you ever run several replicas, put a shared limiter in the proxy.

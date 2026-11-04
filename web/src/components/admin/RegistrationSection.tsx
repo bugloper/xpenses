@@ -8,10 +8,10 @@ import { useAdminSettings, useUpdateAdminSettings } from '@/lib/queries/auth'
 export function RegistrationSection() {
   const { data, isPending, error, refetch } = useAdminSettings()
   const update = useUpdateAdminSettings()
-  if (isPending) return <Skeleton className="h-16 w-full rounded-2xl" />
+  if (isPending) return <Skeleton className="h-16 w-full rounded-[1.25rem]" />
   if (error) return <ErrorState error={error} onRetry={() => void refetch()} compact />
   return (
-    <div className="bg-card ring-foreground/10 flex items-center justify-between gap-4 rounded-2xl p-4 ring-1">
+    <div className="bg-card border flex items-center justify-between gap-4 rounded-[1.25rem] p-4">
       <div>
         <p className="text-sm font-medium">Open registration</p>
         <p className="text-muted-foreground text-xs">

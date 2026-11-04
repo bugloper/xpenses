@@ -20,7 +20,7 @@ export function Avatar({ user, className }: { user: User; className?: string }) 
     <span
       aria-hidden
       className={cn(
-        'bg-primary/15 text-primary flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold',
+        'bg-accent text-accent-foreground flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold select-none',
         className,
       )}
     >
@@ -47,7 +47,7 @@ export function SidebarUser() {
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className="hover:bg-sidebar-accent/60 flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors"
+          className="hover:bg-muted flex w-full items-center gap-3 rounded-lg p-2 text-left transition-colors"
           aria-label={`Signed in as ${user.name}`}
         >
           <Avatar user={user} />
@@ -82,7 +82,7 @@ export function MoreSheetUser() {
   const { user } = useAuth()
   if (!user) return null
   return (
-    <div className="bg-background mb-3 flex items-center gap-3 rounded-xl border px-3 py-3">
+    <div className="bg-card mb-3 flex items-center gap-3 rounded-[1.25rem] border px-3 py-3">
       <Avatar user={user} />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">

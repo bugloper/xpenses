@@ -87,7 +87,7 @@ export function CategoryField({
                 onClick={() => onChange(active ? undefined : c.id)}
                 className={cn(
                   'flex shrink-0 items-center gap-1.5 rounded-full border py-1 pr-3 pl-1 text-xs font-medium transition-colors',
-                  active ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:text-foreground',
+                  active ? 'border-foreground bg-foreground text-background' : 'border-border text-muted-foreground hover:text-foreground',
                 )}
               >
                 <CategoryIcon icon={c.icon} color={c.color} size="sm" className="size-6 [&>svg]:size-3.5" />

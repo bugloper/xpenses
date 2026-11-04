@@ -66,11 +66,11 @@ export function UsersSection() {
   const { data, isPending, error, refetch } = useAdminUsers()
   const del = useDeleteAdminUser()
   const [doomed, setDoomed] = useState<AdminUser | null>(null)
-  if (isPending) return <Skeleton className="h-40 w-full rounded-2xl" />
+  if (isPending) return <Skeleton className="h-40 w-full rounded-[1.25rem]" />
   if (error) return <ErrorState error={error} onRetry={() => void refetch()} compact />
   return (
     <>
-      <div className="bg-card ring-foreground/10 rounded-2xl ring-1">
+      <div className="bg-card border rounded-[1.25rem]">
         {/* Table on wide screens */}
         <table className="hidden w-full text-sm sm:table">
           <thead className="text-muted-foreground text-xs">

@@ -81,11 +81,11 @@ function SessionRow({ s }: { s: AuthSession }) {
 
 export function SessionsSection() {
   const { data, isPending, error, refetch } = useSessions()
-  if (isPending) return <Skeleton className="h-24 w-full rounded-2xl" />
+  if (isPending) return <Skeleton className="h-24 w-full rounded-[1.25rem]" />
   if (error) return <ErrorState error={error} onRetry={() => void refetch()} compact />
   const sessions = [...data].sort((a, b) => Number(b.current) - Number(a.current))
   return (
-    <div className="bg-card ring-foreground/10 rounded-2xl px-4 ring-1">
+    <div className="bg-card border rounded-[1.25rem] px-4">
       <ul className="divide-y">
         {sessions.map((s) => (
           <SessionRow key={s.id} s={s} />

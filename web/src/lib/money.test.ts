@@ -4,18 +4,18 @@ import { formatMoney, formatPct, minorToDecimalString, parseAmount, signedAmount
 describe('formatMoney', () => {
   it('formats BTN with Nu. symbol and thousands separators', () => {
     expect(formatMoney(123456, 'BTN')).toBe('Nu. 1,234.56')
-    expect(formatMoney(100000000)).toBe('Nu. 1,000,000.00')
+    expect(formatMoney(100000000)).toBe('Nu. 1,000,000')
   })
   it('formats zero', () => {
-    expect(formatMoney(0)).toBe('Nu. 0.00')
-    expect(formatMoney(0, 'BTN', { sign: 'always' })).toBe('Nu. 0.00')
+    expect(formatMoney(0)).toBe('Nu. 0')
+    expect(formatMoney(0, 'BTN', { sign: 'always' })).toBe('Nu. 0')
   })
   it('formats negative values with a leading minus', () => {
     expect(formatMoney(-8540)).toBe('-Nu. 85.40')
     expect(formatMoney(-5)).toBe('-Nu. 0.05')
   })
   it('adds + when sign is always', () => {
-    expect(formatMoney(250000, 'BTN', { sign: 'always' })).toBe('+Nu. 2,500.00')
+    expect(formatMoney(250000, 'BTN', { sign: 'always' })).toBe('+Nu. 2,500')
     expect(formatMoney(-8540, 'BTN', { sign: 'always' })).toBe('-Nu. 85.40')
   })
   it('hides sign when never', () => {

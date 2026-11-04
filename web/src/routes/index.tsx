@@ -100,7 +100,7 @@ function DashboardPage() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Section title={granularity === 'day' ? 'Daily cash flow' : 'Monthly trend'}>
-          <div className="bg-card ring-foreground/10 rounded-2xl p-4 ring-1">
+          <div className="bg-card border rounded-[1.25rem] p-4">
             <Suspense fallback={<Skeleton className="h-56 w-full rounded-xl" />}>
               <CashFlowChart
                 data={cashFlow.data}
@@ -113,7 +113,7 @@ function DashboardPage() {
           </div>
         </Section>
         <Section title="Spending by category">
-          <div className="bg-card ring-foreground/10 rounded-2xl p-4 ring-1">
+          <div className="bg-card border rounded-[1.25rem] p-4">
             <Suspense fallback={<Skeleton className="h-64 w-full rounded-xl" />}>
               <CategoryDonut
                 data={categories.data}
@@ -134,7 +134,7 @@ function DashboardPage() {
             </Button>
           }
         >
-          <div className="bg-card ring-foreground/10 rounded-2xl p-4 ring-1">
+          <div className="bg-card border rounded-[1.25rem] p-4">
             <BudgetList
               data={budgets.data}
               loading={budgets.isPending}

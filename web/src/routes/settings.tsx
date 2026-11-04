@@ -46,7 +46,7 @@ function SettingRow({
 
 function GeneralSettings() {
   const { data, isPending, error, refetch } = useSettings()
-  if (isPending) return <Skeleton className="h-32 w-full rounded-2xl" />
+  if (isPending) return <Skeleton className="h-32 w-full rounded-[1.25rem]" />
   if (error) return <ErrorState error={error} onRetry={() => void refetch()} compact />
   // Keyed on the server values so the local drafts reset whenever they change.
   const cur = data.default_currency ?? 'BTN'
@@ -62,7 +62,7 @@ function GeneralSettingsForm({ currency: initialCurrency }: { currency: string }
       onError: (e) => toast.error(errorMessage(e)),
     })
   return (
-    <div className="bg-card ring-foreground/10 divide-y rounded-2xl px-4 ring-1">
+    <div className="bg-card border divide-y rounded-[1.25rem] px-4">
       <SettingRow
         label="Default currency"
         description="3-letter code used for new accounts and the amount entry."
@@ -96,7 +96,7 @@ function GeneralSettingsForm({ currency: initialCurrency }: { currency: string }
 function OfflineRow() {
   const s = useSyncState()
   return (
-    <div className="bg-card ring-foreground/10 flex flex-col gap-3 rounded-2xl p-4 ring-1 sm:flex-row sm:items-center sm:justify-between">
+    <div className="bg-card border flex flex-col gap-3 rounded-[1.25rem] p-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-center gap-3">
         <span className="bg-muted text-muted-foreground flex size-10 items-center justify-center rounded-xl">
           <CloudUpload className="size-5" />
@@ -165,7 +165,7 @@ function SettingsPage() {
         <SessionsSection />
       </Section>
       <Section title="Appearance">
-        <div className="bg-card ring-foreground/10 rounded-2xl px-4 ring-1">
+        <div className="bg-card border rounded-[1.25rem] px-4">
           <SettingRow label="Theme">
             <Segmented
               value={theme}
@@ -194,7 +194,7 @@ function SettingsPage() {
         <OfflineRow />
       </Section>
       <Section title="App">
-        <div className="bg-card ring-foreground/10 flex flex-col gap-3 rounded-2xl p-4 ring-1">
+        <div className="bg-card border flex flex-col gap-3 rounded-[1.25rem] p-4">
           <InstallRow />
           <Field>
             <FieldLabel>Version</FieldLabel>

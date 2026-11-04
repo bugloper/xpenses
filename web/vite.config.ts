@@ -16,9 +16,9 @@ export default defineConfig({
       manifest: {
         name: 'Xpensiv',
         short_name: 'Xpensiv',
-        description: 'Personal expense tracker and bank reconciliation',
-        theme_color: '#0b0f0e',
-        background_color: '#0b0f0e',
+        description: 'Personal expense tracker',
+        theme_color: '#f7f7f9',
+        background_color: '#f7f7f9',
         display: 'standalone',
         start_url: '/',
         scope: '/',

@@ -47,7 +47,7 @@ export function DateField({
             aria-invalid={invalid}
             className={cn(
               'h-9 justify-start rounded-xl font-normal',
-              value !== t && value !== y && 'border-primary/60',
+              value !== t && value !== y && 'border-foreground bg-foreground text-background hover:bg-foreground/90',
             )}
           >
             <CalendarIcon data-icon="inline-start" className="text-muted-foreground" />
@@ -89,8 +89,8 @@ export function Chip({
       className={cn(
         'h-9 rounded-xl border px-3 text-sm font-medium transition-colors',
         active
-          ? 'border-primary bg-primary/10 text-primary'
-          : 'border-border text-muted-foreground hover:bg-muted hover:text-foreground bg-transparent',
+          ? 'border-foreground bg-foreground text-background'
+          : 'border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground',
         className,
       )}
     >
