@@ -1,0 +1,196 @@
+import { useQueryClient } from '@tanstack/react-query'
+import { useEffect, useMemo, useState } from 'react'
+import { toast } from 'sonner'
+import { ResponsiveSheet } from '@/components/common/ResponsiveSheet'
+import { ListSkeleton } from '@/components/common/States'
+import { errorMessage, isApiError } from '@/lib/api'
+import { minorToDecimalString } from '@/lib/money'
+import {
+  getPending,
+  reviseAndRequeue,
+  submitTransaction,
+  syncManager,
+  type PendingTransaction,
+} from '@/lib/offline'
+import {
+  transactionDependentKeys,
+  useDefaultCurrency,
+  useTransaction,
+  useUpdateSettings,
+  useUpdateTransaction,
+} from '@/lib/queries'
+import { uiStore, useUIStore, type AddPreset } from '@/lib/ui-store'
+import type { CreateTransactionRequest, UpdateTransactionRequest } from '@/types/api'
+import {
+  TransactionForm,
+  defaultValues,
+  fromTransaction,
+  toCreateRequest,
+  type TransactionFormValues,
+} from './TransactionForm'
+
+/** Hook shared by the sheet and the /add page: creates (with offline fallback) and remembers last-used ids. */
+export function useSaveTransaction() {
+  const qc = useQueryClient()
+  const updateSettings = useUpdateSettings()
+  const [submitting, setSubmitting] = useState(false)
+  const [serverErrors, setServerErrors] = useState<Record<string, string> | undefined>()
+
+  async function create(payload: CreateTransactionRequest): Promise<'saved' | 'queued' | 'error'> {
+    setSubmitting(true)
+    setServerErrors(undefined)
+    try {
+      const res = await submitTransaction(payload)
+      for (const k of transactionDependentKeys) void qc.invalidateQueries({ queryKey: k })
+      // Remember last used on the server too (best effort, never blocks).
+      const patch: Record<string, string> = { 'ui.last_account_id': payload.account_id }
+      if (payload.category_id) patch['ui.last_category_id'] = payload.category_id
+      updateSettings.mutate(patch, { onError: () => undefined })
+      if (res.queued) {
+        toast.info('Saved offline', { description: 'It will sync when you are back online.' })
+        return 'queued'
+      }
+      toast.success('Transaction saved')
+      return 'saved'
+    } catch (e) {
+      if (isApiError(e) && e.isValidation && Object.keys(e.details).length) setServerErrors(e.details)
+      toast.error(errorMessage(e, 'Could not save'))
+      return 'error'
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return { create, submitting, serverErrors, setServerErrors, setSubmitting }
+}
+
+/** Convert form values into a PATCH body for an existing transaction. */
+export function toUpdateRequest(v: TransactionFormValues, currency: string): UpdateTransactionRequest {
+  const c = toCreateRequest(v, currency)
+  return {
+    type: c.type,
+    amount: c.amount,
+    currency: c.currency,
+    account_id: c.account_id,
+    transfer_account_id: c.transfer_account_id ?? undefined,
+    clear_transfer_account: !c.transfer_account_id,
+    category_id: c.category_id ?? undefined,
+    clear_category: !c.category_id,
+    description: c.description,
+    payee: c.payee,
+    transaction_date: c.transaction_date,
+    notes: c.notes,
+    tags: c.tags,
+  }
+}
+
+export function AddTransactionSheet() {
+  const { addOpen, addPreset } = useUIStore()
+  const editId = addPreset?.editId ?? ''
+  const pendingClientId = addPreset?.pendingClientId ?? ''
+  const title = editId ? 'Edit transaction' : pendingClientId ? 'Fix queued transaction' : 'Add transaction'
+  return (
+    <ResponsiveSheet
+      open={addOpen}
+      onOpenChange={(o) => (o ? uiStore.openAdd(addPreset) : uiStore.closeAdd())}
+      title={title}
+      desktopWidth="sm:max-w-lg"
+    >
+      {/* Keyed so every open starts with fresh local state. */}
+      {addOpen && <SheetBody key={`${editId}|${pendingClientId}`} preset={addPreset} />}
+    </ResponsiveSheet>
+  )
+}
+
+function SheetBody({ preset }: { preset: AddPreset | null }) {
+  const currency = useDefaultCurrency()
+  const { create, submitting, serverErrors, setServerErrors, setSubmitting } = useSaveTransaction()
+  const update = useUpdateTransaction()
+  const editId = preset?.editId ?? ''
+  const pendingClientId = preset?.pendingClientId ?? ''
+  const { data: editing, isLoading: loadingEdit } = useTransaction(editId)
+  const [pendingItem, setPendingItem] = useState<PendingTransaction | null>(null)
+
+  useEffect(() => {
+    if (!pendingClientId) return
+    let cancelled = false
+    void getPending(pendingClientId).then((p) => {
+      if (cancelled) return
+      setPendingItem(p ?? null)
+      if (p?.last_error) setServerErrors({ amount: p.last_error })
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [pendingClientId, setServerErrors])
+
+  const mode: 'create' | 'edit' = editId ? 'edit' : 'create'
+  const initial = useMemo<TransactionFormValues | null>(() => {
+    if (editId) return editing ? fromTransaction(editing) : null
+    if (pendingClientId) {
+      if (!pendingItem) return null
+      const p = pendingItem.payload
+      return {
+        type: p.type,
+        amount: minorToDecimalString(p.amount),
+        account_id: p.account_id,
+        transfer_account_id: p.transfer_account_id ?? undefined,
+        category_id: p.category_id ?? undefined,
+        transaction_date: p.transaction_date,
+        payee: p.payee ?? '',
+        description: p.description ?? '',
+        notes: p.notes ?? '',
+        tags: (p.tags ?? []).join(', '),
+      }
+    }
+    return defaultValues({
+      type: preset?.type,
+      account_id: preset?.account_id,
+      transfer_account_id: preset?.transfer_account_id,
+      category_id: preset?.category_id,
+    })
+  }, [editId, editing, pendingClientId, pendingItem, preset])
+
+  async function handleSubmit(values: TransactionFormValues, opts: { addAnother: boolean }) {
+    if (mode === 'edit' && editing) {
+      setSubmitting(true)
+      try {
+        await update.mutateAsync({ id: editing.id, ...toUpdateRequest(values, editing.currency || currency) })
+        toast.success('Transaction updated')
+        uiStore.closeAdd()
+      } catch (e) {
+        if (isApiError(e) && e.isValidation && Object.keys(e.details).length) setServerErrors(e.details)
+        toast.error(errorMessage(e, 'Could not update'))
+      } finally {
+        setSubmitting(false)
+      }
+      return
+    }
+    if (pendingItem) {
+      await reviseAndRequeue(pendingItem.client_id, toCreateRequest(values, currency))
+      void syncManager.syncNow({ force: true })
+      toast.success('Queued again')
+      uiStore.closeAdd()
+      return
+    }
+    const result = await create(toCreateRequest(values, currency))
+    if (result === 'error') return
+    if (!opts.addAnother) uiStore.closeAdd()
+  }
+
+  const loading = (mode === 'edit' && loadingEdit) || (!!pendingClientId && !pendingItem)
+  if (loading || !initial) return <ListSkeleton rows={4} />
+  return (
+    <TransactionForm
+      formId="sheet-transaction-form"
+      initial={initial}
+      mode={mode}
+      currency={editing?.currency || currency}
+      submitting={submitting}
+      serverErrors={serverErrors}
+      onSubmit={handleSubmit}
+      onCancel={uiStore.closeAdd}
+      allowAddAnother={mode === 'create' && !pendingItem}
+    />
+  )
+}

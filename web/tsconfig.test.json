@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.test.tsbuildinfo",
+    "types": [
+      "vite/client",
+      "vitest/globals",
+      "@testing-library/jest-dom/vitest",
+      "vite-plugin-pwa/react",
+      "vite-plugin-pwa/client"
+    ],
+    "noUnusedLocals": false
+  },
+  "include": ["src", "e2e", "vitest.config.ts", "playwright.config.ts"],
+  "exclude": []
+}
