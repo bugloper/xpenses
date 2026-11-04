@@ -31,7 +31,7 @@ func Load() (Config, error) {
 		MaxUploadBytes:  10 << 20,
 		LogLevel:        getenv("XPENSIV_LOG_LEVEL", "info"),
 		StaticDir:       getenv("XPENSIV_STATIC_DIR", "./web/dist"),
-		CORSOrigin:      getenv("XPENSIV_CORS_ORIGIN", "http://localhost:5173"),
+		CORSOrigin:      corsOrigin(),
 		DefaultCurrency: getenv("XPENSIV_DEFAULT_CURRENCY", "BTN"),
 		SecureCookies:   getenv("XPENSIV_SECURE_COOKIES", "auto"),
 		TrustedProxy:    getenv("XPENSIV_TRUSTED_PROXY", "false") == "true",
@@ -59,6 +59,15 @@ func (c Config) StatementsDir() string { return c.DataDir + "/statements" }
 
 // BackupsDir returns where backups are written.
 func (c Config) BackupsDir() string { return c.DataDir + "/backups" }
+
+// corsOrigin defaults to the Vite dev origin but, unlike getenv, honours an
+// explicitly empty XPENSIV_CORS_ORIGIN= (the documented production setting).
+func corsOrigin() string {
+	if v, ok := os.LookupEnv("XPENSIV_CORS_ORIGIN"); ok {
+		return v
+	}
+	return "http://localhost:5173"
+}
 
 func getenv(key, def string) string {
 	if v := os.Getenv(key); v != "" {

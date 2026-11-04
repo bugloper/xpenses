@@ -47,6 +47,7 @@ func NewDeps(cfg config.Config, db *sql.DB) *Deps {
 		Backup:       &services.BackupService{DB: db, DBPath: cfg.DBPath(), BackupsDir: cfg.BackupsDir()},
 	}
 	d.Auth = auth.NewService(db)
+	d.Auth.StatementsDir = cfg.StatementsDir()
 	d.AuthMW = &auth.Middleware{Svc: d.Auth, SecureCookies: cfg.SecureCookies, TrustedProxy: cfg.TrustedProxy, AllowedOrigin: cfg.CORSOrigin}
 	return d
 }

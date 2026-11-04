@@ -7,8 +7,11 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"net/mail"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -29,6 +32,7 @@ const (
 	maxIPFails      = 30
 	inviteDefaultHr = 72
 	inviteMaxHr     = 720
+	maxEmailLen     = 254
 
 	AppSettingRegistrationOpen = "registration_open"
 )
@@ -37,6 +41,15 @@ const (
 type Service struct {
 	DB   *sql.DB
 	Repo Repo
+	// StatementsDir holds the audit PDFs (<id>.pdf) that DeleteUser removes
+	// alongside the user's rows. Empty leaves files alone.
+	StatementsDir string
+
+	// signup serialises Setup and Register. SQLite resolves two concurrent
+	// read-then-write transactions by failing one with SQLITE_BUSY, which would
+	// surface as a 500 instead of the proper 409/400; and a single process is
+	// the only writer, so a mutex is the simplest correct guard.
+	signup sync.Mutex
 }
 
 func NewService(db *sql.DB) *Service { return &Service{DB: db} }
@@ -60,12 +73,28 @@ func newToken() (string, error) {
 
 func normaliseEmail(e string) string { return strings.ToLower(strings.TrimSpace(e)) }
 
+// validEmail accepts a bare, already-normalised address only: no display
+// name, comments, quoting or whitespace (ParseAddress tolerates all of those
+// and would let visually different strings register as distinct accounts), and
+// a dotted domain since this is a public-internet service.
+func validEmail(email string) bool {
+	if email == "" || len(email) > maxEmailLen || strings.ContainsAny(email, " \t\r\n<>()\"") {
+		return false
+	}
+	a, err := mail.ParseAddress(email)
+	if err != nil || a.Name != "" || a.Address != email {
+		return false
+	}
+	at := strings.LastIndexByte(email, '@')
+	return at > 0 && strings.Contains(email[at+1:], ".")
+}
+
 func validateIdentity(name, email, password string) error {
 	v := validators.Errors{}
 	name = strings.TrimSpace(name)
 	v.Required("name", name)
 	v.MaxLen("name", name, 100)
-	if _, err := mail.ParseAddress(email); err != nil || strings.ContainsAny(email, " <>") {
+	if !validEmail(email) {
 		v.Add("email", "must be a valid email address")
 	}
 	if err := ValidatePassword(password); err != nil {
@@ -115,6 +144,8 @@ func (s *Service) Setup(ctx context.Context, name, email, password string) (*mod
 	if err := validateIdentity(name, email, password); err != nil {
 		return nil, err
 	}
+	s.signup.Lock()
+	defer s.signup.Unlock()
 	var user *models.User
 	err := repositories.WithTx(ctx, s.DB, func(tx *sql.Tx) error {
 		n, err := s.Repo.CountUsers(ctx, tx)
@@ -161,6 +192,8 @@ func (s *Service) Register(ctx context.Context, name, email, password, inviteTok
 	if err := validateIdentity(name, email, password); err != nil {
 		return nil, err
 	}
+	s.signup.Lock()
+	defer s.signup.Unlock()
 	var user *models.User
 	err := repositories.WithTx(ctx, s.DB, func(tx *sql.Tx) error {
 		n, err := s.Repo.CountUsers(ctx, tx)
@@ -196,7 +229,13 @@ func (s *Service) Register(ctx context.Context, name, email, password, inviteTok
 			return err
 		}
 		if invite != nil {
-			return s.Repo.UseInvite(ctx, tx, invite.ID, user.ID, fmtTime(now()))
+			used, err := s.Repo.UseInvite(ctx, tx, invite.ID, user.ID, fmtTime(now()))
+			if err != nil {
+				return err
+			}
+			if !used {
+				return &apperr.Error{Status: 400, Code: "invalid_invite", Message: "this invite link is invalid, expired or already used"}
+			}
 		}
 		return nil
 	})
@@ -256,7 +295,7 @@ func (s *Service) Login(ctx context.Context, email, password, ip string) (*model
 	ts := fmtTime(now())
 	u.LastLoginAt = &ts
 	u.UpdatedAt = ts
-	if err := s.Repo.UpdateUser(ctx, s.DB, u); err != nil {
+	if err := s.Repo.UpdateUserLastLogin(ctx, s.DB, u.ID, ts); err != nil {
 		return nil, apperr.Internal(err)
 	}
 	return u, nil
@@ -365,7 +404,7 @@ func (s *Service) UpdateProfile(ctx context.Context, u *models.User, name string
 	}
 	u.Name = name
 	u.UpdatedAt = fmtTime(now())
-	if err := s.Repo.UpdateUser(ctx, s.DB, u); err != nil {
+	if err := s.Repo.UpdateUserName(ctx, s.DB, u.ID, u.Name, u.UpdatedAt); err != nil {
 		return nil, apperr.Internal(err)
 	}
 	return u, nil
@@ -386,12 +425,16 @@ func (s *Service) ChangePassword(ctx context.Context, u *models.User, currentTok
 	}
 	u.PasswordHash = hash
 	u.UpdatedAt = fmtTime(now())
-	return repositories.WithTx(ctx, s.DB, func(tx *sql.Tx) error {
-		if err := s.Repo.UpdateUser(ctx, tx, u); err != nil {
+	err = repositories.WithTx(ctx, s.DB, func(tx *sql.Tx) error {
+		if err := s.Repo.UpdateUserPassword(ctx, tx, u.ID, u.PasswordHash, u.UpdatedAt); err != nil {
 			return err
 		}
 		return s.Repo.DeleteUserSessions(ctx, tx, u.ID, hashToken(currentToken))
 	})
+	if err != nil {
+		return apperr.Internal(err)
+	}
+	return nil
 }
 
 // Admin
@@ -439,7 +482,7 @@ func (s *Service) UpdateUserAdmin(ctx context.Context, actor *models.User, id st
 	}
 	u.UpdatedAt = fmtTime(now())
 	err = repositories.WithTx(ctx, s.DB, func(tx *sql.Tx) error {
-		if err := s.Repo.UpdateUser(ctx, tx, u); err != nil {
+		if err := s.Repo.UpdateUserRoleActive(ctx, tx, u.ID, u.Role, u.IsActive, u.UpdatedAt); err != nil {
 			return err
 		}
 		if !u.IsActive {
@@ -453,7 +496,9 @@ func (s *Service) UpdateUserAdmin(ctx context.Context, actor *models.User, id st
 	return u, nil
 }
 
-// DeleteUser removes a user and, through ON DELETE CASCADE, every row they own.
+// DeleteUser removes a user and, through ON DELETE CASCADE, every row they
+// own, then the audit PDFs of their statements (which live on disk, outside the
+// cascade).
 func (s *Service) DeleteUser(ctx context.Context, actor *models.User, id string) error {
 	if id == actor.ID {
 		return apperr.Validation("validation failed", map[string]string{"id": "you cannot delete your own account"})
@@ -465,8 +510,21 @@ func (s *Service) DeleteUser(ctx context.Context, actor *models.User, id string)
 	if u == nil {
 		return apperr.NotFound("user")
 	}
-	if err := s.Repo.DeleteUser(ctx, s.DB, id); err != nil {
+	var statementIDs []string
+	err = repositories.WithTx(ctx, s.DB, func(tx *sql.Tx) error {
+		var err error
+		if statementIDs, err = s.Repo.ListStatementIDs(ctx, tx, id); err != nil {
+			return err
+		}
+		return s.Repo.DeleteUser(ctx, tx, id)
+	})
+	if err != nil {
 		return apperr.Internal(err)
+	}
+	if s.StatementsDir != "" {
+		for _, sid := range statementIDs {
+			_ = os.Remove(filepath.Join(s.StatementsDir, sid+".pdf"))
+		}
 	}
 	return nil
 }

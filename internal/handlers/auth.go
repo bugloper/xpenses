@@ -9,6 +9,10 @@ import (
 	apperr "github.com/bugloper/xpensiv/internal/errors"
 )
 
+// authBodyLimit caps credential bodies well below the global upload limit so an
+// anonymous caller cannot make the server buffer megabytes of JSON per attempt.
+const authBodyLimit = 16 << 10
+
 // AuthHandler exposes setup, registration, login and session management.
 type AuthHandler struct {
 	Svc *auth.Service
@@ -53,7 +57,21 @@ func (h *AuthHandler) Status(c echo.Context) error {
 	return JSON(c, http.StatusOK, st)
 }
 
+// bindAuth decodes a credential body subject to authBodyLimit.
+func bindAuth(c echo.Context, v any) error {
+	c.Request().Body = http.MaxBytesReader(c.Response(), c.Request().Body, authBodyLimit)
+	return bind(c, v)
+}
+
+// startSession issues a fresh session for userID and, if the request carried
+// a valid session for some (possibly other) user, revokes that one: a login
+// always replaces the previous session rather than leaving it live.
 func (h *AuthHandler) startSession(c echo.Context, userID string) error {
+	if old := auth.CurrentToken(c); old != "" {
+		if err := h.Svc.Logout(c.Request().Context(), old); err != nil {
+			return err
+		}
+	}
 	tok, err := h.Svc.CreateSession(c.Request().Context(), userID, c.Request().UserAgent(), h.MW.ClientIP(c))
 	if err != nil {
 		return err
@@ -64,7 +82,7 @@ func (h *AuthHandler) startSession(c echo.Context, userID string) error {
 
 func (h *AuthHandler) Setup(c echo.Context) error {
 	var req credentials
-	if err := bind(c, &req); err != nil {
+	if err := bindAuth(c, &req); err != nil {
 		return err
 	}
 	u, err := h.Svc.Setup(c.Request().Context(), req.Name, req.Email, req.Password)
@@ -79,7 +97,7 @@ func (h *AuthHandler) Setup(c echo.Context) error {
 
 func (h *AuthHandler) RegisterUser(c echo.Context) error {
 	var req credentials
-	if err := bind(c, &req); err != nil {
+	if err := bindAuth(c, &req); err != nil {
 		return err
 	}
 	u, err := h.Svc.Register(c.Request().Context(), req.Name, req.Email, req.Password, req.InviteToken)
@@ -94,7 +112,7 @@ func (h *AuthHandler) RegisterUser(c echo.Context) error {
 
 func (h *AuthHandler) Login(c echo.Context) error {
 	var req credentials
-	if err := bind(c, &req); err != nil {
+	if err := bindAuth(c, &req); err != nil {
 		return err
 	}
 	u, err := h.Svc.Login(c.Request().Context(), req.Email, req.Password, h.MW.ClientIP(c))
@@ -137,7 +155,7 @@ func (h *AuthHandler) ChangePassword(c echo.Context) error {
 		Current string `json:"current_password"`
 		New     string `json:"new_password"`
 	}
-	if err := bind(c, &req); err != nil {
+	if err := bindAuth(c, &req); err != nil {
 		return err
 	}
 	if err := h.Svc.ChangePassword(c.Request().Context(), auth.CurrentUser(c), auth.CurrentToken(c), req.Current, req.New); err != nil {

@@ -80,10 +80,48 @@ func (Repo) InsertUser(ctx context.Context, db repositories.DBTX, u *models.User
 	return err
 }
 
-func (Repo) UpdateUser(ctx context.Context, db repositories.DBTX, u *models.User) error {
-	_, err := db.ExecContext(ctx, `UPDATE users SET name=?, password_hash=?, role=?, is_active=?, last_login_at=?, updated_at=? WHERE id=?`,
-		u.Name, u.PasswordHash, u.Role, boolInt(u.IsActive), nullStr(u.LastLoginAt), u.UpdatedAt, u.ID)
+// The update methods each touch only the columns their caller owns. A request
+// carries a snapshot of the user loaded with its session; writing the whole row
+// back would let a stale snapshot undo a concurrent change (an admin demotion,
+// a password change).
+
+func (Repo) UpdateUserName(ctx context.Context, db repositories.DBTX, id, name, updatedAt string) error {
+	_, err := db.ExecContext(ctx, `UPDATE users SET name=?, updated_at=? WHERE id=?`, name, updatedAt, id)
 	return err
+}
+
+func (Repo) UpdateUserPassword(ctx context.Context, db repositories.DBTX, id, hash, updatedAt string) error {
+	_, err := db.ExecContext(ctx, `UPDATE users SET password_hash=?, updated_at=? WHERE id=?`, hash, updatedAt, id)
+	return err
+}
+
+func (Repo) UpdateUserLastLogin(ctx context.Context, db repositories.DBTX, id, at string) error {
+	_, err := db.ExecContext(ctx, `UPDATE users SET last_login_at=?, updated_at=? WHERE id=?`, at, at, id)
+	return err
+}
+
+func (Repo) UpdateUserRoleActive(ctx context.Context, db repositories.DBTX, id, role string, active bool, updatedAt string) error {
+	_, err := db.ExecContext(ctx, `UPDATE users SET role=?, is_active=?, updated_at=? WHERE id=?`, role, boolInt(active), updatedAt, id)
+	return err
+}
+
+// ListStatementIDs returns the ids of the user's bank statements, whose audit
+// PDFs live outside the database and must be removed by hand on deletion.
+func (Repo) ListStatementIDs(ctx context.Context, db repositories.DBTX, userID string) ([]string, error) {
+	rows, err := db.QueryContext(ctx, `SELECT id FROM bank_statements WHERE user_id = ?`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out = append(out, id)
+	}
+	return out, rows.Err()
 }
 
 func (Repo) DeleteUser(ctx context.Context, db repositories.DBTX, id string) error {
@@ -237,9 +275,15 @@ func (Repo) GetInviteByHash(ctx context.Context, db repositories.DBTX, tokenHash
 	return inv, err
 }
 
-func (Repo) UseInvite(ctx context.Context, db repositories.DBTX, id, userID, at string) error {
-	_, err := db.ExecContext(ctx, `UPDATE invites SET used_at = ?, used_by = ? WHERE id = ? AND used_at IS NULL`, at, userID, id)
-	return err
+// UseInvite marks the invite used. It reports false when the invite was
+// already used (or deleted) by the time of the write.
+func (Repo) UseInvite(ctx context.Context, db repositories.DBTX, id, userID, at string) (bool, error) {
+	res, err := db.ExecContext(ctx, `UPDATE invites SET used_at = ?, used_by = ? WHERE id = ? AND used_at IS NULL`, at, userID, id)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n > 0, nil
 }
 
 func (Repo) DeleteInvite(ctx context.Context, db repositories.DBTX, id string) (bool, error) {
@@ -273,11 +317,4 @@ func boolInt(b bool) int {
 		return 1
 	}
 	return 0
-}
-
-func nullStr(p *string) any {
-	if p == nil {
-		return nil
-	}
-	return *p
 }

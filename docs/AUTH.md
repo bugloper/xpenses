@@ -12,10 +12,22 @@ exactly one user. There is one `admin` role (the instance owner) and the `user` 
 - Idle timeout 30 days (sliding, refreshed at most every 5 minutes), absolute lifetime 180 days.
 - Passwords: Argon2id (t=3, m=64 MiB, p=1, 16-byte salt), minimum 10 characters, maximum 200.
 - Login throttling: after 10 failed attempts for an email **or** 30 for an IP within 15 minutes →
-  `429 too_many_attempts` with `Retry-After` seconds.
+  `429 too_many_attempts` with `Retry-After` seconds. Attempts for the email are cleared on a
+  successful login. The per-email counter is deliberately a lockout: anyone who knows an email can
+  keep its owner out for 15 minutes (accepted; it is the price of stopping online guessing).
+- Client IP: with `XPENSIV_TRUSTED_PROXY=true` the IP is the **last** entry of `X-Forwarded-For`
+  (the one appended by the single proxy hop in front); earlier entries are client-supplied and
+  ignored. Without it `X-Forwarded-For` is ignored entirely. Never set it unless exactly one proxy
+  you control sits in front, or clients can forge their IP for the throttle.
+- Login, register, setup and password-change bodies are capped at 16 KB (`400` beyond that).
+- Signing in while a session cookie is already present revokes that previous session: a browser
+  holds at most one live session, and switching users never leaves the earlier user's session alive.
 - **CSRF**: every mutating request (POST/PATCH/PUT/DELETE) must carry the header
   `X-Xpensiv-Client: web` (or any value). Missing header → `403 csrf_rejected`. If an `Origin`
-  header is present it must match the request host (or `XPENSIV_CORS_ORIGIN`) → else `403 csrf_rejected`.
+  header is present it must match the request host (or `XPENSIV_CORS_ORIGIN`) → else `403 csrf_rejected`;
+  on an HTTPS request (direct TLS or `X-Forwarded-Proto: https` from the trusted proxy) an `http://`
+  origin is rejected too. `XPENSIV_CORS_ORIGIN=` (explicitly empty) disables the dev origin; the
+  production compose/Dockerfile set it that way.
   Browsers cannot add custom headers cross-site without a CORS preflight, so together with
   `SameSite=Strict` this blocks CSRF without a token dance.
 - Unauthenticated access to anything except the public auth routes and `/health` → `401 unauthenticated`.
@@ -34,6 +46,16 @@ type User = { id: string; name: string; email: string; role: "admin" | "user"; i
 | GET | /auth/status | → `{setup_required: boolean, registration_open: boolean, authenticated: boolean}` | — |
 | POST | /auth/setup | `{name, email, password}` → 201 `{data: User}` + session cookie. Creates the **first** user as `admin`. | 409 `already_set_up` |
 | POST | /auth/register | `{name, email, password, invite_token?}` → 201 `{data: User}` + cookie | 403 `registration_closed` (no invite and registration off), 400 `invalid_invite` (bad/expired/used), 409 `email_taken`, 422 validation |
+
+Emails are trimmed and lower-cased, then must be a bare address (no display name, comments,
+quoting or whitespace), at most 254 bytes, with a dotted domain (`a@b` is rejected). `409 email_taken`
+is only reachable once the caller holds a valid invite or registration is open, so a closed instance
+never confirms which emails exist; login always answers `401 invalid_credentials` for unknown and
+wrong-password alike (`403 account_disabled` requires the correct password first). An invite is
+single-use even under concurrent registrations (the first commit wins, the rest get `invalid_invite`),
+and `/auth/setup` can only ever create one owner however many requests race for it. With registration
+open, anyone can create accounts (each costing one Argon2id hash); keep it closed and use invites
+unless you accept that.
 | POST | /auth/login | `{email, password}` → 200 `{data: User}` + cookie | 401 `invalid_credentials`, 403 `account_disabled`, 403 `setup_required`, 429 `too_many_attempts` |
 
 ## Authenticated routes
@@ -54,6 +76,10 @@ logged-in user. Resources of another user return `404 not_found`. A new user sta
 default categories (seeded at registration, fresh ids) and no accounts.
 
 `GET /backup` and `POST /restore` are **admin only** (they snapshot/restore the whole instance).
+A restore replaces `users` and `sessions` too: the `200` is sent, then the restoring admin's session
+only survives if it existed in the snapshot, so the client must expect a `401` and sign in again.
+Prefer the `X-Backup-Passphrase` header over `?passphrase=`; the app never logs query strings but a
+reverse proxy's access log may.
 
 ## Admin routes (role `admin`)
 
@@ -61,7 +87,7 @@ default categories (seeded at registration, fresh ids) and no accounts.
 |---|---|---|
 | GET | /admin/users | `[User & {account_count: number, transaction_count: number}]` |
 | PATCH | /admin/users/:id | `{is_active?, role?}` → User. 422 when targeting yourself (cannot disable/demote the last admin or self). Disabling revokes the user's sessions |
-| DELETE | /admin/users/:id | → 204. Deletes the user **and all their data**; 422 for self |
+| DELETE | /admin/users/:id | → 204. Deletes the user **and all their data**, including the audit PDFs of their statements on disk; 422 for self |
 | GET | /admin/settings | `{registration_open: boolean}` |
 | PATCH | /admin/settings | `{registration_open}` → same |
 | POST | /admin/invites | `{email?, expires_in_hours?}` (default 72, max 720) → 201 `{id, token, email, expires_at, register_path: "/register?invite=<token>"}` — the token is shown **once** |

@@ -127,6 +127,11 @@ func (m *Middleware) originAllowed(c echo.Context, origin string) bool {
 	if err != nil {
 		return false
 	}
+	// A page served over HTTPS always reports an https origin; an http origin
+	// on a secure request can only come from a plaintext (MITM-able) page.
+	if m.IsSecure(c) && !strings.EqualFold(u.Scheme, "https") {
+		return false
+	}
 	return strings.EqualFold(u.Host, c.Request().Host)
 }
 
@@ -177,12 +182,18 @@ func (m *Middleware) IsSecure(c echo.Context) bool {
 	return false
 }
 
-// ClientIP returns the caller's IP, honouring X-Forwarded-For only behind a trusted proxy.
+// ClientIP returns the caller's IP, honouring X-Forwarded-For only behind a
+// trusted proxy. TrustedProxy means exactly one proxy hop sits in front, so the
+// trustworthy address is the LAST entry (the one that proxy appended); earlier
+// entries are whatever the client sent and could be forged to dodge or redirect
+// the per-IP login throttle.
 func (m *Middleware) ClientIP(c echo.Context) string {
 	if m.TrustedProxy {
 		if xff := c.Request().Header.Get("X-Forwarded-For"); xff != "" {
 			parts := strings.Split(xff, ",")
-			return strings.TrimSpace(parts[0])
+			if ip := strings.TrimSpace(parts[len(parts)-1]); ip != "" {
+				return ip
+			}
 		}
 	}
 	host, _, err := net.SplitHostPort(c.Request().RemoteAddr)
