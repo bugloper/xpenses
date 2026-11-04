@@ -4,6 +4,7 @@ import {
   PieChart,
   Settings,
   Shapes,
+  Target,
   ShieldCheck,
   Wallet,
   type LucideIcon,
@@ -20,6 +21,7 @@ export const PRIMARY_NAV: NavItem[] = [
 export const MORE_NAV: NavItem[] = [
   { to: '/accounts', label: 'Accounts', icon: Wallet },
   { to: '/categories', label: 'Categories', icon: Shapes },
+  { to: '/budgets', label: 'Budgets', icon: Target },
   { to: '/admin', label: 'Admin', icon: ShieldCheck, adminOnly: true },
   { to: '/settings', label: 'Settings', icon: Settings },
 ]

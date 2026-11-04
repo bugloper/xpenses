@@ -1,11 +1,11 @@
-import { createRoute } from '@tanstack/react-router'
+import { Link, createRoute } from '@tanstack/react-router'
 import { ChevronDown, ChevronRight, Eye, EyeOff, MoreVertical, Pencil, Plus, Shapes } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { z } from 'zod'
-import { BudgetInline } from '@/components/categories/BudgetInline'
 import { CategoryFormSheet } from '@/components/categories/CategoryForm'
 import { CategoryIcon } from '@/components/common/CategoryIcon'
+import { Money } from '@/components/common/Money'
 import { PageHeader } from '@/components/common/PageHeader'
 import { Segmented } from '@/components/common/Segmented'
 import { EmptyState, ErrorState, ListSkeleton } from '@/components/common/States'
@@ -85,8 +85,17 @@ function CategoriesPage() {
         </label>
       </div>
       <p className="text-muted-foreground text-xs">
-        Main categories hold sub-categories. Tap one to see its sub-categories
-        {type === 'expense' ? '; tap a budget to set a monthly limit (0 removes it).' : '.'}
+        Main categories hold sub-categories. Tap one to see its sub-categories.
+        {type === 'expense' && (
+          <>
+            {' '}
+            Monthly limits live on the{' '}
+            <Link to="/budgets" className="text-primary underline underline-offset-2">
+              Budgets
+            </Link>{' '}
+            page.
+          </>
+        )}
       </p>
       {isPending ? (
         <ListSkeleton rows={6} />
@@ -185,10 +194,10 @@ function GroupCard({
       </div>
       {open && (
         <ul className="border-t px-3 py-2" aria-label={`${parent.name} sub-categories`}>
-          {type === 'expense' && parent.is_active && (
+          {type === 'expense' && budgets.get(parent.id) && (
             <li className="text-muted-foreground flex items-center justify-between gap-3 py-1.5 text-xs">
               <span>Budget for all of {parent.name}</span>
-              <BudgetInline categoryId={parent.id} budget={budgets.get(parent.id)} currency={currency} />
+              <BudgetLink amount={budgets.get(parent.id)!.amount} currency={currency} />
             </li>
           )}
           {children.map((c) => (
@@ -203,10 +212,8 @@ function GroupCard({
                     </Badge>
                   )}
                 </div>
-                {type === 'expense' && c.is_active && (
-                  <div className="-ml-2">
-                    <BudgetInline categoryId={c.id} budget={budgets.get(c.id)} currency={currency} />
-                  </div>
+                {type === 'expense' && budgets.get(c.id) && (
+                  <BudgetLink amount={budgets.get(c.id)!.amount} currency={currency} />
                 )}
               </div>
               <RowMenu category={c} onEdit={onEdit} onToggleActive={onToggleActive} />
@@ -220,6 +227,14 @@ function GroupCard({
         </ul>
       )}
     </li>
+  )
+}
+
+function BudgetLink({ amount, currency }: { amount: number; currency: string }) {
+  return (
+    <Link to="/budgets" className="text-muted-foreground hover:text-foreground text-xs">
+      Budget <Money minor={amount} currency={currency} className="text-foreground font-medium" /> / month
+    </Link>
   )
 }
 

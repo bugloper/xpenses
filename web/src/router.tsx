@@ -7,6 +7,7 @@ import { addRoute } from './routes/add'
 import { accountsRoute } from './routes/accounts'
 import { accountDetailRoute } from './routes/account-detail'
 import { categoriesRoute } from './routes/categories'
+import { budgetsRoute } from './routes/budgets'
 import { settingsRoute } from './routes/settings'
 import { reportsRoute } from './routes/reports'
 import { adminRoute } from './routes/admin'
@@ -21,6 +22,7 @@ const routeTree = rootRoute.addChildren([
     accountsRoute,
     accountDetailRoute,
     categoriesRoute,
+    budgetsRoute,
     settingsRoute,
     reportsRoute,
     adminRoute,

@@ -38,7 +38,7 @@ export function BudgetList({
         className="py-8"
         action={
           <Button size="sm" variant="outline" asChild>
-            <Link to="/categories">Set budgets</Link>
+            <Link to="/budgets">Set budgets</Link>
           </Button>
         }
       />

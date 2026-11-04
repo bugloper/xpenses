@@ -130,7 +130,7 @@ function DashboardPage() {
           title={`Budgets · ${formatMonthLabel(month)}`}
           action={
             <Button variant="link" size="sm" className="h-auto p-0" asChild>
-              <Link to="/categories">Manage</Link>
+              <Link to="/budgets">Manage</Link>
             </Button>
           }
         >
