@@ -22,6 +22,16 @@ func (h *TransactionHandler) Register(g *echo.Group) {
 	g.PATCH("/transactions/:id", h.Update)
 	g.DELETE("/transactions/:id", h.Delete)
 	g.POST("/transactions/:id/duplicate", h.Duplicate)
+	g.GET("/payees", h.Payees)
+}
+
+// Payees lists the user's distinct payees, most used first.
+func (h *TransactionHandler) Payees(c echo.Context) error {
+	out, err := h.Svc.Payees(c.Request().Context())
+	if err != nil {
+		return err
+	}
+	return JSON(c, http.StatusOK, out)
 }
 
 func filterFromQuery(c echo.Context) dto.TransactionFilter {

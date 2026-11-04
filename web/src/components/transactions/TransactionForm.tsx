@@ -15,10 +15,11 @@ import { Textarea } from '@/components/ui/textarea'
 import { today } from '@/lib/dates'
 import { getLastUsed, setLastUsed } from '@/lib/last-used'
 import { minorToDecimalString, parseAmount } from '@/lib/money'
-import { useAccounts, useCategories } from '@/lib/queries'
+import { useAccounts, useCategories, usePayees } from '@/lib/queries'
 import { cn } from '@/lib/utils'
 import type { CreateTransactionRequest, Transaction, TransactionType } from '@/types/api'
 import { AmountInput } from './AmountInput'
+import { PayeeCombobox } from './PayeeCombobox'
 
 export const transactionSchema = z
   .object({
@@ -186,6 +187,7 @@ export function TransactionForm({
 
   const { data: accounts = [] } = useAccounts()
   const { data: categories = [] } = useCategories()
+  const { data: payees = [] } = usePayees()
 
   useEffect(() => {
     reset(initial)
@@ -514,7 +516,21 @@ export function TransactionForm({
           render={({ field }) => (
             <Field data-invalid={!!err.payee}>
               <FieldLabel htmlFor={`${formId}-payee`}>Payee</FieldLabel>
-              <Input id={`${formId}-payee`} placeholder="Where / who" {...field} value={field.value ?? ''} />
+              <PayeeCombobox
+                id={`${formId}-payee`}
+                value={field.value ?? ''}
+                onChange={field.onChange}
+                payees={payees}
+                invalid={!!err.payee}
+                onPick={(p) => {
+                  // A known payee brings its usual category along when none is chosen yet.
+                  if (categoryId || !p.last_category_id || !categoryType) return
+                  const cat = categories.find((c) => c.id === p.last_category_id)
+                  if (cat && cat.type === categoryType && cat.is_active) {
+                    setValue('category_id', cat.id, { shouldValidate: true, shouldDirty: true })
+                  }
+                }}
+              />
               <FieldError errors={[err.payee]} />
             </Field>
           )}

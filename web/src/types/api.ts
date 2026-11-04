@@ -132,6 +132,15 @@ export type UpdateTransactionRequest = {
 }
 
 export type TransactionSort = 'date' | 'amount' | 'created_at' | 'payee'
+
+/** A payee the user has saved before, with what was last used alongside it. */
+export type Payee = {
+  name: string
+  count: number
+  last_used: string
+  last_category_id: string | null
+  last_account_id: string | null
+}
 export type TransactionFilter = {
   search?: string
   date_from?: string

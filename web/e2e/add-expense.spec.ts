@@ -48,3 +48,34 @@ test('create a new category from inside the add sheet and save with it', async (
   await page.goto('/categories')
   await expect(page.getByText('Momo')).toBeVisible()
 })
+
+test('payee dropdown grows from your own entries and remembers the category', async ({ page }) => {
+  await page.goto('/')
+  await loginAsNewUser(page)
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Add transaction' }).first().click()
+  await expect(page.getByRole('heading', { name: 'Add transaction' })).toBeVisible()
+
+  // First visit: nothing saved yet, type a new payee and use it.
+  await page.getByLabel('Amount').fill('45')
+  await page.getByRole('radio', { name: 'Food' }).click()
+  await page.getByRole('combobox', { name: 'Payee', exact: true }).click()
+  await expect(page.getByText('No payees yet. Type a name to add one.')).toBeVisible()
+  await page.getByRole('combobox', { name: 'Payee name' }).fill('Ambient Cafe')
+  await page.getByRole('option', { name: 'Use “Ambient Cafe”' }).click()
+  await expect(page.getByRole('combobox', { name: 'Payee', exact: true })).toHaveText('Ambient Cafe')
+  await page.getByRole('button', { name: /^Save$/ }).click()
+  await expect(page.getByText(/saved/i).first()).toBeVisible()
+
+  // Second visit: the payee is in the dropdown and picking it fills the category.
+  await page.getByRole('button', { name: 'Add transaction' }).first().click()
+  await page.getByLabel('Amount').fill('60')
+  await page.getByRole('combobox', { name: 'Payee', exact: true }).click()
+  await page.getByRole('option', { name: 'Ambient Cafe' }).click()
+  await expect(page.getByRole('radio', { name: 'Food' })).toHaveAttribute('aria-checked', 'true')
+  await page.getByRole('button', { name: /^Save$/ }).click()
+  await expect(page.getByText(/saved/i).first()).toBeVisible()
+
+  const txs = await listTransactions(page)
+  expect(txs.filter((t) => t.amount === 4500 || t.amount === 6000)).toHaveLength(2)
+})

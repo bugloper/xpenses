@@ -71,6 +71,15 @@ type Category struct {
 	UpdatedAt string  `json:"updated_at"`
 }
 
+// Payee is a distinct payee the user has saved, with what was last used alongside it.
+type Payee struct {
+	Name           string  `json:"name"`
+	Count          int     `json:"count"`
+	LastUsed       string  `json:"last_used"`
+	LastCategoryID *string `json:"last_category_id"`
+	LastAccountID  *string `json:"last_account_id"`
+}
+
 type Transaction struct {
 	UserID                  string   `json:"-"`
 	ID                      string   `json:"id"`

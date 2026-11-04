@@ -258,3 +258,55 @@ describe('new category from the picker', () => {
     expect(screen.queryByRole('heading', { name: 'New category' })).not.toBeInTheDocument()
   })
 })
+
+describe('payee picker', () => {
+  const payees = [
+    { name: 'Ambient Cafe', count: 4, last_used: '2026-11-03', last_category_id: 'cat-food', last_account_id: 'acc-1' },
+    { name: '8 Eleven', count: 1, last_used: '2026-11-01', last_category_id: null, last_account_id: 'acc-1' },
+  ]
+  function mockApiWithPayees() {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input)
+      const data = url.includes('/accounts')
+        ? accounts
+        : url.includes('/categories')
+          ? categories
+          : url.includes('/payees')
+            ? payees
+            : []
+      return new Response(JSON.stringify({ data }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    })
+  }
+
+  it('lists saved payees and brings the usual category along', async () => {
+    mockApiWithPayees()
+    const user = userEvent.setup()
+    renderForm()
+    await screen.findByRole('radio', { name: 'Food' })
+
+    await user.click(screen.getByRole('combobox', { name: 'Payee' }))
+    await user.click(await screen.findByRole('option', { name: 'Ambient Cafe' }))
+
+    expect(screen.getByRole('combobox', { name: 'Payee' })).toHaveTextContent('Ambient Cafe')
+    expect(screen.getByRole('radio', { name: 'Food' })).toHaveAttribute('aria-checked', 'true')
+  })
+
+  it('offers to use a name that is not in the list', async () => {
+    mockApiWithPayees()
+    const user = userEvent.setup()
+    renderForm()
+    await screen.findByRole('radio', { name: 'Food' })
+
+    await user.click(screen.getByRole('combobox', { name: 'Payee' }))
+    await user.type(await screen.findByRole('combobox', { name: 'Payee name' }), 'Norling')
+    expect(screen.queryByRole('option', { name: 'Ambient Cafe' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('option', { name: 'Use “Norling”' }))
+
+    expect(screen.getByRole('combobox', { name: 'Payee' })).toHaveTextContent('Norling')
+    // Nothing was picked from history, so the category is still the user's call.
+    expect(screen.getByRole('radio', { name: 'Food' })).toHaveAttribute('aria-checked', 'false')
+  })
+})
