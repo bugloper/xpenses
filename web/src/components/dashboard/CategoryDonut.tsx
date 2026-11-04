@@ -5,6 +5,7 @@ import { Money } from '@/components/common/Money'
 import { EmptyState, ErrorState } from '@/components/common/States'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatMoney } from '@/lib/money'
+import { rollupCategories } from '@/lib/reports'
 import type { ReportCategory } from '@/types/api'
 
 export function CategoryDonut({
@@ -24,7 +25,7 @@ export function CategoryDonut({
 }) {
   if (loading && !data) return <Skeleton className="h-64 w-full rounded-xl" />
   if (error && !data) return <ErrorState error={error} onRetry={onRetry} compact />
-  const rows = (data ?? []).filter((r) => r.amount > 0)
+  const rows = rollupCategories((data ?? []).filter((r) => r.amount > 0)).map((g) => g.row)
   if (rows.length === 0) return <EmptyState title="No expenses in this period" className="py-8" />
   const total = rows.reduce((n, r) => n + r.amount, 0)
   const top = rows.slice(0, 6)

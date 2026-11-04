@@ -37,7 +37,7 @@ func TestSetupLoginLogoutFlow(t *testing.T) {
 		t.Fatalf("second setup want 409 got %d", st)
 	}
 	// Default categories seeded for the owner.
-	if st, b := owner.Do("GET", "/categories", nil); st != 200 || len(testutil.List(b)) != 24 {
+	if st, b := owner.Do("GET", "/categories", nil); st != 200 || len(testutil.List(b)) != auth.DefaultCategoryCount() {
 		t.Fatalf("default categories: %d %d", st, len(testutil.List(b)))
 	}
 	// Login with wrong then right password on a fresh client.
@@ -134,7 +134,7 @@ func TestDataIsolationBetweenUsers(t *testing.T) {
 	b := e.Register(a, "Bob", "bob@example.com")
 
 	aAcct := a.CreateAccount("Alice bank", "bank", 100000)
-	_, tx := a.Do("POST", "/transactions", map[string]any{"type": "expense", "amount": 500, "account_id": aAcct, "category_id": a.Category("Food"), "transaction_date": "2026-11-01", "tags": []string{"shared"}})
+	_, tx := a.Do("POST", "/transactions", map[string]any{"type": "expense", "amount": 500, "account_id": aAcct, "category_id": a.Category("Eating out"), "transaction_date": "2026-11-01", "tags": []string{"shared"}})
 	aTx := testutil.Data(tx)["id"].(string)
 
 	// Bob sees nothing of Alice's: only his own seeded Cash account.
@@ -160,7 +160,7 @@ func TestDataIsolationBetweenUsers(t *testing.T) {
 		t.Fatalf("bob post into alice account: %d %v", st, body)
 	}
 	bAcct := b.CreateAccount("Bob cash", "cash", 0)
-	if st, body := b.Do("POST", "/transactions", map[string]any{"type": "expense", "amount": 1, "account_id": bAcct, "category_id": a.Category("Food"), "transaction_date": "2026-11-01"}); st != 422 {
+	if st, body := b.Do("POST", "/transactions", map[string]any{"type": "expense", "amount": 1, "account_id": bAcct, "category_id": a.Category("Eating out"), "transaction_date": "2026-11-01"}); st != 422 {
 		t.Fatalf("bob use alice category: %d %v", st, body)
 	}
 	// Same tag name and same client_id are independent per user.
@@ -175,7 +175,7 @@ func TestDataIsolationBetweenUsers(t *testing.T) {
 	if st, body := b.Do("GET", "/settings", nil); st != 200 || testutil.Data(body)["reconciliation.date_tolerance_days"] != "3" {
 		t.Fatalf("bob settings: %d %v", st, body)
 	}
-	a.Do("POST", "/budgets", map[string]any{"category_id": a.Category("Food"), "amount": 100})
+	a.Do("POST", "/budgets", map[string]any{"category_id": a.Category("Eating out"), "amount": 100})
 	if st, body := b.Do("GET", "/budgets", nil); st != 200 || len(testutil.List(body)) != 0 {
 		t.Fatalf("bob budgets: %d %v", st, body)
 	}
@@ -255,7 +255,7 @@ func TestAdminAndInvites(t *testing.T) {
 	// Delete user cascades their data.
 	bobAcct := 0
 	_ = e.DB.QueryRow(`SELECT COUNT(*) FROM categories WHERE user_id = ?`, bobID).Scan(&bobAcct)
-	if bobAcct != 24 {
+	if bobAcct != auth.DefaultCategoryCount() {
 		t.Fatalf("bob categories before delete %d", bobAcct)
 	}
 	if st, _ := admin.Do("DELETE", "/admin/users/"+bobID, nil); st != 204 {

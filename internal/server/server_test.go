@@ -3,6 +3,7 @@ package server_test
 import (
 	"testing"
 
+	"github.com/bugloper/xpensiv/internal/auth"
 	"github.com/bugloper/xpensiv/internal/testutil"
 )
 
@@ -46,8 +47,8 @@ func TestDefaultCategoriesSeeded(t *testing.T) {
 		t.Fatal(st)
 	}
 	cats := body["data"].([]any)
-	if len(cats) != 24 {
-		t.Fatalf("want 24 default categories, got %d", len(cats))
+	if len(cats) != auth.DefaultCategoryCount() {
+		t.Fatalf("want %d default categories, got %d", auth.DefaultCategoryCount(), len(cats))
 	}
 }
 
@@ -61,9 +62,9 @@ func TestBalanceCalculation(t *testing.T) {
 		body map[string]any
 		want int
 	}{
-		{"expense", map[string]any{"type": "expense", "amount": 2500, "account_id": bank, "category_id": e.cat("Food"), "transaction_date": "2026-11-01"}, 201},
+		{"expense", map[string]any{"type": "expense", "amount": 2500, "account_id": bank, "category_id": e.cat("Eating out"), "transaction_date": "2026-11-01"}, 201},
 		{"income", map[string]any{"type": "income", "amount": 50000, "account_id": bank, "category_id": e.cat("Salary"), "transaction_date": "2026-11-01"}, 201},
-		{"refund", map[string]any{"type": "refund", "amount": 500, "account_id": bank, "category_id": e.cat("Refund"), "transaction_date": "2026-11-02"}, 201},
+		{"refund", map[string]any{"type": "refund", "amount": 500, "account_id": bank, "category_id": e.cat("Refunds"), "transaction_date": "2026-11-02"}, 201},
 		{"transfer", map[string]any{"type": "transfer", "amount": 10000, "account_id": bank, "transfer_account_id": cash, "transaction_date": "2026-11-02"}, 201},
 		{"adjustment negative", map[string]any{"type": "adjustment", "amount": -300, "account_id": cash, "transaction_date": "2026-11-03"}, 201},
 		{"pending draft not counted", map[string]any{"type": "expense", "amount": 99999, "account_id": bank, "transaction_date": "2026-11-03", "status": "pending"}, 201},
@@ -99,7 +100,7 @@ func TestBalanceCalculation(t *testing.T) {
 func TestTransactionListFilterAndDelete(t *testing.T) {
 	e := newEnv(t)
 	bank := e.createAccount("BOB", "bank", 0)
-	_, b1 := e.do("POST", "/transactions", map[string]any{"type": "expense", "amount": 100, "account_id": bank, "category_id": e.cat("Food"), "transaction_date": "2026-10-05", "payee": "Cafe", "tags": []string{"Work", "work"}})
+	_, b1 := e.do("POST", "/transactions", map[string]any{"type": "expense", "amount": 100, "account_id": bank, "category_id": e.cat("Eating out"), "transaction_date": "2026-10-05", "payee": "Cafe", "tags": []string{"Work", "work"}})
 	e.do("POST", "/transactions", map[string]any{"type": "expense", "amount": 200, "account_id": bank, "category_id": e.cat("Fuel"), "transaction_date": "2026-11-05"})
 	id := data(b1)["id"].(string)
 	if tags := data(b1)["tags"].([]any); len(tags) != 1 || tags[0] != "work" {
@@ -152,11 +153,11 @@ func TestOfflineClientIDIsIdempotent(t *testing.T) {
 
 func TestBudgets(t *testing.T) {
 	e := newEnv(t)
-	st, body := e.do("POST", "/budgets", map[string]any{"category_id": e.cat("Food"), "amount": 500000})
+	st, body := e.do("POST", "/budgets", map[string]any{"category_id": e.cat("Eating out"), "amount": 500000})
 	if st != 201 {
 		t.Fatalf("create: %d %v", st, body)
 	}
-	if st, _ := e.do("POST", "/budgets", map[string]any{"category_id": e.cat("Food"), "amount": 1}); st != 409 {
+	if st, _ := e.do("POST", "/budgets", map[string]any{"category_id": e.cat("Eating out"), "amount": 1}); st != 409 {
 		t.Fatalf("duplicate budget want 409 got %d", st)
 	}
 	if st, _ := e.do("POST", "/budgets", map[string]any{"category_id": e.cat("Salary"), "amount": 1}); st != 422 {
@@ -172,7 +173,7 @@ func TestRecurringGeneration(t *testing.T) {
 	e := newEnv(t)
 	bank := e.createAccount("BOB", "bank", 0)
 	st, body := e.do("POST", "/recurring", map[string]any{"name": "Internet", "type": "expense", "amount": 99900, "account_id": bank,
-		"category_id": e.cat("Internet & Telecom"), "frequency": "monthly", "start_date": "2026-01-31", "generate_as": "cleared"})
+		"category_id": e.cat("Internet/Wi-Fi"), "frequency": "monthly", "start_date": "2026-01-31", "generate_as": "cleared"})
 	if st != 201 {
 		t.Fatalf("create recurring: %d %v", st, body)
 	}

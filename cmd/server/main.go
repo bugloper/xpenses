@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/bugloper/xpensiv/internal/auth"
 	"github.com/bugloper/xpensiv/internal/config"
 	"github.com/bugloper/xpensiv/internal/database"
 	"github.com/bugloper/xpensiv/internal/server"
@@ -52,6 +53,10 @@ func run() error {
 	defer db.Close()
 	if err := database.Migrate(context.Background(), db); err != nil {
 		return fmt.Errorf("migrate: %w", err)
+	}
+	if err := auth.UpgradeCategoryTrees(context.Background(), db); err != nil {
+		slog.Error("upgrade category trees", "err", err)
+		os.Exit(1)
 	}
 
 	deps := server.NewDeps(cfg, db)

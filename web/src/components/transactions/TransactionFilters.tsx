@@ -2,7 +2,16 @@ import { DateRangePicker } from '@/components/common/DateRangePicker'
 import { ResponsiveSheet } from '@/components/common/ResponsiveSheet'
 import { Button } from '@/components/ui/button'
 import { Field, FieldLabel } from '@/components/ui/field'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { groupCategories } from '@/lib/categories'
 import { useAccounts, useCategories } from '@/lib/queries'
 import type { TransactionSort, TransactionStatus, TransactionType } from '@/types/api'
 
@@ -95,11 +104,23 @@ export function TransactionFiltersSheet({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={ANY}>All categories</SelectItem>
-              {categories.map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.name} · {c.type}
-                </SelectItem>
-              ))}
+              {(['expense', 'income'] as const).flatMap((t) =>
+                groupCategories(categories, t, { includeInactive: true }).map((g) => (
+                  <SelectGroup key={g.parent.id}>
+                    <SelectLabel>
+                      {g.parent.name} · {t}
+                    </SelectLabel>
+                    <SelectItem value={g.parent.id}>
+                      {g.children.length > 0 ? `All ${g.parent.name}` : g.parent.name}
+                    </SelectItem>
+                    {g.children.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                )),
+              )}
             </SelectContent>
           </Select>
         </Field>

@@ -106,7 +106,7 @@ func TestReconciliationFlow(t *testing.T) {
 	bank := e.account("BOB", "bank", 100000)
 	cash := e.account("Wallet", "cash", 5000)
 	cc := e.account("Card", "credit_card", 0)
-	catFood, catSalary := e.c.Category("Food"), e.c.Category("Salary")
+	catFood, catSalary := e.c.Category("Eating out"), e.c.Category("Salary")
 
 	e.statement("st1", bank, "2026-11-01", "2026-11-30", 79300, 50000, 8)
 	e.bankTx("b1", "st1", bank, 1, "2026-11-04", "POS/AMBIENT CAFE THIMPHU/1", 1250, 0)
@@ -518,7 +518,7 @@ func TestReconciliationIsolation(t *testing.T) {
 		b.must(404, "POST", "/reconciliation/transfer", map[string]any{"bank_transaction_id": "b1", "transaction_id": mA})
 		// A's accounts and categories are not valid targets for B either.
 		b.must(422, "POST", "/reconciliation/transfer", map[string]any{"bank_transaction_id": "b1", "transfer_account_id": cashA})
-		b.must(422, "POST", "/reconciliation/create-transaction", map[string]any{"bank_transaction_id": "b1", "category_id": a.c.Category("Food")})
+		b.must(422, "POST", "/reconciliation/create-transaction", map[string]any{"bank_transaction_id": "b1", "category_id": a.c.Category("Eating out")})
 		if b.recon("b1") != nil {
 			t.Fatal("b1 must stay unreconciled")
 		}

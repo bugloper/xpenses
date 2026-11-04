@@ -10,7 +10,7 @@ Multi-user with fully isolated data, installable as a PWA, with offline expense 
 ## Features
 
 - Expenses, income, transfers, refunds, adjustments; accounts (bank, cash, mobile wallet, credit card, savings) with ledger-calculated balances.
-- Default categories, custom categories, monthly budgets per category with 75/90/100% warnings.
+- Two-level categories: 12 expense and 4 income main categories with sub-categories seeded by default, your own on top; a compact picker with search and recently used chips; monthly budgets per category (a main category's budget covers its sub-categories) with 75/90/100% warnings.
 - Recurring transactions (daily/weekly/monthly/yearly) generated as drafts or real entries, never duplicated.
 - BOB statement PDF import (password-protected PDFs supported) with preview, correction, balance validation and duplicate detection.
 - Reconciliation workspace: deterministic suggested matches, confirm/reject, manual match, ignore, mark as transfer, create from bank line, adjustments. Fully reversible.

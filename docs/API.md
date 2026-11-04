@@ -28,10 +28,10 @@ Status codes: 200 OK, 201 Created, 204 No Content, 400 bad_request, 404 not_foun
 | GET | /accounts?include_inactive=1 | Account includes `current_balance` (computed from ledger) |
 | POST | /accounts | `{name,type,currency?,opening_balance,opening_balance_date?,account_number?}` type ∈ bank,cash,mobile_wallet,credit_card,savings |
 | GET/PATCH | /accounts/:id | PATCH accepts any subset incl. `is_active` |
-| GET | /categories?include_inactive=1 | |
-| POST | /categories | `{name,icon,color,type('expense'|'income'),parent_id?}` |
+| GET | /categories?include_inactive=1 | Flat list; `parent_id` null = main category, set = sub-category of that main category. Every new user gets the default two-level tree (see `internal/auth/defaults.go`); users from before the tree are upgraded once at startup (`auth.UpgradeCategoryTrees`). |
+| POST | /categories | `{name,icon,color,type('expense'|'income'),parent_id?}` — `parent_id` must be a category of the same type |
 | GET/PATCH | /categories/:id | |
-| GET | /transactions | query: search,date_from,date_to,category_id,account_id,type,status,origin,unmatched=1,sort(date|amount|created_at|payee),order(asc|desc),page,per_page(≤200) |
+| GET | /transactions | query: search,date_from,date_to,category_id (a main category includes its sub-categories),account_id,type,status,origin,unmatched=1,sort(date|amount|created_at|payee),order(asc|desc),page,per_page(≤200) |
 | GET | /transactions/export.csv | same filters, streams CSV |
 | POST | /transactions | see below. Returns 201, or 200 if `client_id` was already seen (idempotent replay) |
 | GET/PATCH/DELETE | /transactions/:id | PATCH is partial; `clear_category:true` / `clear_transfer_account:true` to null those. 409 when changing amount/account/type/date/status of a transaction that is reconciled (unmatch first). DELETE of a matched transaction removes the reconciliation row (bank line becomes unrecorded again). |

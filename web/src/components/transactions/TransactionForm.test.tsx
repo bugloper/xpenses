@@ -40,12 +40,25 @@ const accounts: Account[] = [
 ]
 const categories: Category[] = [
   {
+    id: 'cat-group-food',
+    name: 'Food & Groceries',
+    icon: 'utensils',
+    color: '#f97316',
+    type: 'expense',
+    parent_id: null,
+    is_active: true,
+    is_system: true,
+    sort_order: 0,
+    created_at: '',
+    updated_at: '',
+  },
+  {
     id: 'cat-food',
     name: 'Food',
     icon: 'utensils',
     color: '#f97316',
     type: 'expense',
-    parent_id: null,
+    parent_id: 'cat-group-food',
     is_active: true,
     is_system: true,
     sort_order: 1,
@@ -76,6 +89,13 @@ function mockApi() {
       headers: { 'Content-Type': 'application/json' },
     })
   })
+}
+
+/** Opens the category picker, expands the Food & Groceries group and picks `name`. */
+async function pickCategory(user: ReturnType<typeof userEvent.setup>, name: string) {
+  await user.click(screen.getByRole('button', { name: 'Category' }))
+  await user.click(await screen.findByRole('button', { name: 'Food & Groceries' }))
+  await user.click(await screen.findByRole('radio', { name }))
 }
 
 function renderForm(onSubmit = vi.fn()) {
@@ -158,7 +178,7 @@ describe('TransactionForm', () => {
   it('shows validation errors and does not submit an empty form', async () => {
     const user = userEvent.setup()
     const onSubmit = renderForm()
-    await screen.findByText('Food') // data loaded
+    await screen.findByRole('button', { name: 'Category' }) // data loaded
     await user.click(screen.getByRole('button', { name: /^Save$/ }))
     expect(await screen.findByText(/Enter a valid amount/)).toBeInTheDocument()
     expect(onSubmit).not.toHaveBeenCalled()
@@ -167,7 +187,7 @@ describe('TransactionForm', () => {
   it('pre-selects an account so quick entry never stalls on the picker', async () => {
     const user = userEvent.setup()
     const onSubmit = renderForm()
-    await screen.findByText('Food')
+    await screen.findByRole('button', { name: 'Category' })
     // No last-used account: the first active account (bank first) is chosen.
     await waitFor(() => expect(screen.getByRole('combobox', { name: /Account/ })).toHaveTextContent('BOB'))
     await user.type(screen.getByLabelText('Amount'), '12')
@@ -179,9 +199,12 @@ describe('TransactionForm', () => {
   it('submits parsed values and remembers last-used account + category', async () => {
     const user = userEvent.setup()
     const onSubmit = renderForm()
-    await screen.findByText('Food') // categories loaded
+    await screen.findByRole('button', { name: 'Category' }) // categories loaded
     await user.type(screen.getByLabelText('Amount'), '85.40')
-    await user.click(screen.getByRole('radio', { name: /Food/ }))
+    await pickCategory(user, 'Food')
+    // The field now shows the choice with its group.
+    expect(screen.getByRole('button', { name: 'Category' })).toHaveTextContent('Food')
+    expect(screen.getByRole('button', { name: 'Category' })).toHaveTextContent('Food & Groceries')
     await user.click(screen.getByRole('combobox', { name: /Account/ }))
     await user.click(await screen.findByRole('option', { name: 'BOB' }))
     await user.click(screen.getByRole('button', { name: /^Save$/ }))
@@ -194,14 +217,15 @@ describe('TransactionForm', () => {
     expect(JSON.parse(localStorage.getItem('xpensiv-last-used') ?? '{}')).toMatchObject({
       expense: { account_id: 'acc-1', category_id: 'cat-food' },
     })
+    expect(JSON.parse(localStorage.getItem('xpensiv-recent-categories') ?? '{}')).toEqual({ expense: ['cat-food'] })
   })
 
   it('hides categories and shows the destination account for transfers', async () => {
     const user = userEvent.setup()
     renderForm()
-    await screen.findByText('Food')
+    await screen.findByRole('button', { name: 'Category' })
     await user.click(screen.getByRole('tab', { name: 'Transfer' }))
-    expect(screen.queryByText('Food')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Category' })).not.toBeInTheDocument()
     expect(screen.getByText('To account')).toBeInTheDocument()
   })
 })
@@ -240,9 +264,10 @@ describe('new category from the picker', () => {
     })
     const user = userEvent.setup()
     renderForm()
-    await screen.findByRole('radio', { name: 'Food' })
+    await screen.findByRole('button', { name: 'Category' })
 
-    await user.click(screen.getByRole('button', { name: 'New category' }))
+    await user.click(screen.getByRole('button', { name: 'Category' }))
+    await user.click(await screen.findByRole('button', { name: 'New main category' }))
     expect(await screen.findByRole('heading', { name: 'New category' })).toBeInTheDocument()
     // The kind is fixed to the transaction's type, so there is no type switch.
     expect(screen.queryByRole('radio', { name: 'Income' })).not.toBeInTheDocument()
@@ -250,8 +275,24 @@ describe('new category from the picker', () => {
     await user.type(screen.getByLabelText('Name'), 'Momo')
     await user.click(screen.getByRole('button', { name: 'Create' }))
 
-    const chip = await screen.findByRole('radio', { name: 'Momo' })
-    await waitFor(() => expect(chip).toHaveAttribute('aria-checked', 'true'))
+    // Picker and form both close; the field shows the new category.
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Category' })).toHaveTextContent('Momo'))
     expect(screen.queryByRole('heading', { name: 'New category' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Choose a category' })).not.toBeInTheDocument()
+  })
+})
+
+describe('recent categories', () => {
+  it('offers recently used categories as one-tap chips', async () => {
+    localStorage.setItem('xpensiv-recent-categories', JSON.stringify({ expense: ['cat-food'] }))
+    const user = userEvent.setup()
+    const onSubmit = renderForm()
+    const chip = await screen.findByRole('radio', { name: 'Food' })
+    await user.click(chip)
+    expect(chip).toHaveAttribute('aria-checked', 'true')
+    await user.type(screen.getByLabelText('Amount'), '5')
+    await user.click(screen.getByRole('button', { name: /^Save$/ }))
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1))
+    expect((onSubmit.mock.calls[0] as [{ category_id?: string }])[0].category_id).toBe('cat-food')
   })
 })

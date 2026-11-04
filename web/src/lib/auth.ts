@@ -6,6 +6,7 @@
 import { useSyncExternalStore } from 'react'
 import { isApiError } from './api'
 import { clearLastUsed } from './last-used'
+import { clearRecentCategories } from '@/lib/recent-categories'
 import { QUERY_CACHE_STORAGE_KEY, queryClient, queryPersister } from './queryClient'
 import type { User } from '@/types/api'
 
@@ -105,6 +106,7 @@ export async function purgeSessionData(): Promise<void> {
     // storage unavailable
   }
   clearLastUsed()
+  clearRecentCategories()
   writeLastUser(null)
   try {
     const doomed: string[] = []

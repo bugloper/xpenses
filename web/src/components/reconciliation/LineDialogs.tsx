@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { AccountIcon } from '@/components/common/AccountIcon'
+import { CategoryField } from '@/components/categories/CategoryField'
 import { CategoryIcon } from '@/components/common/CategoryIcon'
 import { Money } from '@/components/common/Money'
 import { ResponsiveSheet } from '@/components/common/ResponsiveSheet'
@@ -306,7 +307,6 @@ function CreateForm({
 }) {
   const side = bankSide(line)
   const wanted = side.isDebit ? 'expense' : 'income'
-  const visible = categories.filter((c) => c.type === wanted && c.is_active)
   const [categoryId, setCategoryId] = useState<string>('')
   const [payee, setPayee] = useState(cleanDescription(line.description))
   const [description, setDescription] = useState(line.description.trim())
@@ -332,32 +332,14 @@ function CreateForm({
         {formatShortDate(line.transaction_date)}.
       </p>
       <Field>
-        <FieldLabel>Category</FieldLabel>
-        {visible.length === 0 ? (
-          <p className="text-muted-foreground text-sm">No {wanted} categories yet.</p>
-        ) : (
-          <div className="grid grid-cols-4 gap-2 sm:grid-cols-5" role="radiogroup" aria-label="Category">
-            {visible.map((c) => {
-              const active = categoryId === c.id
-              return (
-                <button
-                  key={c.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={active}
-                  onClick={() => setCategoryId(active ? '' : c.id)}
-                  className={cn(
-                    'flex flex-col items-center gap-1.5 rounded-xl border p-2 text-center transition-colors',
-                    active ? 'border-primary bg-primary/10' : 'bg-muted/50 hover:bg-muted border-transparent',
-                  )}
-                >
-                  <CategoryIcon icon={c.icon} color={c.color} size="sm" />
-                  <span className="line-clamp-2 text-[11px] leading-tight font-medium">{c.name}</span>
-                </button>
-              )
-            })}
-          </div>
-        )}
+        <FieldLabel htmlFor="create-category">Category</FieldLabel>
+        <CategoryField
+          id="create-category"
+          categories={categories}
+          type={wanted}
+          value={categoryId || undefined}
+          onChange={(id) => setCategoryId(id ?? '')}
+        />
       </Field>
       <Field>
         <FieldLabel htmlFor="create-payee">Payee</FieldLabel>

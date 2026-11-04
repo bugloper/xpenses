@@ -38,7 +38,7 @@ func TestPatchReconciledTransactionFreezesMoneyFields(t *testing.T) {
 			t.Errorf("%s: want 409 got %d", name, st)
 		}
 	}
-	if st, _ := c.Do(http.MethodPatch, "/transactions/"+txID, map[string]any{"payee": "Shop", "notes": "ok", "category_id": c.Category("Food"), "tags": []string{"x"}}); st != http.StatusOK {
+	if st, _ := c.Do(http.MethodPatch, "/transactions/"+txID, map[string]any{"payee": "Shop", "notes": "ok", "category_id": c.Category("Eating out"), "tags": []string{"x"}}); st != http.StatusOK {
 		t.Errorf("descriptive edit: want 200 got %d", st)
 	}
 	var amount int64

@@ -16,7 +16,9 @@ test('offline expense is queued and synced when back online', async ({ page, con
 
   await context.setOffline(true)
   await page.getByLabel('Amount').fill('12.50')
-  await page.getByRole('radio', { name: 'Groceries' }).click()
+  await page.getByRole('button', { name: 'Category', exact: true }).click()
+  await page.getByRole('button', { name: 'Food & Groceries' }).click()
+  await page.getByRole('radio', { name: 'Groceries', exact: true }).click()
   await page.getByLabel('Account').first().click()
   await page.getByRole('option', { name: /Offline Wallet/ }).click()
   await page.getByRole('button', { name: /^Save$/ }).click()

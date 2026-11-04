@@ -2,7 +2,7 @@
 import { addMonths, endOfMonth, endOfWeek, startOfMonth, startOfWeek } from 'date-fns'
 import { toQuery } from '@/lib/api'
 import { isISODate, toISODate, type DateRange } from '@/lib/dates'
-import type { CashFlowGranularity, ExportFormat, ExportReport, FlowType } from '@/types/api'
+import type { CashFlowGranularity, ExportFormat, ExportReport, FlowType, ReportCategory } from '@/types/api'
 
 export type ReportPeriodPreset = 'month' | 'prev_month' | 'week' | 'last3' | 'custom'
 export const REPORT_PRESETS: { value: ReportPeriodPreset; label: string }[] = [
@@ -149,4 +149,64 @@ export function pct1(part: number, total: number): string {
   if (total <= 0) return '0.0'
   const tenths = Math.round((part * 1000) / total)
   return `${Math.trunc(tenths / 10)}.${tenths % 10}`
+}
+
+export type CategoryRollup = {
+  /** The main category (or a stand-alone category / "Uncategorised"). */
+  row: ReportCategory
+  /** Sub-category rows folded into this one, largest first. */
+  children: ReportCategory[]
+  amount: number
+  count: number
+}
+
+/**
+ * Folds sub-category rows into their parent so charts show main categories.
+ * A parent with no transactions of its own still appears when its
+ * sub-categories do; its own spending is listed as a "General" child.
+ */
+export function rollupCategories(rows: ReportCategory[]): CategoryRollup[] {
+  const groups = new Map<string, CategoryRollup>()
+  const keyOf = (r: ReportCategory) => r.parent_id ?? r.category_id ?? 'none'
+  for (const r of rows) {
+    const key = keyOf(r)
+    let g = groups.get(key)
+    if (!g) {
+      const row: ReportCategory = r.parent_id
+        ? {
+            category_id: r.parent_id,
+            name: r.parent_name,
+            icon: r.icon,
+            color: r.color,
+            parent_id: null,
+            parent_name: '',
+            amount: 0,
+            count: 0,
+            pct: 0,
+          }
+        : { ...r }
+      g = { row, children: [], amount: 0, count: 0 }
+      groups.set(key, g)
+    } else if (!r.parent_id) {
+      // The parent's own row arrived after a child: adopt its icon/colour.
+      g.row = { ...r, amount: g.row.amount, count: g.row.count }
+    }
+    g.amount += r.amount
+    g.count += r.count
+    if (r.parent_id) g.children.push(r)
+  }
+  const total = [...groups.values()].reduce((n, g) => n + g.amount, 0)
+  const out = [...groups.values()].map((g) => {
+    const own = g.amount - g.children.reduce((n, c) => n + c.amount, 0)
+    const children =
+      g.children.length > 0 && own > 0
+        ? [{ ...g.row, name: 'General', amount: own, count: g.count - g.children.reduce((n, c) => n + c.count, 0) }, ...g.children]
+        : g.children
+    return {
+      ...g,
+      children: [...children].sort((a, b) => b.amount - a.amount),
+      row: { ...g.row, amount: g.amount, count: g.count, pct: total > 0 ? Math.round((g.amount * 1000) / total) / 10 : 0 },
+    }
+  })
+  return out.sort((a, b) => b.amount - a.amount)
 }

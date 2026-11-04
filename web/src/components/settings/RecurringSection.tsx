@@ -1,3 +1,4 @@
+import { CategoryField } from '@/components/categories/CategoryField'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { MoreVertical, Pause, Pencil, Play, Plus, Repeat, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
@@ -35,7 +36,6 @@ import {
 } from '@/lib/queries'
 import type { RecurringTransaction } from '@/types/api'
 
-const NONE = '__none'
 
 const schema = z
   .object({
@@ -130,7 +130,6 @@ function RecurringFormSheet({
   const err = formState.errors
   const busy = create.isPending || update.isPending
   const categoryType = type === 'income' ? 'income' : 'expense'
-  const cats = categories.filter((c) => c.type === categoryType && c.is_active)
   // Switching expense <-> income must not keep a category of the other type (server rejects it).
   useEffect(() => {
     if (!categoryId || categories.length === 0) return
@@ -281,23 +280,15 @@ function RecurringFormSheet({
               name="category_id"
               render={({ field }) => (
                 <Field>
-                  <FieldLabel>Category</FieldLabel>
-                  <Select
-                    value={field.value ?? NONE}
-                    onValueChange={(v) => field.onChange(v === NONE ? undefined : v)}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="None" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={NONE}>None</SelectItem>
-                      {cats.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <FieldLabel htmlFor="recurring-category">Category</FieldLabel>
+                  <CategoryField
+                    id="recurring-category"
+                    categories={categories}
+                    type={categoryType}
+                    value={field.value}
+                    onChange={field.onChange}
+                    showRecent={false}
+                  />
                 </Field>
               )}
             />

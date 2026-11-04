@@ -99,7 +99,7 @@ func seed(t *testing.T) *fixture {
 	acct("acc-old", "Closed", "bank", 777, 0)
 
 	exec(t, db, `INSERT INTO categories (id,user_id,name,icon,color,type,parent_id,created_at,updated_at)
-		VALUES ('cat-coffee',?,'Coffee','coffee','#000000','expense',?,?,?)`, uid, cat["Food"], ts, ts)
+		VALUES ('cat-coffee',?,'Coffee','coffee','#000000','expense',?,?,?)`, uid, cat["Eating out"], ts, ts)
 	cat["Coffee"] = "cat-coffee"
 
 	type tx struct {
@@ -115,20 +115,20 @@ func seed(t *testing.T) *fixture {
 		createdAt string
 	}
 	rows := []tx{
-		{"tx1", "expense", 2500, "acc-bank", nil, cat["Food"], "Ambient Cafe", "2026-11-01", "manual", "cleared", "2026-11-01T01:00:00Z"},
+		{"tx1", "expense", 2500, "acc-bank", nil, cat["Eating out"], "Ambient Cafe", "2026-11-01", "manual", "cleared", "2026-11-01T01:00:00Z"},
 		{"tx2", "expense", 1500, "acc-bank", nil, cat["Coffee"], "Ambient Cafe", "2026-11-03", "manual", "cleared", "2026-11-03T01:00:00Z"},
 		{"tx3", "expense", 4000, "acc-bank", nil, cat["Groceries"], "8 Eleven", "2026-11-05", "manual", "cleared", "2026-11-05T01:00:00Z"},
 		{"tx4", "expense", 1000, "acc-cash", nil, nil, "", "2026-11-10", "manual", "cleared", "2026-11-10T01:00:00Z"},
 		{"tx5", "income", 50000, "acc-bank", nil, cat["Salary"], "Employer", "2026-11-01", "manual", "cleared", "2026-11-01T02:00:00Z"},
-		{"tx6", "refund", 500, "acc-bank", nil, cat["Refund"], "Ambient Cafe", "2026-11-02", "manual", "cleared", "2026-11-02T01:00:00Z"},
+		{"tx6", "refund", 500, "acc-bank", nil, cat["Refunds"], "Ambient Cafe", "2026-11-02", "manual", "cleared", "2026-11-02T01:00:00Z"},
 		{"tx7", "transfer", 10000, "acc-bank", "acc-cash", nil, "", "2026-11-02", "manual", "cleared", "2026-11-02T02:00:00Z"},
 		{"tx8", "adjustment", -300, "acc-cash", nil, nil, "", "2026-11-03", "adjustment", "cleared", "2026-11-03T02:00:00Z"},
 		{"tx9", "adjustment", 200, "acc-bank", nil, nil, "", "2026-11-04", "adjustment", "cleared", "2026-11-04T01:00:00Z"},
-		{"tx10", "expense", 99999, "acc-cash", nil, cat["Food"], "Draft", "2026-11-03", "manual", "pending", "2026-11-03T03:00:00Z"},
-		{"tx11", "expense", 99999, "acc-bank", nil, cat["Food"], "Void", "2026-11-03", "manual", "void", "2026-11-03T04:00:00Z"},
-		{"tx12", "expense", 8000, "acc-bank", nil, cat["Food"], "Ambient Cafe", "2026-10-15", "manual", "cleared", "2026-10-15T01:00:00Z"},
-		{"tx13", "expense", 700, "acc-bank", nil, cat["Food"], "Ambient Cafe", "2026-10-01", "manual", "cleared", "2026-10-01T01:00:00Z"},
-		{"tx14", "expense", 300, "acc-bank", nil, cat["Food"], "Ambient Cafe", "2026-12-01", "manual", "cleared", "2026-12-01T01:00:00Z"},
+		{"tx10", "expense", 99999, "acc-cash", nil, cat["Eating out"], "Draft", "2026-11-03", "manual", "pending", "2026-11-03T03:00:00Z"},
+		{"tx11", "expense", 99999, "acc-bank", nil, cat["Eating out"], "Void", "2026-11-03", "manual", "void", "2026-11-03T04:00:00Z"},
+		{"tx12", "expense", 8000, "acc-bank", nil, cat["Eating out"], "Ambient Cafe", "2026-10-15", "manual", "cleared", "2026-10-15T01:00:00Z"},
+		{"tx13", "expense", 700, "acc-bank", nil, cat["Eating out"], "Ambient Cafe", "2026-10-01", "manual", "cleared", "2026-10-01T01:00:00Z"},
+		{"tx14", "expense", 300, "acc-bank", nil, cat["Eating out"], "Ambient Cafe", "2026-12-01", "manual", "cleared", "2026-12-01T01:00:00Z"},
 	}
 	for _, r := range rows {
 		exec(t, db, `INSERT INTO transactions (id,user_id,type,amount,currency,account_id,transfer_account_id,category_id,payee,transaction_date,origin,status,created_at,updated_at)
@@ -137,7 +137,7 @@ func seed(t *testing.T) *fixture {
 
 	exec(t, db, `INSERT INTO budgets (id,user_id,category_id,amount,created_at,updated_at) VALUES
 		('b-food',?,?,5000,?,?), ('b-groc',?,?,4000,?,?), ('b-trans',?,?,1000,?,?)`,
-		uid, cat["Food"], ts, ts, uid, cat["Groceries"], ts, ts, uid, cat["Transportation"], ts, ts)
+		uid, cat["Eating out"], ts, ts, uid, cat["Groceries"], ts, ts, uid, cat["Transportation"], ts, ts)
 
 	exec(t, db, `INSERT INTO bank_statements (id,user_id,provider,account_id,file_name,file_sha256,file_size,period_start,period_end,
 		opening_balance,closing_balance,total_debits,total_credits,transaction_count,imported_at)
@@ -179,11 +179,11 @@ func seedOther(t *testing.T, db *sql.DB) *fixture {
 		exec(t, db, `INSERT INTO transactions (id,user_id,type,amount,currency,account_id,category_id,payee,transaction_date,origin,status,created_at,updated_at)
 			VALUES (?,?,?,?,'BTN','acc-b-bank',?,?,?,'manual',?,?,?)`, id, uid, typ, amount, catID, payee, date, status, createdAt, createdAt)
 	}
-	tx("bx1", "expense", 1000, cat["Food"], "Ambient Cafe", "2026-11-02", "cleared", "2026-11-02T01:00:00Z")
+	tx("bx1", "expense", 1000, cat["Eating out"], "Ambient Cafe", "2026-11-02", "cleared", "2026-11-02T01:00:00Z")
 	tx("bx2", "income", 7000, cat["Salary"], "Employer B", "2026-11-01", "cleared", "2026-11-01T01:00:00Z")
 	tx("bx3", "expense", 600, cat["Groceries"], "8 Eleven", "2026-10-10", "cleared", "2026-10-10T01:00:00Z")
-	tx("bx4", "expense", 5, cat["Food"], "Draft B", "2026-12-02", "pending", "2026-12-02T01:00:00Z")
-	exec(t, db, `INSERT INTO budgets (id,user_id,category_id,amount,created_at,updated_at) VALUES ('b-b-food',?,?,2000,?,?)`, uid, cat["Food"], ts, ts)
+	tx("bx4", "expense", 5, cat["Eating out"], "Draft B", "2026-12-02", "pending", "2026-12-02T01:00:00Z")
+	exec(t, db, `INSERT INTO budgets (id,user_id,category_id,amount,created_at,updated_at) VALUES ('b-b-food',?,?,2000,?,?)`, uid, cat["Eating out"], ts, ts)
 	exec(t, db, `INSERT INTO bank_statements (id,user_id,provider,account_id,file_name,file_sha256,file_size,period_start,period_end,
 		opening_balance,closing_balance,total_debits,total_credits,transaction_count,imported_at)
 		VALUES ('st-b',?,'bob','acc-b-bank','nov-b.pdf','def',10,'2026-11-01','2026-11-30',20000,26000,1000,7000,2,?)`, uid, ts)
@@ -255,9 +255,9 @@ func TestCategories(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []CategoryRow{
-		{CategoryID: ptr(f.cat["Groceries"]), Name: "Groceries", Icon: "shopping-basket", Color: "#22c55e", Amount: 4000, Count: 1, Pct: 44.4},
-		{CategoryID: ptr(f.cat["Food"]), Name: "Food", Icon: "utensils", Color: "#f97316", Amount: 2500, Count: 1, Pct: 27.8},
-		{CategoryID: ptr(f.cat["Coffee"]), Name: "Coffee", Icon: "coffee", Color: "#000000", Amount: 1500, Count: 1, Pct: 16.7},
+		{CategoryID: ptr(f.cat["Groceries"]), Name: "Groceries", Icon: "shopping-basket", Color: "#f97316", ParentID: ptr(f.cat["Food & Groceries"]), ParentName: "Food & Groceries", Amount: 4000, Count: 1, Pct: 44.4},
+		{CategoryID: ptr(f.cat["Eating out"]), Name: "Eating out", Icon: "utensils", Color: "#f97316", ParentID: ptr(f.cat["Food & Groceries"]), ParentName: "Food & Groceries", Amount: 2500, Count: 1, Pct: 27.8},
+		{CategoryID: ptr(f.cat["Coffee"]), Name: "Coffee", Icon: "coffee", Color: "#000000", ParentID: ptr(f.cat["Eating out"]), ParentName: "Eating out", Amount: 1500, Count: 1, Pct: 16.7},
 		{CategoryID: nil, Name: "Uncategorised", Icon: "circle", Color: "#64748b", Amount: 1000, Count: 1, Pct: 11.1},
 	}
 	if !reflect.DeepEqual(got, want) {
@@ -268,7 +268,7 @@ func TestCategories(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(got) != 2 || got[0].Name != "Salary" || got[0].Amount != 50000 || got[0].Pct != 99.0 ||
-		got[1].Name != "Refund" || got[1].Amount != 500 || got[1].Pct != 1.0 {
+		got[1].Name != "Refunds" || got[1].Amount != 500 || got[1].Pct != 1.0 {
 		t.Fatalf("income: %s", dump(got))
 	}
 	empty, err := f.svc.Categories(f.ctx, Period{From: "2020-01-01", To: "2020-01-31"}, FlowExpense)
@@ -362,8 +362,8 @@ func TestBudgets(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []BudgetRow{
-		{BudgetID: "b-food", CategoryID: f.cat["Food"], Name: "Food", Icon: "utensils", Color: "#f97316", Amount: 5000, Spent: 4000, Remaining: 1000, Pct: 80, Level: LevelWarn75},
-		{BudgetID: "b-groc", CategoryID: f.cat["Groceries"], Name: "Groceries", Icon: "shopping-basket", Color: "#22c55e", Amount: 4000, Spent: 4000, Remaining: 0, Pct: 100, Level: LevelOver},
+		{BudgetID: "b-groc", CategoryID: f.cat["Groceries"], Name: "Groceries", Icon: "shopping-basket", Color: "#f97316", Amount: 4000, Spent: 4000, Remaining: 0, Pct: 100, Level: LevelOver},
+		{BudgetID: "b-food", CategoryID: f.cat["Eating out"], Name: "Eating out", Icon: "utensils", Color: "#f97316", Amount: 5000, Spent: 4000, Remaining: 1000, Pct: 80, Level: LevelWarn75},
 		{BudgetID: "b-trans", CategoryID: f.cat["Transportation"], Name: "Transportation", Icon: "car", Color: "#3b82f6", Amount: 1000, Spent: 0, Remaining: 1000, Pct: 0, Level: LevelOK},
 	}
 	if !reflect.DeepEqual(got, want) {
@@ -373,8 +373,16 @@ func TestBudgets(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if oct[0].Spent != 8700 || oct[0].Pct != 174 || oct[0].Level != LevelOver {
-		t.Fatalf("october food: %+v", oct[0])
+	// Rows come back in category order (Groceries before Eating out); the
+	// food budget rolls up its Coffee sub-category.
+	var food BudgetRow
+	for _, b := range oct {
+		if b.BudgetID == "b-food" {
+			food = b
+		}
+	}
+	if food.Spent != 8700 || food.Pct != 174 || food.Level != LevelOver {
+		t.Fatalf("october food: %+v", food)
 	}
 }
 
@@ -473,7 +481,7 @@ func TestExportCSV(t *testing.T) {
 	if lines[0] != "Categories (expense)" || lines[1] != "Period: 2026-11-01 to 2026-11-30" || !strings.HasPrefix(lines[2], "Generated: ") {
 		t.Fatalf("header: %q", lines[:3])
 	}
-	want := []string{"", "Category,Count,Amount,%", "Groceries,1,40.00,44.4", "Food,1,25.00,27.8", "Coffee,1,15.00,16.7", "Uncategorised,1,10.00,11.1"}
+	want := []string{"", "Category,Count,Amount,%", "Groceries,1,40.00,44.4", "Eating out,1,25.00,27.8", "Coffee,1,15.00,16.7", "Uncategorised,1,10.00,11.1"}
 	if !reflect.DeepEqual(lines[3:], want) {
 		t.Fatalf("body: %q", lines[3:])
 	}
@@ -503,7 +511,7 @@ func TestExportCSV(t *testing.T) {
 	}
 	buf.Reset()
 	_ = WriteCSV(&buf, doc)
-	if doc.Filename != "xpensiv-budgets-2026-11" || !strings.Contains(buf.String(), "Food,50.00,40.00,10.00,80,warn75") {
+	if doc.Filename != "xpensiv-budgets-2026-11" || !strings.Contains(buf.String(), "Eating out,50.00,40.00,10.00,80,warn75") {
 		t.Fatalf("budgets csv: %s\n%s", doc.Filename, buf.String())
 	}
 }
@@ -572,11 +580,11 @@ func TestIsolation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []CategoryRow{{CategoryID: ptr(b.cat["Food"]), Name: "Food", Icon: "utensils", Color: "#f97316", Amount: 1000, Count: 1, Pct: 100}}
+	want := []CategoryRow{{CategoryID: ptr(b.cat["Eating out"]), Name: "Eating out", Icon: "utensils", Color: "#f97316", ParentID: ptr(b.cat["Food & Groceries"]), ParentName: "Food & Groceries", Amount: 1000, Count: 1, Pct: 100}}
 	if !reflect.DeepEqual(cats, want) {
 		t.Fatalf("categories:\n got %s\nwant %s", dump(cats), dump(want))
 	}
-	if b.cat["Food"] == a.cat["Food"] {
+	if b.cat["Eating out"] == a.cat["Eating out"] {
 		t.Fatal("users must not share category ids")
 	}
 	inc, err := b.svc.Categories(b.ctx, nov, FlowIncome)
@@ -613,7 +621,7 @@ func TestIsolation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantBudgets := []BudgetRow{{BudgetID: "b-b-food", CategoryID: b.cat["Food"], Name: "Food", Icon: "utensils", Color: "#f97316", Amount: 2000, Spent: 1000, Remaining: 1000, Pct: 50, Level: LevelOK}}
+	wantBudgets := []BudgetRow{{BudgetID: "b-b-food", CategoryID: b.cat["Eating out"], Name: "Eating out", Icon: "utensils", Color: "#f97316", Amount: 2000, Spent: 1000, Remaining: 1000, Pct: 50, Level: LevelOK}}
 	if !reflect.DeepEqual(budgets, wantBudgets) {
 		t.Fatalf("budgets:\n got %s\nwant %s", dump(budgets), dump(wantBudgets))
 	}
@@ -643,7 +651,7 @@ func TestIsolation(t *testing.T) {
 		t.Fatal(err)
 	}
 	lines := strings.Split(strings.TrimRight(buf.String(), "\n"), "\n")
-	if wantLines := []string{"", "Category,Count,Amount,%", "Food,1,10.00,100.0"}; !reflect.DeepEqual(lines[3:], wantLines) {
+	if wantLines := []string{"", "Category,Count,Amount,%", "Eating out,1,10.00,100.0"}; !reflect.DeepEqual(lines[3:], wantLines) {
 		t.Fatalf("export csv: %q", lines[3:])
 	}
 	doc, err = b.svc.Export(b.ctx, ExportRequest{Report: "summary", Period: nov})

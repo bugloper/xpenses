@@ -1,5 +1,5 @@
 import { createRoute } from '@tanstack/react-router'
-import { Eye, EyeOff, MoreVertical, Pencil, Plus, Shapes } from 'lucide-react'
+import { ChevronDown, ChevronRight, Eye, EyeOff, MoreVertical, Pencil, Plus, Shapes } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { z } from 'zod'
@@ -19,11 +19,15 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Switch } from '@/components/ui/switch'
 import { errorMessage } from '@/lib/api'
+import { groupCategories, type CategoryGroup } from '@/lib/categories'
 import { useBudgets, useCategories, useDefaultCurrency, useUpdateCategory } from '@/lib/queries'
-import type { Category, CategoryType } from '@/types/api'
+import { cn } from '@/lib/utils'
+import type { Budget, Category, CategoryType } from '@/types/api'
 import { appRoute } from './__root'
 
 const searchSchema = z.object({ type: z.enum(['expense', 'income']).optional().catch(undefined) })
+
+type Editing = { category: Category | null; parentId: string | null } | null
 
 function CategoriesPage() {
   const search = categoriesRoute.useSearch()
@@ -34,9 +38,13 @@ function CategoriesPage() {
   const budgets = useBudgets()
   const update = useUpdateCategory()
   const currency = useDefaultCurrency()
-  const [editing, setEditing] = useState<Category | null | undefined>(undefined)
+  const [editing, setEditing] = useState<Editing>(null)
+  const [open, setOpen] = useState<Record<string, boolean>>({})
 
-  const list = useMemo(() => (data ?? []).filter((c) => c.type === type), [data, type])
+  const groups = useMemo(
+    () => groupCategories(data ?? [], type, { includeInactive: showInactive }),
+    [data, type, showInactive],
+  )
   const budgetByCategory = useMemo(
     () => new Map((budgets.data ?? []).map((b) => [b.category_id, b])),
     [budgets.data],
@@ -56,7 +64,7 @@ function CategoriesPage() {
       <PageHeader
         title="Categories"
         actions={
-          <Button size="sm" onClick={() => setEditing(null)}>
+          <Button size="sm" onClick={() => setEditing({ category: null, parentId: null })}>
             <Plus data-icon="inline-start" /> New
           </Button>
         }
@@ -76,29 +84,116 @@ function CategoriesPage() {
           <Switch checked={showInactive} onCheckedChange={setShowInactive} />
         </label>
       </div>
-      {type === 'expense' && (
-        <p className="text-muted-foreground text-xs">
-          Tap a budget to set the monthly limit. Set it to 0 to remove it.
-        </p>
-      )}
+      <p className="text-muted-foreground text-xs">
+        Main categories hold sub-categories. Tap one to see its sub-categories
+        {type === 'expense' ? '; tap a budget to set a monthly limit (0 removes it).' : '.'}
+      </p>
       {isPending ? (
         <ListSkeleton rows={6} />
       ) : error ? (
         <ErrorState error={error} onRetry={() => void refetch()} />
-      ) : list.length === 0 ? (
+      ) : groups.length === 0 ? (
         <EmptyState
           icon={Shapes}
           title={`No ${type} categories`}
-          action={<Button onClick={() => setEditing(null)}>Create one</Button>}
+          action={<Button onClick={() => setEditing({ category: null, parentId: null })}>Create one</Button>}
         />
       ) : (
-        <ul className="grid gap-2 sm:grid-cols-2">
-          {list.map((c) => (
-            <li
-              key={c.id}
-              className="bg-card ring-foreground/10 flex items-center gap-3 rounded-2xl p-3 ring-1"
-            >
-              <CategoryIcon icon={c.icon} color={c.color} />
+        <ul className="flex flex-col gap-2">
+          {groups.map((g) => (
+            <GroupCard
+              key={g.parent.id}
+              group={g}
+              type={type}
+              currency={currency}
+              budgets={budgetByCategory}
+              open={open[g.parent.id] ?? false}
+              onToggle={() => setOpen((o) => ({ ...o, [g.parent.id]: !(o[g.parent.id] ?? false) }))}
+              onEdit={(c) => setEditing({ category: c, parentId: null })}
+              onAddSub={() => setEditing({ category: null, parentId: g.parent.id })}
+              onToggleActive={toggleActive}
+            />
+          ))}
+        </ul>
+      )}
+      <CategoryFormSheet
+        open={editing !== null}
+        onOpenChange={(o) => !o && setEditing(null)}
+        category={editing?.category ?? null}
+        defaultType={type}
+        defaultParentId={editing?.parentId ?? null}
+      />
+    </div>
+  )
+}
+
+function GroupCard({
+  group,
+  type,
+  currency,
+  budgets,
+  open,
+  onToggle,
+  onEdit,
+  onAddSub,
+  onToggleActive,
+}: {
+  group: CategoryGroup
+  type: CategoryType
+  currency: string
+  budgets: Map<string, Budget>
+  open: boolean
+  onToggle: () => void
+  onEdit: (c: Category) => void
+  onAddSub: () => void
+  onToggleActive: (c: Category) => void
+}) {
+  const { parent, children } = group
+  return (
+    <li className="bg-card ring-foreground/10 rounded-2xl ring-1">
+      <div className="flex items-center gap-3 p-3">
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-label={`${open ? 'Collapse' : 'Expand'} ${parent.name}`}
+          onClick={onToggle}
+          className="flex min-w-0 flex-1 items-center gap-3 text-left"
+        >
+          <CategoryIcon icon={parent.icon} color={parent.color} />
+          <span className="min-w-0 flex-1">
+            <span className="flex items-center gap-2">
+              <span className="truncate text-sm font-semibold">{parent.name}</span>
+              {!parent.is_active && (
+                <Badge variant="outline" className="h-5 text-[10px]">
+                  Inactive
+                </Badge>
+              )}
+            </span>
+            <span className="text-muted-foreground block text-xs">
+              {children.length === 0
+                ? 'No sub-categories'
+                : `${children.length} sub-categor${children.length === 1 ? 'y' : 'ies'}`}
+            </span>
+          </span>
+          {open ? (
+            <ChevronDown className="text-muted-foreground size-4 shrink-0" />
+          ) : (
+            <ChevronRight className="text-muted-foreground size-4 shrink-0" />
+          )}
+        </button>
+        <RowMenu category={parent} onEdit={onEdit} onToggleActive={onToggleActive} onAddSub={onAddSub} />
+      </div>
+      {open && (
+        <ul className="border-t px-3 py-2" aria-label={`${parent.name} sub-categories`}>
+          {type === 'expense' && parent.is_active && (
+            <li className="text-muted-foreground flex items-center justify-between gap-3 py-1.5 text-xs">
+              <span>Budget for all of {parent.name}</span>
+              <BudgetInline categoryId={parent.id} budget={budgets.get(parent.id)} currency={currency} />
+            </li>
+          )}
+          {children.map((c) => (
+            <li key={c.id} className={cn('flex items-center gap-3 py-2', !c.is_active && 'opacity-60')}>
+              <CategoryIcon icon={c.icon} color={c.color} size="sm" />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <p className="truncate text-sm font-medium">{c.name}</p>
@@ -109,37 +204,57 @@ function CategoriesPage() {
                   )}
                 </div>
                 {type === 'expense' && c.is_active && (
-                  <div className="mt-0.5 -ml-2">
-                    <BudgetInline categoryId={c.id} budget={budgetByCategory.get(c.id)} currency={currency} />
+                  <div className="-ml-2">
+                    <BudgetInline categoryId={c.id} budget={budgets.get(c.id)} currency={currency} />
                   </div>
                 )}
               </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon-sm" aria-label={`Actions for ${c.name}`}>
-                    <MoreVertical />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onSelect={() => setEditing(c)}>
-                    <Pencil /> Edit
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => toggleActive(c)}>
-                    {c.is_active ? <EyeOff /> : <Eye />} {c.is_active ? 'Deactivate' : 'Activate'}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <RowMenu category={c} onEdit={onEdit} onToggleActive={onToggleActive} />
             </li>
           ))}
+          <li className="py-1.5">
+            <Button variant="ghost" size="sm" onClick={onAddSub}>
+              <Plus data-icon="inline-start" /> Add sub-category
+            </Button>
+          </li>
         </ul>
       )}
-      <CategoryFormSheet
-        open={editing !== undefined}
-        onOpenChange={(o) => !o && setEditing(undefined)}
-        category={editing ?? null}
-        defaultType={type}
-      />
-    </div>
+    </li>
+  )
+}
+
+function RowMenu({
+  category: c,
+  onEdit,
+  onToggleActive,
+  onAddSub,
+}: {
+  category: Category
+  onEdit: (c: Category) => void
+  onToggleActive: (c: Category) => void
+  onAddSub?: () => void
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon-sm" aria-label={`Actions for ${c.name}`}>
+          <MoreVertical />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onSelect={() => onEdit(c)}>
+          <Pencil /> Edit
+        </DropdownMenuItem>
+        {onAddSub && (
+          <DropdownMenuItem onSelect={onAddSub}>
+            <Plus /> Add sub-category
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuItem onSelect={() => onToggleActive(c)}>
+          {c.is_active ? <EyeOff /> : <Eye />} {c.is_active ? 'Deactivate' : 'Activate'}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 

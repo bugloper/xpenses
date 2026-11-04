@@ -228,6 +228,9 @@ export type ReportCategory = {
   name: string
   icon: string
   color: string
+  /** Set for a sub-category; reports roll up by parent. */
+  parent_id: string | null
+  parent_name: string
   amount: number
   count: number
   pct: number

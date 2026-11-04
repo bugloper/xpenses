@@ -27,10 +27,10 @@ func newReportEnv(t *testing.T) (*testutil.Env, *testutil.Client) {
 	exec(`INSERT INTO transactions (id,user_id,type,amount,account_id,category_id,payee,transaction_date,created_at,updated_at) VALUES
 		('t1',?,'expense',2500,?,?,'Cafe','2026-11-02',?,?),
 		('t2',?,'income',50000,?,?,'Employer','2026-11-01',?,?)`,
-		admin.UserID, acc, admin.Category("Food"), reportTS, reportTS,
+		admin.UserID, acc, admin.Category("Eating out"), reportTS, reportTS,
 		admin.UserID, acc, admin.Category("Salary"), reportTS, reportTS)
 	exec(`INSERT INTO budgets (id,user_id,category_id,amount,created_at,updated_at) VALUES ('b1',?,?,5000,?,?)`,
-		admin.UserID, admin.Category("Food"), reportTS, reportTS)
+		admin.UserID, admin.Category("Eating out"), reportTS, reportTS)
 	return env, admin
 }
 
@@ -72,7 +72,7 @@ func TestReportsJSON(t *testing.T) {
 
 	st, _, body = get(t, c, "/reports/categories?from=2026-11-01&to=2026-11-30")
 	rows := decode(t, body)["data"].([]any)
-	if st != 200 || len(rows) != 1 || rows[0].(map[string]any)["name"] != "Food" || rows[0].(map[string]any)["pct"].(float64) != 100 {
+	if st != 200 || len(rows) != 1 || rows[0].(map[string]any)["name"] != "Eating out" || rows[0].(map[string]any)["pct"].(float64) != 100 {
 		t.Fatalf("categories: %d %s", st, body)
 	}
 
@@ -207,10 +207,10 @@ func TestReportsIsolation(t *testing.T) {
 	bob := env.Register(admin, "Bob", "bob@example.com")
 	bobAcc := bob.CreateAccount("Cash", "cash", 500)
 	exec(`INSERT INTO transactions (id,user_id,type,amount,account_id,category_id,payee,transaction_date,created_at,updated_at)
-		VALUES ('tb1',?,'expense',200,?,?,'Kiosk','2026-11-05',?,?)`, bob.UserID, bobAcc, bob.Category("Food"), reportTS, reportTS)
+		VALUES ('tb1',?,'expense',200,?,?,'Kiosk','2026-11-05',?,?)`, bob.UserID, bobAcc, bob.Category("Eating out"), reportTS, reportTS)
 	exec(`INSERT INTO budgets (id,user_id,category_id,amount,created_at,updated_at) VALUES ('bb1',?,?,1000,?,?)`,
-		bob.UserID, bob.Category("Food"), reportTS, reportTS)
-	if bob.Category("Food") == admin.Category("Food") {
+		bob.UserID, bob.Category("Eating out"), reportTS, reportTS)
+	if bob.Category("Eating out") == admin.Category("Eating out") {
 		t.Fatal("users must not share category ids")
 	}
 
@@ -241,7 +241,7 @@ func TestReportsIsolation(t *testing.T) {
 
 	st, _, body = get(t, bob, "/reports/categories?"+nov)
 	rows := decode(t, body)["data"].([]any)
-	if st != 200 || len(rows) != 1 || rows[0].(map[string]any)["category_id"] != bob.Category("Food") || rows[0].(map[string]any)["amount"].(float64) != 200 {
+	if st != 200 || len(rows) != 1 || rows[0].(map[string]any)["category_id"] != bob.Category("Eating out") || rows[0].(map[string]any)["amount"].(float64) != 200 {
 		t.Fatalf("bob categories: %d %s", st, body)
 	}
 
@@ -298,7 +298,7 @@ func TestReportsIsolation(t *testing.T) {
 	}
 
 	st, _, body = get(t, bob, "/reports/export?report=categories&format=csv&"+nov)
-	if st != 200 || !strings.Contains(string(body), "Food,1,2.00,100.0") || strings.Contains(string(body), "25.00") {
+	if st != 200 || !strings.Contains(string(body), "Eating out,1,2.00,100.0") || strings.Contains(string(body), "25.00") {
 		t.Fatalf("bob export csv: %d %s", st, body)
 	}
 	st, _, body = get(t, bob, "/reports/export?report=summary&format=csv&"+nov)

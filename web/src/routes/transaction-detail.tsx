@@ -10,9 +10,10 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { errorMessage } from '@/lib/api'
 import { formatDateTime, formatShortDate } from '@/lib/dates'
-import { useDeleteTransaction, useDuplicateTransaction, useTransaction } from '@/lib/queries'
+import { useCategories, useDeleteTransaction, useDuplicateTransaction, useTransaction } from '@/lib/queries'
 import { displayAmount, transactionTitle } from '@/lib/transactions'
 import { uiStore } from '@/lib/ui-store'
+import { categoryLabel } from '@/lib/categories'
 import { appRoute } from './__root'
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
@@ -29,6 +30,7 @@ function TransactionDetailPage() {
   const { id } = transactionDetailRoute.useParams()
   const navigate = useNavigate()
   const { data: tx, isPending, error, refetch } = useTransaction(id)
+  const { data: allCategories = [] } = useCategories(true)
   const del = useDeleteTransaction()
   const dup = useDuplicateTransaction()
   const [confirm, setConfirm] = useState(false)
@@ -110,7 +112,7 @@ function TransactionDetailPage() {
             }
           />
         )}
-        <Row label="Category" value={tx.category_name} />
+        <Row label="Category" value={categoryLabel(allCategories, tx.category_id) || tx.category_name} />
         <Row label="Description" value={tx.description} />
         <Row label="Created" value={formatDateTime(tx.created_at)} />
       </div>

@@ -68,8 +68,9 @@ func buildFilter(f dto.TransactionFilter) (string, []any) {
 		args = append(args, f.DateTo)
 	}
 	if f.CategoryID != "" {
-		where = append(where, `t.category_id = ?`)
-		args = append(args, f.CategoryID)
+		// A main category includes its sub-categories.
+		where = append(where, `(t.category_id = ? OR t.category_id IN (SELECT ch.id FROM categories ch WHERE ch.parent_id = ?))`)
+		args = append(args, f.CategoryID, f.CategoryID)
 	}
 	if f.AccountID != "" {
 		where = append(where, `(t.account_id = ? OR t.transfer_account_id = ?)`)

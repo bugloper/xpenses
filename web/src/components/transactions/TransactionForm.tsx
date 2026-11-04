@@ -1,10 +1,8 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { Controller, useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod'
-import { ChevronUp, MoreHorizontal, Plus } from 'lucide-react'
-import { CategoryFormSheet } from '@/components/categories/CategoryForm'
-import { CategoryIcon } from '@/components/common/CategoryIcon'
+import { CategoryField } from '@/components/categories/CategoryField'
 import { DateField } from '@/components/common/DateField'
 import { Segmented } from '@/components/common/Segmented'
 import { Button } from '@/components/ui/button'
@@ -13,6 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { today } from '@/lib/dates'
 import { getLastUsed, setLastUsed } from '@/lib/last-used'
+import { pushRecentCategory } from '@/lib/recent-categories'
 import { minorToDecimalString, parseAmount } from '@/lib/money'
 import { useAccounts, useCategories } from '@/lib/queries'
 import { cn } from '@/lib/utils'
@@ -187,13 +186,6 @@ export function TransactionForm({
 
   const categoryType =
     type === 'expense' ? 'expense' : type === 'income' || type === 'refund' ? 'income' : null
-  const visibleCategories = useMemo(
-    () =>
-      categoryType
-        ? categories.filter((c) => c.type === categoryType && (c.is_active || c.id === categoryId))
-        : [],
-    [categories, categoryType, categoryId],
-  )
   // Clear a category that doesn't match the new type.
   useEffect(() => {
     if (
@@ -221,19 +213,6 @@ export function TransactionForm({
     if (preferred) setValue('account_id', preferred, { shouldValidate: formState.isSubmitted })
   }, [mode, activeAccounts, accountId, type, setValue, formState.isSubmitted])
 
-  const [showAllCategories, setShowAllCategories] = useState(false)
-  const [newCategoryOpen, setNewCategoryOpen] = useState(false)
-  const COMPACT_COUNT = 8
-  const compactCategories = useMemo(() => {
-    if (showAllCategories || visibleCategories.length <= COMPACT_COUNT) return visibleCategories
-    const head = visibleCategories.slice(0, COMPACT_COUNT)
-    // Keep the selected category visible even when it sits further down the list.
-    if (categoryId && !head.some((c) => c.id === categoryId)) {
-      const selected = visibleCategories.find((c) => c.id === categoryId)
-      if (selected) return [...head.slice(0, COMPACT_COUNT - 1), selected]
-    }
-    return head
-  }, [showAllCategories, visibleCategories, categoryId])
   const tone = type === 'expense' ? 'expense' : type === 'income' || type === 'refund' ? 'income' : 'neutral'
 
   const submit = (addAnother: boolean) =>
@@ -243,6 +222,7 @@ export function TransactionForm({
         category_id: values.category_id,
         transfer_account_id: values.transfer_account_id,
       })
+      if (categoryType) pushRecentCategory(categoryType, values.category_id)
       await onSubmit(values, { addAnother })
       if (addAnother) {
         reset(
@@ -330,81 +310,18 @@ export function TransactionForm({
           name="category_id"
           render={({ field }) => (
             <Field data-invalid={!!err.category_id}>
-              <FieldLabel>Category</FieldLabel>
-              {visibleCategories.length === 0 ? (
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-muted-foreground text-sm">No {categoryType} categories yet.</p>
-                  <Button type="button" variant="outline" size="sm" onClick={() => setNewCategoryOpen(true)}>
-                    <Plus data-icon="inline-start" /> New category
-                  </Button>
-                </div>
-              ) : (
-                <div
-                  className="grid grid-cols-4 gap-2 sm:grid-cols-5"
-                  role="radiogroup"
-                  aria-label="Category"
-                >
-                  {compactCategories.map((c) => {
-                    const active = field.value === c.id
-                    return (
-                      <button
-                        key={c.id}
-                        type="button"
-                        role="radio"
-                        aria-checked={active}
-                        onClick={() => field.onChange(active ? undefined : c.id)}
-                        className={cn(
-                          'flex flex-col items-center gap-1.5 rounded-xl border p-2 text-center transition-colors',
-                          active
-                            ? 'border-primary bg-primary/10'
-                            : 'bg-muted/50 hover:bg-muted border-transparent',
-                        )}
-                      >
-                        <CategoryIcon icon={c.icon} color={c.color} size="sm" />
-                        <span className="line-clamp-2 text-[11px] leading-tight font-medium">{c.name}</span>
-                      </button>
-                    )
-                  })}
-                  {visibleCategories.length > COMPACT_COUNT && (
-                    <button
-                      type="button"
-                      onClick={() => setShowAllCategories((v) => !v)}
-                      className="bg-muted/50 hover:bg-muted text-muted-foreground flex flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-transparent p-2 text-center text-[11px] font-medium"
-                      aria-expanded={showAllCategories}
-                    >
-                      {showAllCategories ? (
-                        <ChevronUp className="size-5" />
-                      ) : (
-                        <MoreHorizontal className="size-5" />
-                      )}
-                      {showAllCategories ? 'Less' : `All ${visibleCategories.length}`}
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setNewCategoryOpen(true)}
-                    className="bg-muted/50 hover:bg-muted text-muted-foreground flex flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-transparent p-2 text-center text-[11px] font-medium"
-                    aria-label="New category"
-                  >
-                    <Plus className="size-5" />
-                    New
-                  </button>
-                </div>
-              )}
+              <FieldLabel htmlFor={`${formId}-category`}>Category</FieldLabel>
+              <CategoryField
+                id={`${formId}-category`}
+                categories={categories}
+                type={categoryType}
+                value={field.value}
+                onChange={field.onChange}
+                invalid={!!err.category_id}
+              />
               <FieldError errors={[err.category_id]} />
             </Field>
           )}
-        />
-      )}
-      {categoryType && (
-        <CategoryFormSheet
-          open={newCategoryOpen}
-          onOpenChange={setNewCategoryOpen}
-          defaultType={categoryType}
-          lockType
-          onCreated={(c) => {
-            setValue('category_id', c.id, { shouldValidate: true, shouldDirty: true })
-          }}
         />
       )}
 

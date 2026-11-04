@@ -57,6 +57,9 @@ type CategoryRow struct {
 	Name       string  `json:"name"`
 	Icon       string  `json:"icon"`
 	Color      string  `json:"color"`
+	// Set when the category is a sub-category; reports roll up by parent.
+	ParentID   *string `json:"parent_id"`
+	ParentName string  `json:"parent_name"`
 	Amount     int64   `json:"amount"`
 	Count      int     `json:"count"`
 	Pct        float64 `json:"pct"`
@@ -212,8 +215,9 @@ func (s *Service) Summary(ctx context.Context, p Period) (*Summary, error) {
 
 func (s *Service) Categories(ctx context.Context, p Period, typ string) ([]CategoryRow, error) {
 	rows, err := s.db.QueryContext(ctx, `SELECT t.category_id, COALESCE(c.name, 'Uncategorised'),
-		COALESCE(c.icon, 'circle'), COALESCE(c.color, '#64748b'), SUM(t.amount), COUNT(*)
+		COALESCE(c.icon, 'circle'), COALESCE(c.color, '#64748b'), c.parent_id, COALESCE(pc.name, ''), SUM(t.amount), COUNT(*)
 		FROM transactions t LEFT JOIN categories c ON c.id = t.category_id AND c.user_id = t.user_id
+		LEFT JOIN categories pc ON pc.id = c.parent_id
 		WHERE t.user_id = ? AND t.status = 'cleared' AND `+flowFilter(typ)+` AND t.transaction_date BETWEEN ? AND ?
 		GROUP BY t.category_id ORDER BY SUM(t.amount) DESC, c.name`, auth.UserID(ctx), p.From, p.To)
 	if err != nil {
@@ -224,13 +228,17 @@ func (s *Service) Categories(ctx context.Context, p Period, typ string) ([]Categ
 	var total int64
 	for rows.Next() {
 		var r CategoryRow
-		var id sql.NullString
-		if err := rows.Scan(&id, &r.Name, &r.Icon, &r.Color, &r.Amount, &r.Count); err != nil {
+		var id, parent sql.NullString
+		if err := rows.Scan(&id, &r.Name, &r.Icon, &r.Color, &parent, &r.ParentName, &r.Amount, &r.Count); err != nil {
 			return nil, apperr.Internal(err)
 		}
 		if id.Valid {
 			v := id.String
 			r.CategoryID = &v
+		}
+		if parent.Valid {
+			v := parent.String
+			r.ParentID = &v
 		}
 		total += r.Amount
 		out = append(out, r)
