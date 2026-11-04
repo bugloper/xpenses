@@ -157,6 +157,13 @@ func Analyse(in Input) Result {
 		st := ManualStatus{Status: ManualUnmatched}
 		if r, ok := byTx[t.ID]; ok {
 			st.Status = r.Status
+		} else if t.ReconciliationStatus != "" {
+			// Linked to a bank line of another statement. Adjacent statements
+			// always overlap through the tolerance window, and periods may
+			// overlap outright; the link is in the reconciliations table either
+			// way (the repository joins it), so the transaction is spoken for
+			// and must not become a candidate again.
+			st.Status = t.ReconciliationStatus
 		} else if t.SourceBankTransactionID != nil {
 			// Transactions derived from a bank line (created-from-bank, adjustments)
 			// are accounted for as long as that line is still reconciled.

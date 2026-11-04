@@ -431,14 +431,13 @@ func (s *StatementService) Import(ctx context.Context, req ImportRequest) (*Impo
 
 	// Recompute everything the client could have edited.
 	ps := &pdf.ParsedStatement{OpeningBalance: req.Statement.OpeningBalance, ClosingBalance: req.Statement.ClosingBalance}
-	var totalDebits, totalCredits int64
 	fps := make([]string, len(req.Transactions))
 	for i, t := range req.Transactions {
 		fps[i] = Fingerprint(req.AccountID, t.TransactionDate, t.Description, t.Debit, t.Credit, t.Balance)
-		totalDebits += t.Debit
-		totalCredits += t.Credit
 		ps.Transactions = append(ps.Transactions, pdf.ParsedTransaction{Debit: t.Debit, Credit: t.Credit, Balance: t.Balance})
 	}
+	// The balance check is a property of the document, so it runs over every
+	// submitted row, including rows skipped below as duplicates.
 	validation := pdf.Validate(ps)
 
 	existing, err := s.BankTxs.ExistingFingerprints(ctx, s.DB, req.AccountID, fps)
@@ -452,7 +451,7 @@ func (s *StatementService) Import(ctx context.Context, req ImportRequest) (*Impo
 		AccountNumber: strings.TrimSpace(req.Statement.AccountNumber), AccountHolder: strings.TrimSpace(req.Statement.AccountHolder),
 		PeriodStart: req.Statement.PeriodStart, PeriodEnd: req.Statement.PeriodEnd,
 		OpeningBalance: req.Statement.OpeningBalance, ClosingBalance: req.Statement.ClosingBalance,
-		TotalDebits: totalDebits, TotalCredits: totalCredits, BalanceVerified: validation.BalanceCheck == "ok", ImportedAt: now,
+		BalanceVerified: validation.BalanceCheck == "ok", ImportedAt: now,
 	}
 	skipped := 0
 	err = repositories.WithTx(ctx, s.DB, func(tx *sql.Tx) error {
@@ -483,7 +482,16 @@ func (s *StatementService) Import(ctx context.Context, req ImportRequest) (*Impo
 				Description: t.Description, Reference: t.Reference, Debit: t.Debit, Credit: t.Credit, Balance: t.Balance, Fingerprint: fp, CreatedAt: now,
 			})
 		}
+		// Counts and totals describe the rows this statement actually holds,
+		// so the workspace summary (statement totals) and the reconciliation
+		// report (sum of lines) agree. Skipped rows belong to the statement
+		// that imported them first.
 		st.TransactionCount = len(inserts)
+		st.TotalDebits, st.TotalCredits = 0, 0
+		for i := range inserts {
+			st.TotalDebits += inserts[i].Debit
+			st.TotalCredits += inserts[i].Credit
+		}
 		if skipped > 0 {
 			st.Notes = fmt.Sprintf("%d duplicate row(s) skipped at import", skipped)
 		}

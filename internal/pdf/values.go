@@ -47,6 +47,10 @@ func ParseDate(s string) (string, bool) {
 func normaliseMonth(s string) string {
 	return monthRe.ReplaceAllStringFunc(s, func(m string) string {
 		lower := strings.ToLower(m)
+		if lower == "sept" {
+			// Go's "Jan" layout only knows three-letter abbreviations.
+			lower = "sep"
+		}
 		return strings.ToUpper(lower[:1]) + lower[1:]
 	})
 }
@@ -88,8 +92,10 @@ type Amount struct {
 var (
 	amountCurrencyRe = regexp.MustCompile(`(?i)^(?:nu\.?|btn|inr|rs\.?|usd|₹)\s*`)
 	amountSuffixRe   = regexp.MustCompile(`(?i)\s*(dr|cr)\.?$`)
-	amountBodyRe     = regexp.MustCompile(`^(\d[\d,]*)?(?:\.(\d+))?$`)
-	amountLooksRe    = regexp.MustCompile(`(?i)^[\(\-\+]?\s*(?:nu\.?|btn|inr|rs\.?|usd|₹)?\s*\d[\d,]*(?:\.\d+)?\s*(?:dr|cr)?\.?\s*[\)\-]?$`)
+	// The integer part must end in a digit: "1,234," is a fragment split
+	// mid-number, not 1234.00.
+	amountBodyRe  = regexp.MustCompile(`^(\d(?:[\d,]*\d)?)?(?:\.(\d+))?$`)
+	amountLooksRe = regexp.MustCompile(`(?i)^[\(\-\+]?\s*(?:nu\.?|btn|inr|rs\.?|usd|₹)?\s*\d[\d,]*(?:\.\d+)?\s*(?:dr|cr)?\.?\s*[\)\-]?$`)
 )
 
 // LooksLikeAmount is a cheap pre-check used when classifying fragments.

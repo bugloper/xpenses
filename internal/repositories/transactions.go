@@ -240,7 +240,12 @@ func (TransactionRepo) SetTags(ctx context.Context, db DBTX, txID string, tags [
 }
 
 // CountUnmatchedManual counts cleared manual transactions on bank-type accounts
-// that are not linked to any bank transaction.
+// that are not linked to any bank transaction. It feeds the dashboard
+// (/reports/summary) and the reconciliation overview, and is deliberately
+// narrower than a workspace's summary.unmatched_manual, which is scoped to one
+// statement's account and period (± tolerance) and also counts pending drafts
+// and imported-origin rows that lost their link. The two numbers are not
+// expected to agree.
 func (TransactionRepo) CountUnmatchedManual(ctx context.Context, db DBTX) (int, error) {
 	var n int
 	err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM transactions t

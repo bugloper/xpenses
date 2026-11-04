@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 
@@ -35,7 +36,7 @@ func ErrorHandler(log *slog.Logger) echo.HTTPErrorHandler {
 			var he *echo.HTTPError
 			if errors.As(err, &he) {
 				status = he.Code
-				body.Error.Code = http.StatusText(he.Code)
+				body.Error.Code = codeForStatus(he.Code)
 				if msg, ok := he.Message.(string); ok {
 					body.Error.Message = msg
 				} else {
@@ -53,6 +54,28 @@ func ErrorHandler(log *slog.Logger) echo.HTTPErrorHandler {
 		}
 		_ = c.JSON(status, body)
 	}
+}
+
+// codeForStatus gives errors raised by Echo itself (unknown route, wrong
+// method, body limit) the same snake_case codes docs/API.md uses for
+// application errors.
+func codeForStatus(status int) string {
+	switch status {
+	case http.StatusBadRequest:
+		return "bad_request"
+	case http.StatusNotFound:
+		return "not_found"
+	case http.StatusConflict:
+		return "conflict"
+	case http.StatusRequestEntityTooLarge:
+		return "payload_too_large"
+	case http.StatusUnprocessableEntity:
+		return "validation_error"
+	}
+	if status >= 500 {
+		return "internal_error"
+	}
+	return strings.ToLower(strings.ReplaceAll(http.StatusText(status), " ", "_"))
 }
 
 // bind decodes JSON and maps syntax errors to a 400.
