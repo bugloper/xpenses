@@ -208,3 +208,53 @@ describe('TransactionForm', () => {
     expect(screen.getByText('To account')).toBeInTheDocument()
   })
 })
+
+describe('new category from the picker', () => {
+  it('creates a category in place and selects it', async () => {
+    const list = [...categories]
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const url = String(input)
+      if (url.includes('/categories') && init?.method === 'POST') {
+        const body = JSON.parse(String(init.body)) as { name: string; type: string; icon: string; color: string }
+        const created: Category = {
+          id: 'cat-new',
+          name: body.name,
+          icon: body.icon,
+          color: body.color,
+          type: body.type as Category['type'],
+          parent_id: null,
+          is_active: true,
+          is_system: false,
+          sort_order: 99,
+          created_at: '',
+          updated_at: '',
+        }
+        list.push(created)
+        return new Response(JSON.stringify({ data: created }), {
+          status: 201,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+      const data = url.includes('/accounts') ? accounts : url.includes('/categories') ? list : []
+      return new Response(JSON.stringify({ data }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    })
+    const user = userEvent.setup()
+    renderForm()
+    await screen.findByRole('radio', { name: 'Food' })
+
+    await user.click(screen.getByRole('button', { name: 'New category' }))
+    expect(await screen.findByRole('heading', { name: 'New category' })).toBeInTheDocument()
+    // The kind is fixed to the transaction's type, so there is no type switch.
+    expect(screen.queryByRole('radio', { name: 'Income' })).not.toBeInTheDocument()
+
+    await user.type(screen.getByLabelText('Name'), 'Momo')
+    await user.click(screen.getByRole('button', { name: 'Create' }))
+
+    const chip = await screen.findByRole('radio', { name: 'Momo' })
+    await waitFor(() => expect(chip).toHaveAttribute('aria-checked', 'true'))
+    expect(screen.queryByRole('heading', { name: 'New category' })).not.toBeInTheDocument()
+  })
+})

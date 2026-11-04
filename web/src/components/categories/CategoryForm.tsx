@@ -29,11 +29,17 @@ export function CategoryFormSheet({
   onOpenChange,
   category,
   defaultType = 'expense',
+  lockType = false,
+  onCreated,
 }: {
   open: boolean
   onOpenChange: (o: boolean) => void
   category?: Category | null
   defaultType?: CategoryType
+  /** Hide the type switch: the caller already knows which kind it needs. */
+  lockType?: boolean
+  /** Called with the new category after a successful create. */
+  onCreated?: (category: Category) => void
 }) {
   const create = useCreateCategory()
   const update = useUpdateCategory()
@@ -62,8 +68,9 @@ export function CategoryFormSheet({
         await update.mutateAsync({ id: category.id, name: v.name, icon: v.icon, color: v.color })
         toast.success('Category updated')
       } else {
-        await create.mutateAsync(v)
+        const created = await create.mutateAsync(v)
         toast.success('Category created')
+        onCreated?.(created)
       }
       onOpenChange(false)
     } catch (e) {
@@ -87,7 +94,12 @@ export function CategoryFormSheet({
         </div>
       }
     >
-      <form id="category-form" className="flex flex-col gap-5" onSubmit={(e) => void submit(e)} noValidate>
+      <form id="category-form" className="flex flex-col gap-5" onSubmit={(e) => {
+          e.stopPropagation()
+          void submit(e)
+        }}
+        noValidate
+      >
         <div className="bg-muted/50 flex items-center gap-3 rounded-xl p-3">
           <CategoryIcon icon={icon} color={color} size="lg" />
           <div>
@@ -106,7 +118,7 @@ export function CategoryFormSheet({
             </Field>
           )}
         />
-        {!category && (
+        {!category && !lockType && (
           <Controller
             control={control}
             name="type"

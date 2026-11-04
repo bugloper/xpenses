@@ -2,7 +2,8 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Controller, useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod'
-import { ChevronUp, MoreHorizontal } from 'lucide-react'
+import { ChevronUp, MoreHorizontal, Plus } from 'lucide-react'
+import { CategoryFormSheet } from '@/components/categories/CategoryForm'
 import { CategoryIcon } from '@/components/common/CategoryIcon'
 import { DateField } from '@/components/common/DateField'
 import { Segmented } from '@/components/common/Segmented'
@@ -246,6 +247,7 @@ export function TransactionForm({
   }, [mode, activeAccounts, accountId, type, setValue, formState.isSubmitted])
 
   const [showAllCategories, setShowAllCategories] = useState(false)
+  const [newCategoryOpen, setNewCategoryOpen] = useState(false)
   const COMPACT_COUNT = 8
   const compactCategories = useMemo(() => {
     if (showAllCategories || visibleCategories.length <= COMPACT_COUNT) return visibleCategories
@@ -355,7 +357,12 @@ export function TransactionForm({
             <Field data-invalid={!!err.category_id}>
               <FieldLabel>Category</FieldLabel>
               {visibleCategories.length === 0 ? (
-                <p className="text-muted-foreground text-sm">No {categoryType} categories yet.</p>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-muted-foreground text-sm">No {categoryType} categories yet.</p>
+                  <Button type="button" variant="outline" size="sm" onClick={() => setNewCategoryOpen(true)}>
+                    <Plus data-icon="inline-start" /> New category
+                  </Button>
+                </div>
               ) : (
                 <div
                   className="grid grid-cols-4 gap-2 sm:grid-cols-5"
@@ -398,11 +405,31 @@ export function TransactionForm({
                       {showAllCategories ? 'Less' : `All ${visibleCategories.length}`}
                     </button>
                   )}
+                  <button
+                    type="button"
+                    onClick={() => setNewCategoryOpen(true)}
+                    className="bg-muted/50 hover:bg-muted text-muted-foreground flex flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-transparent p-2 text-center text-[11px] font-medium"
+                    aria-label="New category"
+                  >
+                    <Plus className="size-5" />
+                    New
+                  </button>
                 </div>
               )}
               <FieldError errors={[err.category_id]} />
             </Field>
           )}
+        />
+      )}
+      {categoryType && (
+        <CategoryFormSheet
+          open={newCategoryOpen}
+          onOpenChange={setNewCategoryOpen}
+          defaultType={categoryType}
+          lockType
+          onCreated={(c) => {
+            setValue('category_id', c.id, { shouldValidate: true, shouldDirty: true })
+          }}
         />
       )}
 
