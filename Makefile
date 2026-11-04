@@ -27,7 +27,7 @@ test-web:
 	cd web && bun run test
 
 e2e:
-	cd web && bun run e2e
+	cd web && bun run test:e2e
 
 lint:
 	gofmt -l . && go vet ./...

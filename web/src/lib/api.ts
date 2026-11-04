@@ -132,6 +132,12 @@ function notifyRequestOk() {
   if (typeof window !== 'undefined') window.dispatchEvent(new Event('xpensiv:request-ok'))
 }
 
+/** Fired when a request failed at the transport level: the sync manager treats it as being offline. */
+export const REQUEST_FAILED_EVENT = 'xpensiv:request-failed'
+export function notifyRequestFailed() {
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(REQUEST_FAILED_EVENT))
+}
+
 /**
  * Turns a session-level failure into a window event. A 401 on an auth-flow endpoint
  * (wrong password, wrong current password) is an ordinary error for the form.
@@ -171,6 +177,7 @@ export async function request<T>(path: string, opts: RequestOptions = {}): Promi
     })
   } catch (e) {
     if (e instanceof DOMException && e.name === 'AbortError') throw e
+    notifyRequestFailed()
     throw new ApiError({
       status: 0,
       code: 'network_error',
@@ -239,6 +246,7 @@ export async function downloadFile(path: string, fallbackName: string, headers?:
   try {
     res = await fetch(`${API_BASE}${path}`, { headers: baseHeaders(headers), credentials: 'same-origin' })
   } catch {
+    notifyRequestFailed()
     throw new ApiError({
       status: 0,
       code: 'network_error',

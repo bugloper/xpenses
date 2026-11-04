@@ -59,11 +59,16 @@ func Open(path string) (*sql.DB, error) {
 	return db, nil
 }
 
+// pragmaSuffix builds the DSN options. _txlock=immediate makes every
+// transaction take the write lock up front (BEGIN IMMEDIATE): with the default
+// deferred mode a read-then-write transaction that loses a race fails with
+// SQLITE_BUSY_SNAPSHOT, which busy_timeout cannot retry; immediate
+// transactions simply queue on the busy timeout instead.
 func pragmaSuffix(path string) string {
 	if path == ":memory:" {
-		return "&_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)"
+		return "&_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)&_txlock=immediate"
 	}
-	return "?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)"
+	return "?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_txlock=immediate"
 }
 
 // Migrate applies every embedded migration that has not yet been applied, in

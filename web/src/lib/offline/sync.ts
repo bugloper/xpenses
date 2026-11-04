@@ -76,6 +76,7 @@ class SyncManager {
     window.addEventListener('focus', this.handleFocus)
     document.addEventListener('visibilitychange', this.handleVisibility)
     window.addEventListener('xpensiv:request-ok', this.handleRequestOk)
+    window.addEventListener('xpensiv:request-failed', this.handleRequestFailed)
     this.unsubscribeQueue = subscribeQueue(() => void this.refreshCounts())
     this.unsubscribeAuth = authStore.subscribe(this.handleUserChange)
     void this.refreshCounts()
@@ -90,6 +91,7 @@ class SyncManager {
     window.removeEventListener('focus', this.handleFocus)
     document.removeEventListener('visibilitychange', this.handleVisibility)
     window.removeEventListener('xpensiv:request-ok', this.handleRequestOk)
+    window.removeEventListener('xpensiv:request-failed', this.handleRequestFailed)
     this.unsubscribeQueue?.()
     this.unsubscribeQueue = null
     this.unsubscribeAuth?.()
@@ -108,6 +110,10 @@ class SyncManager {
     void this.syncNow()
   }
   private handleOffline = () => this.setState({ online: false })
+  /** navigator.onLine is unreliable (true behind a router with no uplink); a failed request is the better signal. */
+  private handleRequestFailed = () => {
+    if (this.state.online) this.setState({ online: false })
+  }
   private lastUserId: string | null = currentUserId()
   /** Counts are per user; a login also drains what that user queued earlier. */
   private handleUserChange = () => {

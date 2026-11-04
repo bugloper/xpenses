@@ -47,9 +47,16 @@ Data lives in `./data/` by default (`xpensiv.db`, uploaded statements under `sta
 ```sh
 make test-api     # go test ./...   (unit + SQLite integration tests via httptest)
 make test-web     # vitest + React Testing Library
-make e2e          # Playwright (needs the app running; see web/e2e)
+make e2e          # Playwright: builds web/dist, starts the Go server on a throwaway DB, runs both device projects
 make lint         # gofmt, go vet, eslint, tsc
 ```
+
+The Playwright suite (`web/e2e/`) runs in real Chromium against the production build served by the Go
+binary, at phone and desktop widths: sign-in/sign-out and redirects, user isolation, admin invites,
+quick add, statement import + auto-match, service worker registration and the offline app shell, the
+"new version" update prompt, the install prompt, the offline transaction queue syncing exactly once,
+keyboard navigation of the add sheet and dialogs, and an axe WCAG 2.1 AA scan of every screen
+(serious/critical violations fail the run). First time: `cd web && bunx playwright install chromium`.
 
 ## Production build
 

@@ -1,41 +1,29 @@
-import { expect, test, type APIRequestContext } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 import path from 'node:path'
+import { HEADERS, loginAs } from './helpers'
 
 // Import the synthetic encrypted BOB statement, then run auto-match in the
-// workspace. Needs the Vite dev server and the Go API; skips when nothing is
-// listening (same convention as add-expense.spec.ts).
+// workspace. Runs against the server Playwright starts (see playwright.config.ts).
 const PDF = path.resolve(import.meta.dirname, '../../testdata/statements/bob_synthetic_encrypted.pdf')
 const PASSWORD = '0101'
-
-async function reachable(request: APIRequestContext, baseURL: string): Promise<boolean> {
-  try {
-    const res = await request.get(`${baseURL}/api/v1/health`, { timeout: 3_000 })
-    return res.ok()
-  } catch {
-    return false
-  }
-}
-
-/**
- * Creates a fresh bank account per run. Row fingerprints are per account, so a
- * re-run still imports rows; the identical bytes are flagged as a duplicate
- * statement (sha256) which the test forces through "Import anyway".
- */
-async function createAccount(request: APIRequestContext, baseURL: string): Promise<string> {
-  const created = await request.post(`${baseURL}/api/v1/accounts`, {
-    data: { name: `E2E Bank ${Date.now()}`, type: 'bank', opening_balance: 0 },
-  })
-  expect(created.ok()).toBeTruthy()
-  return ((await created.json()) as { data: { id: string } }).data.id
-}
 
 test.describe('statement import and auto-match', () => {
   test.describe.configure({ mode: 'serial' })
   let statementId: string | null = null
 
-  test('imports the encrypted BOB statement through the wizard', async ({ page, baseURL, request }) => {
-    test.skip(!(await reachable(request, baseURL!)), 'dev server / API not running')
-    await createAccount(request, baseURL!)
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/')
+    await loginAs(page)
+  })
+
+  test('imports the encrypted BOB statement through the wizard', async ({ page }) => {
+    // Fresh account per run: fingerprints are per account, so rows always import;
+    // identical bytes are flagged as a duplicate statement which the test forces.
+    const created = await page.request.post('/api/v1/accounts', {
+      headers: HEADERS,
+      data: { name: `E2E Bank ${Date.now()}`, type: 'bank', opening_balance: 0 },
+    })
+    expect(created.ok()).toBeTruthy()
 
     await page.goto('/statements')
     await page.getByRole('button', { name: 'Import statement' }).click()
@@ -76,8 +64,7 @@ test.describe('statement import and auto-match', () => {
     expect(statementId).toBeTruthy()
   })
 
-  test('runs auto-match in the workspace and can reach the report', async ({ page, baseURL, request }) => {
-    test.skip(!(await reachable(request, baseURL!)), 'dev server / API not running')
+  test('runs auto-match in the workspace and can reach the report', async ({ page }) => {
     test.skip(!statementId, 'import test did not run')
 
     await page.goto(`/reconciliation/${statementId}`)

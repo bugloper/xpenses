@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { ResponsiveSheet } from '@/components/common/ResponsiveSheet'
 import { ListSkeleton } from '@/components/common/States'
@@ -86,6 +86,21 @@ export function toUpdateRequest(v: TransactionFormValues, currency: string): Upd
 
 export function AddTransactionSheet() {
   const { addOpen, addPreset } = useUIStore()
+  // The sheet is opened from app state (the + button, keyboard shortcuts),
+  // not a Radix trigger, so focus has to be restored to the opener by hand.
+  const opener = useRef<HTMLElement | null>(null)
+  useEffect(() => {
+    if (addOpen) {
+      opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+      return
+    }
+    const el = opener.current
+    opener.current = null
+    if (el && el.isConnected) {
+      const id = requestAnimationFrame(() => el.focus())
+      return () => cancelAnimationFrame(id)
+    }
+  }, [addOpen])
   const editId = addPreset?.editId ?? ''
   const pendingClientId = addPreset?.pendingClientId ?? ''
   const title = editId ? 'Edit transaction' : pendingClientId ? 'Fix queued transaction' : 'Add transaction'
