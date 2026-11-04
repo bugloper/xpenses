@@ -162,7 +162,7 @@ function TransactionsPage() {
           <Input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search payee, description, notes"
+            placeholder="Search transactions"
             className="h-10 rounded-xl pl-9"
             aria-label="Search transactions"
           />

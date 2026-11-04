@@ -16,7 +16,6 @@ export const keys = {
     detail: (id: string) => ['transactions', 'detail', id] as const,
   },
   budgets: { all: ['budgets'] as const },
-  payees: { all: ['payees'] as const },
   recurring: { all: ['recurring'] as const },
   settings: { all: ['settings'] as const },
   reports: {
@@ -48,7 +47,6 @@ export const keys = {
 /** Everything that changes when a transaction is written. */
 export const transactionDependentKeys = [
   keys.transactions.all,
-  keys.payees.all,
   keys.accounts.all,
   keys.reports.all,
   keys.reconciliation.all,

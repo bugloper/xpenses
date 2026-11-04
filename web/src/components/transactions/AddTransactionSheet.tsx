@@ -77,10 +77,7 @@ export function toUpdateRequest(v: TransactionFormValues, currency: string): Upd
     category_id: c.category_id ?? undefined,
     clear_category: !c.category_id,
     description: c.description,
-    payee: c.payee,
     transaction_date: c.transaction_date,
-    notes: c.notes,
-    tags: c.tags,
   }
 }
 
@@ -152,10 +149,7 @@ function SheetBody({ preset }: { preset: AddPreset | null }) {
         transfer_account_id: p.transfer_account_id ?? undefined,
         category_id: p.category_id ?? undefined,
         transaction_date: p.transaction_date,
-        payee: p.payee ?? '',
         description: p.description ?? '',
-        notes: p.notes ?? '',
-        tags: (p.tags ?? []).join(', '),
       }
     }
     return defaultValues({

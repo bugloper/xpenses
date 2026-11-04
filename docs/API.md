@@ -36,7 +36,6 @@ Status codes: 200 OK, 201 Created, 204 No Content, 400 bad_request, 404 not_foun
 | POST | /transactions | see below. Returns 201, or 200 if `client_id` was already seen (idempotent replay) |
 | GET/PATCH/DELETE | /transactions/:id | PATCH is partial; `clear_category:true` / `clear_transfer_account:true` to null those. 409 when changing amount/account/type/date/status of a transaction that is reconciled (unmatch first). DELETE of a matched transaction removes the reconciliation row (bank line becomes unrecorded again). |
 | POST | /transactions/:id/duplicate | body `{transaction_date?}` default today → 201 |
-| GET | /payees | `[{name,count,last_used,last_category_id,last_account_id}]` distinct payees from the user's own non-void transactions, most used first (max 500) |
 | GET | /budgets | `[{id,category_id,amount}]` monthly amount per expense category |
 | POST | /budgets | `{category_id, amount}` (409 if exists) |
 | PATCH/DELETE | /budgets/:id | |

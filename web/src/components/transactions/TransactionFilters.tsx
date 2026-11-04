@@ -152,7 +152,6 @@ export function TransactionFiltersSheet({
                 <SelectItem value="date">Date</SelectItem>
                 <SelectItem value="amount">Amount</SelectItem>
                 <SelectItem value="created_at">Created</SelectItem>
-                <SelectItem value="payee">Payee</SelectItem>
               </SelectContent>
             </Select>
           </Field>

@@ -11,15 +11,13 @@ import { Button } from '@/components/ui/button'
 import { Field, FieldError, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Textarea } from '@/components/ui/textarea'
 import { today } from '@/lib/dates'
 import { getLastUsed, setLastUsed } from '@/lib/last-used'
 import { minorToDecimalString, parseAmount } from '@/lib/money'
-import { useAccounts, useCategories, usePayees } from '@/lib/queries'
+import { useAccounts, useCategories } from '@/lib/queries'
 import { cn } from '@/lib/utils'
 import type { CreateTransactionRequest, Transaction, TransactionType } from '@/types/api'
 import { AmountInput } from './AmountInput'
-import { PayeeCombobox } from './PayeeCombobox'
 
 export const transactionSchema = z
   .object({
@@ -29,10 +27,7 @@ export const transactionSchema = z
     transfer_account_id: z.string().optional(),
     category_id: z.string().optional(),
     transaction_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Pick a date'),
-    payee: z.string().max(200, 'Too long').optional(),
     description: z.string().max(500, 'Too long').optional(),
-    notes: z.string().max(2000, 'Too long').optional(),
-    tags: z.string().optional(),
   })
   .superRefine((v, ctx) => {
     const minor = parseAmount(v.amount)
@@ -62,18 +57,6 @@ export const transactionSchema = z
 
 export type TransactionFormValues = z.infer<typeof transactionSchema>
 
-export function parseTags(input: string | undefined): string[] {
-  if (!input) return []
-  return Array.from(
-    new Set(
-      input
-        .split(',')
-        .map((t) => t.trim())
-        .filter(Boolean),
-    ),
-  )
-}
-
 /** Converts validated form values into the API payload. */
 export function toCreateRequest(v: TransactionFormValues, currency: string): CreateTransactionRequest {
   const amount = parseAmount(v.amount) ?? 0
@@ -87,10 +70,7 @@ export function toCreateRequest(v: TransactionFormValues, currency: string): Cre
     transfer_account_id: isTransfer ? (v.transfer_account_id ?? null) : null,
     category_id: hasCategory && v.category_id ? v.category_id : null,
     description: v.description?.trim() ?? '',
-    payee: v.payee?.trim() ?? '',
     transaction_date: v.transaction_date,
-    notes: v.notes?.trim() ?? '',
-    tags: parseTags(v.tags),
     status: 'cleared',
   }
 }
@@ -103,10 +83,7 @@ export function fromTransaction(tx: Transaction): TransactionFormValues {
     transfer_account_id: tx.transfer_account_id ?? undefined,
     category_id: tx.category_id ?? undefined,
     transaction_date: tx.transaction_date,
-    payee: tx.payee,
     description: tx.description,
-    notes: tx.notes,
-    tags: (tx.tags ?? []).join(', '),
   }
 }
 
@@ -135,10 +112,7 @@ export function defaultValues(preset: Partial<TransactionFormValues> = {}): Tran
     transfer_account_id: given.transfer_account_id ?? last.transfer_account_id ?? undefined,
     category_id: given.category_id ?? last.category_id ?? undefined,
     transaction_date: today(),
-    payee: '',
     description: '',
-    notes: '',
-    tags: '',
     ...given,
   }
 }
@@ -187,7 +161,6 @@ export function TransactionForm({
 
   const { data: accounts = [] } = useAccounts()
   const { data: categories = [] } = useCategories()
-  const { data: payees = [] } = usePayees()
 
   useEffect(() => {
     reset(initial)
@@ -509,81 +482,22 @@ export function TransactionForm({
         )}
       />
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Controller
-          control={control}
-          name="payee"
-          render={({ field }) => (
-            <Field data-invalid={!!err.payee}>
-              <FieldLabel htmlFor={`${formId}-payee`}>Payee</FieldLabel>
-              <PayeeCombobox
-                id={`${formId}-payee`}
-                value={field.value ?? ''}
-                onChange={field.onChange}
-                payees={payees}
-                invalid={!!err.payee}
-                onPick={(p) => {
-                  // A known payee brings its usual category along when none is chosen yet.
-                  if (categoryId || !p.last_category_id || !categoryType) return
-                  const cat = categories.find((c) => c.id === p.last_category_id)
-                  if (cat && cat.type === categoryType && cat.is_active) {
-                    setValue('category_id', cat.id, { shouldValidate: true, shouldDirty: true })
-                  }
-                }}
-              />
-              <FieldError errors={[err.payee]} />
-            </Field>
-          )}
-        />
-        <Controller
-          control={control}
-          name="description"
-          render={({ field }) => (
-            <Field data-invalid={!!err.description}>
-              <FieldLabel htmlFor={`${formId}-description`}>Description</FieldLabel>
-              <Input
-                id={`${formId}-description`}
-                placeholder="What was it for"
-                {...field}
-                value={field.value ?? ''}
-              />
-              <FieldError errors={[err.description]} />
-            </Field>
-          )}
-        />
-      </div>
-
-      <details className="group rounded-xl border px-3 py-2">
-        <summary className="text-muted-foreground cursor-pointer text-sm select-none">Notes & tags</summary>
-        <div className="mt-3 flex flex-col gap-4">
-          <Controller
-            control={control}
-            name="notes"
-            render={({ field }) => (
-              <Field data-invalid={!!err.notes}>
-                <FieldLabel htmlFor={`${formId}-notes`}>Notes</FieldLabel>
-                <Textarea id={`${formId}-notes`} rows={2} {...field} value={field.value ?? ''} />
-                <FieldError errors={[err.notes]} />
-              </Field>
-            )}
-          />
-          <Controller
-            control={control}
-            name="tags"
-            render={({ field }) => (
-              <Field>
-                <FieldLabel htmlFor={`${formId}-tags`}>Tags</FieldLabel>
-                <Input
-                  id={`${formId}-tags`}
-                  placeholder="work, trip (comma separated)"
-                  {...field}
-                  value={field.value ?? ''}
-                />
-              </Field>
-            )}
-          />
-        </div>
-      </details>
+      <Controller
+        control={control}
+        name="description"
+        render={({ field }) => (
+          <Field data-invalid={!!err.description}>
+            <FieldLabel htmlFor={`${formId}-description`}>Description</FieldLabel>
+            <Input
+              id={`${formId}-description`}
+              placeholder="What was it for"
+              {...field}
+              value={field.value ?? ''}
+            />
+            <FieldError errors={[err.description]} />
+          </Field>
+        )}
+      />
 
       <FormActions
         mode={mode}

@@ -6,7 +6,6 @@ import type { Account, Category } from '@/types/api'
 import {
   TransactionForm,
   defaultValues,
-  parseTags,
   toCreateRequest,
   transactionSchema,
 } from './TransactionForm'
@@ -141,19 +140,17 @@ describe('toCreateRequest', () => {
       ...defaultValues({ account_id: 'acc-1' }),
       amount: '85.40',
       category_id: 'cat-food',
-      tags: 'a, b, a',
-      payee: ' Cafe ',
+      description: ' Lunch ',
     }
     expect(toCreateRequest(v, 'BTN')).toMatchObject({
       amount: 8540,
       category_id: 'cat-food',
-      tags: ['a', 'b'],
-      payee: 'Cafe',
+      description: 'Lunch',
       status: 'cleared',
     })
+    expect(toCreateRequest(v, 'BTN')).not.toHaveProperty('payee')
     const t = { ...v, type: 'transfer' as const, transfer_account_id: 'acc-2' }
     expect(toCreateRequest(t, 'BTN')).toMatchObject({ category_id: null, transfer_account_id: 'acc-2' })
-    expect(parseTags(undefined)).toEqual([])
   })
 })
 
@@ -256,57 +253,5 @@ describe('new category from the picker', () => {
     const chip = await screen.findByRole('radio', { name: 'Momo' })
     await waitFor(() => expect(chip).toHaveAttribute('aria-checked', 'true'))
     expect(screen.queryByRole('heading', { name: 'New category' })).not.toBeInTheDocument()
-  })
-})
-
-describe('payee picker', () => {
-  const payees = [
-    { name: 'Ambient Cafe', count: 4, last_used: '2026-11-03', last_category_id: 'cat-food', last_account_id: 'acc-1' },
-    { name: '8 Eleven', count: 1, last_used: '2026-11-01', last_category_id: null, last_account_id: 'acc-1' },
-  ]
-  function mockApiWithPayees() {
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
-      const url = String(input)
-      const data = url.includes('/accounts')
-        ? accounts
-        : url.includes('/categories')
-          ? categories
-          : url.includes('/payees')
-            ? payees
-            : []
-      return new Response(JSON.stringify({ data }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      })
-    })
-  }
-
-  it('lists saved payees and brings the usual category along', async () => {
-    mockApiWithPayees()
-    const user = userEvent.setup()
-    renderForm()
-    await screen.findByRole('radio', { name: 'Food' })
-
-    await user.click(screen.getByRole('combobox', { name: 'Payee' }))
-    await user.click(await screen.findByRole('option', { name: 'Ambient Cafe' }))
-
-    expect(screen.getByRole('combobox', { name: 'Payee' })).toHaveTextContent('Ambient Cafe')
-    expect(screen.getByRole('radio', { name: 'Food' })).toHaveAttribute('aria-checked', 'true')
-  })
-
-  it('offers to use a name that is not in the list', async () => {
-    mockApiWithPayees()
-    const user = userEvent.setup()
-    renderForm()
-    await screen.findByRole('radio', { name: 'Food' })
-
-    await user.click(screen.getByRole('combobox', { name: 'Payee' }))
-    await user.type(await screen.findByRole('combobox', { name: 'Payee name' }), 'Norling')
-    expect(screen.queryByRole('option', { name: 'Ambient Cafe' })).not.toBeInTheDocument()
-    await user.click(screen.getByRole('option', { name: 'Use “Norling”' }))
-
-    expect(screen.getByRole('combobox', { name: 'Payee' })).toHaveTextContent('Norling')
-    // Nothing was picked from history, so the category is still the user's call.
-    expect(screen.getByRole('radio', { name: 'Food' })).toHaveAttribute('aria-checked', 'false')
   })
 })

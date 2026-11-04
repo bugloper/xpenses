@@ -253,37 +253,3 @@ func (TransactionRepo) CountUnmatchedManual(ctx context.Context, db DBTX, userID
 		AND a.type IN ('bank','savings','credit_card')`, userID).Scan(&n)
 	return n, err
 }
-
-// Payees lists the user's distinct non-empty payees, most used first, with the
-// category and account that last accompanied each one.
-func (TransactionRepo) Payees(ctx context.Context, db DBTX, userID string, limit int) ([]models.Payee, error) {
-	rows, err := db.QueryContext(ctx, `
-		SELECT t.payee, COUNT(*) AS uses, MAX(t.transaction_date) AS last_used,
-			(SELECT c.category_id FROM transactions c
-				WHERE c.user_id = t.user_id AND c.payee = t.payee AND c.category_id IS NOT NULL AND c.status != 'void'
-				ORDER BY c.transaction_date DESC, c.created_at DESC LIMIT 1),
-			(SELECT a.account_id FROM transactions a
-				WHERE a.user_id = t.user_id AND a.payee = t.payee AND a.status != 'void'
-				ORDER BY a.transaction_date DESC, a.created_at DESC LIMIT 1)
-		FROM transactions t
-		WHERE t.user_id = ? AND t.payee != '' AND t.status != 'void'
-		GROUP BY t.payee
-		ORDER BY uses DESC, last_used DESC, t.payee ASC
-		LIMIT ?`, userID, limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	out := []models.Payee{}
-	for rows.Next() {
-		var p models.Payee
-		var cat, acc sql.NullString
-		if err := rows.Scan(&p.Name, &p.Count, &p.LastUsed, &cat, &acc); err != nil {
-			return nil, err
-		}
-		p.LastCategoryID = strPtr(cat)
-		p.LastAccountID = strPtr(acc)
-		out = append(out, p)
-	}
-	return out, rows.Err()
-}

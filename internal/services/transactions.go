@@ -47,15 +47,6 @@ func (s *TransactionService) List(ctx context.Context, f dto.TransactionFilter) 
 	return txs, total, nil
 }
 
-// Payees returns the user's saved payees for the payee picker.
-func (s *TransactionService) Payees(ctx context.Context) ([]models.Payee, error) {
-	out, err := s.Repo.Payees(ctx, s.DB, auth.UserID(ctx), 500)
-	if err != nil {
-		return nil, apperr.Internal(err)
-	}
-	return out, nil
-}
-
 func (s *TransactionService) Get(ctx context.Context, id string) (*models.Transaction, error) {
 	t, err := s.Repo.Get(ctx, s.DB, auth.UserID(ctx), id)
 	if err != nil {

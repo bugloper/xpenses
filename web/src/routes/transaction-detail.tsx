@@ -111,26 +111,7 @@ function TransactionDetailPage() {
           />
         )}
         <Row label="Category" value={tx.category_name} />
-        <Row label="Payee" value={tx.payee} />
         <Row label="Description" value={tx.description} />
-        <Row
-          label="Notes"
-          value={tx.notes ? <span className="whitespace-pre-wrap">{tx.notes}</span> : null}
-        />
-        <Row
-          label="Tags"
-          value={
-            tx.tags && tx.tags.length > 0 ? (
-              <span className="flex flex-wrap justify-end gap-1">
-                {tx.tags.map((t) => (
-                  <Badge key={t} variant="outline">
-                    {t}
-                  </Badge>
-                ))}
-              </span>
-            ) : null
-          }
-        />
         <Row label="Created" value={formatDateTime(tx.created_at)} />
       </div>
       <div className="grid grid-cols-3 gap-2">
