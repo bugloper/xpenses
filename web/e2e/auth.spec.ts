@@ -76,11 +76,16 @@ test.describe('authentication', () => {
     await loginAs(page)
     await page.goto('/admin')
     await expect(page.getByRole('heading', { name: 'Admin' })).toBeVisible()
-    await page.getByRole('button', { name: /invite/i }).first().click()
+    await page
+      .getByRole('button', { name: /invite/i })
+      .first()
+      .click()
     await expect(page.getByRole('heading', { name: 'New invite' })).toBeVisible()
     await page.getByRole('button', { name: 'Create invite' }).click()
     await expect(page.getByRole('heading', { name: 'Invite link' })).toBeVisible()
-    await expect(page.getByRole('textbox', { name: 'Invite link' })).toHaveValue(/\/register\?invite=[0-9a-f]{64}$/)
+    await expect(page.getByRole('textbox', { name: 'Invite link' })).toHaveValue(
+      /\/register\?invite=[0-9a-f]{64}$/,
+    )
     const users = await page.request.get('/api/v1/admin/users', { headers: HEADERS })
     expect(users.status()).toBe(200)
   })

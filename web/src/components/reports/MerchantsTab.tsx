@@ -9,7 +9,17 @@ import { useReportMerchants } from '@/lib/queries'
 import { pct1, pctOf } from '@/lib/reports'
 import type { FlowType } from '@/types/api'
 
-export function MerchantsTab({ range, type, onType, currency }: { range: DateRange; type: FlowType; onType: (t: FlowType) => void; currency: string }) {
+export function MerchantsTab({
+  range,
+  type,
+  onType,
+  currency,
+}: {
+  range: DateRange
+  type: FlowType
+  onType: (t: FlowType) => void
+  currency: string
+}) {
   const q = useReportMerchants(range.from, range.to, type)
   const rows = useMemo(() => (q.data ?? []).filter((r) => r.amount > 0), [q.data])
   const total = rows.reduce((n, r) => n + r.amount, 0)
@@ -31,7 +41,12 @@ export function MerchantsTab({ range, type, onType, currency }: { range: DateRan
         ) : q.error ? (
           <ErrorState error={q.error} onRetry={() => void q.refetch()} compact />
         ) : rows.length === 0 ? (
-          <EmptyState icon={Store} title="No merchants in this period" description="Add a payee to your transactions to see them ranked here." className="py-8" />
+          <EmptyState
+            icon={Store}
+            title="No merchants in this period"
+            description="Add a payee to your transactions to see them ranked here."
+            className="py-8"
+          />
         ) : (
           <ol aria-label="Ranked merchants" className="flex flex-col">
             {rows.map((r, i) => {
@@ -39,15 +54,28 @@ export function MerchantsTab({ range, type, onType, currency }: { range: DateRan
               const noPayee = r.payee === '(no payee)' || r.payee === ''
               const inner = (
                 <>
-                  <span className="text-muted-foreground tabular w-6 shrink-0 text-right text-xs">{i + 1}</span>
+                  <span className="text-muted-foreground tabular w-6 shrink-0 text-right text-xs">
+                    {i + 1}
+                  </span>
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center justify-between gap-2">
                       <span className="truncate text-sm font-medium">{noPayee ? '(no payee)' : r.payee}</span>
-                      <Money minor={r.amount} currency={currency} className="shrink-0 text-sm font-semibold" />
+                      <Money
+                        minor={r.amount}
+                        currency={currency}
+                        className="shrink-0 text-sm font-semibold"
+                      />
                     </span>
                     <span className="mt-1 flex items-center gap-2">
                       <span className="bg-muted h-1 flex-1 overflow-hidden rounded-full">
-                        <span className={type === 'expense' ? 'bg-expense/70 block h-full rounded-full' : 'bg-income/70 block h-full rounded-full'} style={{ width: `${share}%` }} />
+                        <span
+                          className={
+                            type === 'expense'
+                              ? 'bg-expense/70 block h-full rounded-full'
+                              : 'bg-income/70 block h-full rounded-full'
+                          }
+                          style={{ width: `${share}%` }}
+                        />
                       </span>
                       <span className="text-muted-foreground tabular shrink-0 text-[11px]">
                         {pct1(r.amount, total)}% · {r.count}×
@@ -62,7 +90,11 @@ export function MerchantsTab({ range, type, onType, currency }: { range: DateRan
                   {noPayee ? (
                     <div className={cls}>{inner}</div>
                   ) : (
-                    <Link to="/transactions" search={{ q: r.payee, from: range.from, to: range.to, tab: type }} className={cls}>
+                    <Link
+                      to="/transactions"
+                      search={{ q: r.payee, from: range.from, to: range.to, tab: type }}
+                      className={cls}
+                    >
                       {inner}
                     </Link>
                   )}

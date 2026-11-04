@@ -39,10 +39,19 @@ export type ReportsSearch = {
 }
 
 /** Resolves URL search params into a concrete range, falling back to this month. */
-export function resolveReportRange(search: ReportsSearch, now = new Date()): { preset: ReportPeriodPreset; range: DateRange } {
+export function resolveReportRange(
+  search: ReportsSearch,
+  now = new Date(),
+): { preset: ReportPeriodPreset; range: DateRange } {
   const preset = search.period ?? 'month'
   if (preset === 'custom') {
-    if (search.from && search.to && isISODate(search.from) && isISODate(search.to) && search.from <= search.to)
+    if (
+      search.from &&
+      search.to &&
+      isISODate(search.from) &&
+      isISODate(search.to) &&
+      search.from <= search.to
+    )
       return { preset, range: { from: search.from, to: search.to } }
     return { preset: 'month', range: reportPresetRange('month', now) }
   }
@@ -97,7 +106,11 @@ export function exportPath(report: ExportReport, format: ExportFormat, params: E
 
 export function exportFileName(report: ExportReport, format: ExportFormat, params: ExportParams): string {
   const stamp =
-    report === 'budgets' ? params.month : report === 'reconciliation' ? params.statement_id : `${params.from}_${params.to}`
+    report === 'budgets'
+      ? params.month
+      : report === 'reconciliation'
+        ? params.statement_id
+        : `${params.from}_${params.to}`
   return `${report}-${stamp ?? 'export'}.${format}`
 }
 

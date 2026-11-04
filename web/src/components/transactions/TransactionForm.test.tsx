@@ -161,10 +161,22 @@ describe('TransactionForm', () => {
   it('shows validation errors and does not submit an empty form', async () => {
     const user = userEvent.setup()
     const onSubmit = renderForm()
+    await screen.findByText('Food') // data loaded
     await user.click(screen.getByRole('button', { name: /^Save$/ }))
     expect(await screen.findByText(/Enter a valid amount/)).toBeInTheDocument()
-    expect((await screen.findAllByRole('alert')).map((el) => el.textContent)).toContain('Select an account')
     expect(onSubmit).not.toHaveBeenCalled()
+  })
+
+  it('pre-selects an account so quick entry never stalls on the picker', async () => {
+    const user = userEvent.setup()
+    const onSubmit = renderForm()
+    await screen.findByText('Food')
+    // No last-used account: the first active account (bank first) is chosen.
+    await waitFor(() => expect(screen.getByRole('combobox', { name: /Account/ })).toHaveTextContent('BOB'))
+    await user.type(screen.getByLabelText('Amount'), '12')
+    await user.click(screen.getByRole('button', { name: /^Save$/ }))
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1))
+    expect(screen.queryByText('Select an account')).not.toBeInTheDocument()
   })
 
   it('submits parsed values and remembers last-used account + category', async () => {

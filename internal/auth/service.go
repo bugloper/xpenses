@@ -41,6 +41,8 @@ const (
 type Service struct {
 	DB   *sql.DB
 	Repo Repo
+	// DefaultCurrency is used for the seeded Cash account.
+	DefaultCurrency string
 	// StatementsDir holds the audit PDFs (<id>.pdf) that DeleteUser removes
 	// alongside the user's rows. Empty leaves files alone.
 	StatementsDir string
@@ -181,6 +183,9 @@ func (s *Service) createUser(ctx context.Context, tx *sql.Tx, name, email, passw
 		return nil, err
 	}
 	if err := SeedDefaultCategories(ctx, tx, u.ID); err != nil {
+		return nil, err
+	}
+	if err := SeedDefaultAccount(ctx, tx, u.ID, s.DefaultCurrency); err != nil {
 		return nil, err
 	}
 	return u, nil

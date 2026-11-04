@@ -7,7 +7,13 @@ import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { isApiError } from '@/lib/api'
-import { formatBytes, MAX_UPLOAD_BYTES, uploadErrorInfo, validateStatementFile, type UploadErrorInfo } from '@/lib/statements'
+import {
+  formatBytes,
+  MAX_UPLOAD_BYTES,
+  uploadErrorInfo,
+  validateStatementFile,
+  type UploadErrorInfo,
+} from '@/lib/statements'
 import { cn } from '@/lib/utils'
 import type { Account, ImportPreview } from '@/types/api'
 
@@ -15,7 +21,9 @@ export type UploadValues = { file: File; account_id: string; password: string }
 
 /** Accounts a bank statement can belong to. */
 export function statementAccounts(accounts: Account[]): Account[] {
-  return accounts.filter((a) => a.is_active && (a.type === 'bank' || a.type === 'savings' || a.type === 'credit_card'))
+  return accounts.filter(
+    (a) => a.is_active && (a.type === 'bank' || a.type === 'savings' || a.type === 'credit_card'),
+  )
 }
 
 export function UploadStep({
@@ -33,7 +41,9 @@ export function UploadStep({
   formId?: string
 }) {
   const id = useId()
-  const [accountId, setAccountId] = useState(defaultAccountId ?? (accounts.length === 1 ? accounts[0]!.id : ''))
+  const [accountId, setAccountId] = useState(
+    defaultAccountId ?? (accounts.length === 1 ? accounts[0]!.id : ''),
+  )
   const [file, setFile] = useState<File | null>(null)
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -62,7 +72,11 @@ export function UploadStep({
   const submit = async () => {
     setError(null)
     if (!accountId) {
-      setError({ field: 'account', title: 'Select an account', description: 'Which account is this statement for?' })
+      setError({
+        field: 'account',
+        title: 'Select an account',
+        description: 'Which account is this statement for?',
+      })
       return
     }
     if (!file) {
@@ -104,7 +118,11 @@ export function UploadStep({
       <Field data-invalid={error?.field === 'account' || undefined}>
         <FieldLabel htmlFor={`${id}-account`}>Account</FieldLabel>
         <Select value={accountId} onValueChange={setAccountId}>
-          <SelectTrigger id={`${id}-account`} className="w-full" aria-invalid={error?.field === 'account' || undefined}>
+          <SelectTrigger
+            id={`${id}-account`}
+            className="w-full"
+            aria-invalid={error?.field === 'account' || undefined}
+          >
             <SelectValue placeholder="Select the statement's account" />
           </SelectTrigger>
           <SelectContent>
@@ -142,7 +160,13 @@ export function UploadStep({
               <p className="truncate text-sm font-medium">{file.name}</p>
               <p className="text-muted-foreground text-xs">{formatBytes(file.size)}</p>
             </div>
-            <Button type="button" variant="ghost" size="icon-sm" aria-label="Remove file" onClick={() => setFile(null)}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Remove file"
+              onClick={() => setFile(null)}
+            >
               <X />
             </Button>
           </div>
@@ -164,7 +188,9 @@ export function UploadStep({
           >
             <Upload className="text-muted-foreground size-5" />
             <span className="text-sm font-medium">Choose a PDF or drop it here</span>
-            <span className="text-muted-foreground text-xs">BOB statement export · up to {formatBytes(MAX_UPLOAD_BYTES)}</span>
+            <span className="text-muted-foreground text-xs">
+              BOB statement export · up to {formatBytes(MAX_UPLOAD_BYTES)}
+            </span>
           </button>
         )}
         {fieldError('file')}
@@ -202,8 +228,8 @@ export function UploadStep({
           </button>
         </div>
         <FieldDescription id={`${id}-password-hint`}>
-          <strong>DDMM of your DOB</strong> (for example 0101 for 1 January). BOB protects statements with this.
-          The password is sent once with this upload only and is never stored.
+          <strong>DDMM of your DOB</strong> (for example 0101 for 1 January). BOB protects statements with
+          this. The password is sent once with this upload only and is never stored.
         </FieldDescription>
         {fieldError('password')}
       </Field>
@@ -216,7 +242,11 @@ export function UploadStep({
       )}
 
       <Button type="submit" size="lg" className="h-11 rounded-xl" disabled={busy || accounts.length === 0}>
-        {busy ? <Loader2 data-icon="inline-start" className="animate-spin" /> : <Upload data-icon="inline-start" />}
+        {busy ? (
+          <Loader2 data-icon="inline-start" className="animate-spin" />
+        ) : (
+          <Upload data-icon="inline-start" />
+        )}
         {busy ? 'Reading statement…' : 'Parse statement'}
       </Button>
     </form>

@@ -39,7 +39,12 @@ function Stepper({ step }: { step: Step }) {
           >
             {s.n < step ? <Check className="size-3" /> : s.n}
           </span>
-          <span className={cn(s.n === step ? 'text-foreground font-medium' : 'text-muted-foreground', 'hidden sm:inline')}>
+          <span
+            className={cn(
+              s.n === step ? 'text-foreground font-medium' : 'text-muted-foreground',
+              'hidden sm:inline',
+            )}
+          >
             {s.label}
           </span>
           {i < STEPS.length - 1 && <span className="bg-border h-px w-4 sm:w-6" />}
@@ -111,7 +116,9 @@ export function ImportWizard({
       description="Upload a BOB PDF, check the parsed rows, then import."
     >
       {/* Keyed so each open starts from step 1 with no password left in memory. */}
-      {open && <WizardBody key="wizard" defaultAccountId={defaultAccountId} onDone={() => onOpenChange(false)} />}
+      {open && (
+        <WizardBody key="wizard" defaultAccountId={defaultAccountId} onDone={() => onOpenChange(false)} />
+      )}
     </Shell>
   )
 }
@@ -152,12 +159,15 @@ function WizardBody({ defaultAccountId, onDone }: { defaultAccountId?: string; o
         statement: state.statement,
         transactions: toImportRows(state.rows),
       })
-      toast.success(`Imported ${res.transaction_count} transaction${res.transaction_count === 1 ? '' : 's'}`, {
-        description:
-          res.skipped_duplicates > 0
-            ? `${res.skipped_duplicates} duplicate${res.skipped_duplicates === 1 ? '' : 's'} skipped.`
-            : undefined,
-      })
+      toast.success(
+        `Imported ${res.transaction_count} transaction${res.transaction_count === 1 ? '' : 's'}`,
+        {
+          description:
+            res.skipped_duplicates > 0
+              ? `${res.skipped_duplicates} duplicate${res.skipped_duplicates === 1 ? '' : 's'} skipped.`
+              : undefined,
+        },
+      )
       onDone()
       void navigate({
         to: '/reconciliation/$statementId',
@@ -166,7 +176,9 @@ function WizardBody({ defaultAccountId, onDone }: { defaultAccountId?: string; o
       })
     } catch (e) {
       if (isApiError(e) && e.code === 'duplicate_statement') {
-        setImportError('This file was already imported. Go back to the preview and choose "Import anyway" to force it.')
+        setImportError(
+          'This file was already imported. Go back to the preview and choose "Import anyway" to force it.',
+        )
       } else if (isApiError(e) && e.code === 'duplicate_bank_transaction') {
         setImportError('Some rows already exist for this account. Go back and turn "Skip duplicates" on.')
       } else if (isApiError(e) && e.status === 400 && /upload token/i.test(e.message)) {
@@ -208,7 +220,12 @@ function WizardBody({ defaultAccountId, onDone }: { defaultAccountId?: string; o
             <Button
               type="button"
               onClick={() => setStep(3)}
-              disabled={state.rows.length === 0 || (!!preview.duplicate_statement && preview.duplicate_statement.reason === 'sha256' && !state.force)}
+              disabled={
+                state.rows.length === 0 ||
+                (!!preview.duplicate_statement &&
+                  preview.duplicate_statement.reason === 'sha256' &&
+                  !state.force)
+              }
             >
               Continue
             </Button>
@@ -267,19 +284,29 @@ function ConfirmStep({
       <div className="bg-muted/40 divide-y rounded-2xl px-4">
         <Row label="File" value={preview.file_name} />
         <Row label="Account" value={accountName} />
-        <Row label="Period" value={rangeLabel({ from: state.statement.period_start, to: state.statement.period_end })} />
+        <Row
+          label="Period"
+          value={rangeLabel({ from: state.statement.period_start, to: state.statement.period_end })}
+        />
         <Row label="Rows to import" value={willImport} />
         {totals.duplicates > 0 && (
-          <Row label="Duplicates" value={state.skipDuplicates ? `${totals.duplicates} skipped` : `${totals.duplicates} kept`} />
+          <Row
+            label="Duplicates"
+            value={state.skipDuplicates ? `${totals.duplicates} skipped` : `${totals.duplicates} kept`}
+          />
         )}
         <Row label="Debits" value={<Money minor={-totals.debits} currency={currency} tone="expense" />} />
-        <Row label="Credits" value={<Money minor={totals.credits} currency={currency} tone="income" sign="always" />} />
+        <Row
+          label="Credits"
+          value={<Money minor={totals.credits} currency={currency} tone="income" sign="always" />}
+        />
         {state.force && <Row label="Duplicate statement" value="Importing anyway" />}
       </div>
       <ValidationBanner validation={validation} currency={currency} />
       {willImport === 0 && (
         <p className="text-muted-foreground text-sm">
-          Nothing to import: every row already exists for this account{totals.duplicates > 0 ? ' and duplicates are skipped' : ''}.
+          Nothing to import: every row already exists for this account
+          {totals.duplicates > 0 ? ' and duplicates are skipped' : ''}.
         </p>
       )}
       {error && (
@@ -292,7 +319,11 @@ function ConfirmStep({
           <ArrowLeft data-icon="inline-start" /> Back
         </Button>
         <Button type="button" onClick={onImport} disabled={busy || willImport === 0}>
-          {busy ? <Loader2 data-icon="inline-start" className="animate-spin" /> : <Check data-icon="inline-start" />}
+          {busy ? (
+            <Loader2 data-icon="inline-start" className="animate-spin" />
+          ) : (
+            <Check data-icon="inline-start" />
+          )}
           {busy ? 'Importing…' : `Import ${willImport} row${willImport === 1 ? '' : 's'}`}
         </Button>
       </div>

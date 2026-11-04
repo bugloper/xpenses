@@ -42,7 +42,7 @@ export function useReconciliationActions(): LineActions {
   const create = useCreateFromBankLine()
   const auto = useAutoMatch()
 
-  const run = async <T,>(p: Promise<T>, success: (r: T) => string): Promise<boolean> => {
+  const run = async <T>(p: Promise<T>, success: (r: T) => string): Promise<boolean> => {
     try {
       const r = await p
       toast.success(success(r))
@@ -65,18 +65,34 @@ export function useReconciliationActions(): LineActions {
     confirm: (bank_transaction_id, transaction_id, note) =>
       run(match.mutateAsync({ bank_transaction_id, transaction_id, note }), () => 'Matched'),
     adjust: (bank_transaction_id, transaction_id, note) =>
-      run(adjustment.mutateAsync({ bank_transaction_id, transaction_id, note }), () => 'Matched with an adjustment'),
+      run(
+        adjustment.mutateAsync({ bank_transaction_id, transaction_id, note }),
+        () => 'Matched with an adjustment',
+      ),
     unmatch: (bank_transaction_id) => run(unmatch.mutateAsync(bank_transaction_id), () => 'Unmatched'),
-    ignore: (bank_transaction_id, note) => run(ignore.mutateAsync({ bank_transaction_id, note }), () => 'Ignored'),
+    ignore: (bank_transaction_id, note) =>
+      run(ignore.mutateAsync({ bank_transaction_id, note }), () => 'Ignored'),
     transfer: (body) =>
-      run(transfer.mutateAsync(body), (r) => (body.transaction_id ? 'Linked to transfer' : `Transfer created (${r.transaction.transfer_account_name || 'other account'})`)),
+      run(transfer.mutateAsync(body), (r) =>
+        body.transaction_id
+          ? 'Linked to transfer'
+          : `Transfer created (${r.transaction.transfer_account_name || 'other account'})`,
+      ),
     create: (body) => run(create.mutateAsync(body), () => 'Transaction created and matched'),
     autoMatch: async (statementId) => {
       try {
         const r = await auto.mutateAsync(statementId)
-        toast.success(r.matched === 0 ? 'No new confident matches' : `Auto-matched ${r.matched} line${r.matched === 1 ? '' : 's'}`, {
-          description: r.matched === 0 ? 'Only unique same-amount matches are applied automatically; see suggestions for the rest.' : undefined,
-        })
+        toast.success(
+          r.matched === 0
+            ? 'No new confident matches'
+            : `Auto-matched ${r.matched} line${r.matched === 1 ? '' : 's'}`,
+          {
+            description:
+              r.matched === 0
+                ? 'Only unique same-amount matches are applied automatically; see suggestions for the rest.'
+                : undefined,
+          },
+        )
         return r.matched
       } catch (e) {
         toast.error(reconciliationErrorMessage(e))

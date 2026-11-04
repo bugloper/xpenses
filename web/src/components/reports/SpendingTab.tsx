@@ -10,7 +10,17 @@ const SpendingBars = lazy(() => import('./charts').then((m) => ({ default: m.Spe
 
 export type SpendingGranularity = 'day' | 'week'
 
-export function SpendingTab({ range, granularity, onGranularity, currency }: { range: DateRange; granularity: SpendingGranularity; onGranularity: (g: SpendingGranularity) => void; currency: string }) {
+export function SpendingTab({
+  range,
+  granularity,
+  onGranularity,
+  currency,
+}: {
+  range: DateRange
+  granularity: SpendingGranularity
+  onGranularity: (g: SpendingGranularity) => void
+  currency: string
+}) {
   const q = useReportCashFlow(range.from, range.to, granularity)
   const rows = useMemo(() => q.data ?? [], [q.data])
   const stats = useMemo(() => {
@@ -35,15 +45,25 @@ export function SpendingTab({ range, granularity, onGranularity, currency }: { r
         ]}
       />
       <div className="grid grid-cols-3 gap-3">
-        <Stat label="Total spent" value={<Money minor={stats.total} currency={currency} tone="expense" className="font-semibold" />} loading={q.isPending} />
-        <Stat label={`Average per ${unit}`} value={<Money minor={stats.average} currency={currency} className="font-semibold" />} loading={q.isPending} />
+        <Stat
+          label="Total spent"
+          value={<Money minor={stats.total} currency={currency} tone="expense" className="font-semibold" />}
+          loading={q.isPending}
+        />
+        <Stat
+          label={`Average per ${unit}`}
+          value={<Money minor={stats.average} currency={currency} className="font-semibold" />}
+          loading={q.isPending}
+        />
         <Stat
           label={`Highest ${unit}`}
           value={
             stats.highest && stats.highest.expenses > 0 ? (
               <>
                 <Money minor={stats.highest.expenses} currency={currency} className="font-semibold" />
-                <span className="text-muted-foreground block text-[11px]">{formatPeriodTick(stats.highest.period)} · {stats.highest.period}</span>
+                <span className="text-muted-foreground block text-[11px]">
+                  {formatPeriodTick(stats.highest.period)} · {stats.highest.period}
+                </span>
               </>
             ) : (
               '—'
@@ -53,7 +73,9 @@ export function SpendingTab({ range, granularity, onGranularity, currency }: { r
         />
       </div>
       <section className="bg-card ring-foreground/10 flex flex-col gap-3 rounded-2xl p-4 ring-1">
-        <h2 className="text-sm font-medium">{granularity === 'day' ? 'Daily spending' : 'Weekly spending'}</h2>
+        <h2 className="text-sm font-medium">
+          {granularity === 'day' ? 'Daily spending' : 'Weekly spending'}
+        </h2>
         {q.isPending ? (
           <Skeleton className="h-56 w-full rounded-xl" />
         ) : q.error ? (

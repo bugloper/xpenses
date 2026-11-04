@@ -37,9 +37,15 @@ async function setup(parse: (v: unknown) => Promise<never>) {
 
 describe('UploadStep error mapping', () => {
   it('shows a wrong password inline on the password field and stays on the step', async () => {
-    const parse = vi.fn().mockRejectedValue(
-      new ApiError({ status: 400, code: 'pdf_password_incorrect', message: 'the password did not open this statement' }),
-    )
+    const parse = vi
+      .fn()
+      .mockRejectedValue(
+        new ApiError({
+          status: 400,
+          code: 'pdf_password_incorrect',
+          message: 'the password did not open this statement',
+        }),
+      )
     const { onParsed } = await setup(parse)
     const alert = await screen.findByRole('alert')
     expect(alert).toHaveTextContent(/password did not open/i)
@@ -50,7 +56,9 @@ describe('UploadStep error mapping', () => {
   })
 
   it('explains a scanned PDF (OCR not supported)', async () => {
-    const parse = vi.fn().mockRejectedValue(new ApiError({ status: 422, code: 'pdf_no_text', message: 'no text' }))
+    const parse = vi
+      .fn()
+      .mockRejectedValue(new ApiError({ status: 422, code: 'pdf_no_text', message: 'no text' }))
     await setup(parse)
     expect(await screen.findByRole('alert')).toHaveTextContent(/scanned PDF/i)
     expect(screen.getByRole('alert')).toHaveTextContent(/OCR/)
@@ -58,7 +66,9 @@ describe('UploadStep error mapping', () => {
   })
 
   it('explains an unrecognised layout and that nothing was imported', async () => {
-    const parse = vi.fn().mockRejectedValue(new ApiError({ status: 422, code: 'pdf_unrecognised', message: 'x' }))
+    const parse = vi
+      .fn()
+      .mockRejectedValue(new ApiError({ status: 422, code: 'pdf_unrecognised', message: 'x' }))
     await setup(parse)
     expect(await screen.findByRole('alert')).toHaveTextContent(/layout not recognised/i)
     expect(screen.getByRole('alert')).toHaveTextContent(/nothing was imported/i)

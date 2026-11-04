@@ -9,7 +9,7 @@ import { ErrorState, ListSkeleton } from '@/components/common/States'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { errorMessage } from '@/lib/api'
-import { formatShortDate } from '@/lib/dates'
+import { formatDateTime, formatShortDate } from '@/lib/dates'
 import { useDeleteTransaction, useDuplicateTransaction, useTransaction } from '@/lib/queries'
 import { displayAmount, transactionTitle } from '@/lib/transactions'
 import { uiStore } from '@/lib/ui-store'
@@ -131,7 +131,7 @@ function TransactionDetailPage() {
             ) : null
           }
         />
-        <Row label="Created" value={new Date(tx.created_at).toLocaleString()} />
+        <Row label="Created" value={formatDateTime(tx.created_at)} />
       </div>
       <div className="grid grid-cols-3 gap-2">
         <Button

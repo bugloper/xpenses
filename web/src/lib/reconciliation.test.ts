@@ -112,7 +112,13 @@ describe('rankManualCandidates', () => {
       tx({ id: 'far-amount', amount: 20000, transaction_date: '2026-11-10' }),
       tx({ id: 'other-account', amount: 8540, account_id: 'zzz' }),
     ])
-    expect(out.map((r) => r.tx.id)).toEqual(['same-close', 'same-far', 'near-amount', 'far-amount', 'income-same'])
+    expect(out.map((r) => r.tx.id)).toEqual([
+      'same-close',
+      'same-far',
+      'near-amount',
+      'far-amount',
+      'income-same',
+    ])
     expect(out[0]).toMatchObject({ sameAmount: true, sameDirection: true, amountDiff: 0, dateDiff: 1 })
     expect(out[2]).toMatchObject({ sameAmount: false, amountDiff: -60 })
     expect(out[4]!.sameDirection).toBe(false)

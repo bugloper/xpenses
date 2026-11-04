@@ -50,10 +50,9 @@ describe('recomputeValidation', () => {
   })
 
   it('stays exact for large balances', () => {
-    const v = recomputeValidation(
-      { opening_balance: 9_999_999_999_99, closing_balance: 9_999_999_999_98 },
-      [row(1, 0, 9_999_999_999_98)],
-    )
+    const v = recomputeValidation({ opening_balance: 9_999_999_999_99, closing_balance: 9_999_999_999_98 }, [
+      row(1, 0, 9_999_999_999_98),
+    ])
     expect(v.balance_check).toBe('ok')
   })
 
@@ -86,7 +85,10 @@ describe('recomputeValidation', () => {
       row(0, 10, 30), // 25 + 10 = 35, not 30
     ])
     expect(v.messages[0]).toBe('2 rows where the running balance does not follow from the previous row')
-    const one = recomputeValidation({ opening_balance: 0, closing_balance: 20 }, [row(0, 10, 10), row(0, 10, 25)])
+    const one = recomputeValidation({ opening_balance: 0, closing_balance: 20 }, [
+      row(0, 10, 10),
+      row(0, 10, 25),
+    ])
     expect(one.messages[0]).toBe('1 row where the running balance does not follow from the previous row')
   })
 

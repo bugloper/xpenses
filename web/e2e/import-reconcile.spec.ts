@@ -31,7 +31,10 @@ test.describe('statement import and auto-match', () => {
 
     // Account select (Radix): open and pick the account created above.
     await page.getByLabel('Account').first().click()
-    await page.getByRole('option', { name: /E2E Bank/ }).last().click()
+    await page
+      .getByRole('option', { name: /E2E Bank/ })
+      .last()
+      .click()
 
     await page.locator('input[type=file]').setInputFiles(PDF)
     await expect(page.getByRole('dialog').getByText('bob_synthetic_encrypted.pdf')).toBeVisible()
@@ -45,10 +48,16 @@ test.describe('statement import and auto-match', () => {
     await page.getByRole('button', { name: /parse statement/i }).click()
 
     // Preview step: rows parsed, balances evaluated.
-    await expect(page.getByRole('heading', { name: /^Transactions \(\d+\)/ })).toBeVisible({ timeout: 15_000 })
-    const rows = page.locator('[aria-label^="Row "][aria-label$=" description"], li:has([aria-label="Description"])')
+    await expect(page.getByRole('heading', { name: /^Transactions \(\d+\)/ })).toBeVisible({
+      timeout: 15_000,
+    })
+    const rows = page.locator(
+      '[aria-label^="Row "][aria-label$=" description"], li:has([aria-label="Description"])',
+    )
     expect(await rows.count()).toBeGreaterThan(0)
-    const banner = page.locator('[data-state]').filter({ hasText: /Balances check out|Closing balance differs|Balance check unavailable/ })
+    const banner = page
+      .locator('[data-state]')
+      .filter({ hasText: /Balances check out|Closing balance differs|Balance check unavailable/ })
     await expect(banner.first()).toBeVisible()
 
     // A re-import of the same bytes is flagged as a duplicate; force it so the test is rerunnable.
@@ -74,7 +83,9 @@ test.describe('statement import and auto-match', () => {
     const auto = page.getByRole('button', { name: 'Auto-match' })
     if (await auto.isEnabled()) {
       await auto.click()
-      await expect(page.getByText(/Auto-matched \d+ lines?|No new confident matches/)).toBeVisible({ timeout: 15_000 })
+      await expect(page.getByText(/Auto-matched \d+ lines?|No new confident matches/)).toBeVisible({
+        timeout: 15_000,
+      })
     }
 
     await page.getByRole('button', { name: 'Report' }).click()

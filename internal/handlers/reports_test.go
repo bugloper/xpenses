@@ -90,7 +90,8 @@ func TestReportsJSON(t *testing.T) {
 
 	st, _, body = get(t, c, "/reports/accounts?from=2026-11-01&to=2026-11-30")
 	rows = decode(t, body)["data"].([]any)
-	if st != 200 || len(rows) != 1 || rows[0].(map[string]any)["balance"].(float64) != 57500 {
+	// Every user also has the seeded "Cash" account (balance 0).
+	if st != 200 || len(rows) != 2 || rows[0].(map[string]any)["balance"].(float64) != 57500 {
 		t.Fatalf("accounts: %d %s", st, body)
 	}
 
@@ -262,7 +263,14 @@ func TestReportsIsolation(t *testing.T) {
 
 	st, _, body = get(t, bob, "/reports/accounts?"+nov)
 	rows = decode(t, body)["data"].([]any)
-	if st != 200 || len(rows) != 1 || rows[0].(map[string]any)["account_id"] != bobAcc || rows[0].(map[string]any)["balance"].(float64) != 300 {
+	// Bob's seeded Cash account plus the one created in this test; nothing of the admin's.
+	var bobRow map[string]any
+	for _, r := range rows {
+		if r.(map[string]any)["account_id"] == bobAcc {
+			bobRow = r.(map[string]any)
+		}
+	}
+	if st != 200 || len(rows) != 2 || bobRow == nil || bobRow["balance"].(float64) != 300 {
 		t.Fatalf("bob accounts: %d %s", st, body)
 	}
 

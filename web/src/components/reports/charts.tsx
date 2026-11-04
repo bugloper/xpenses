@@ -1,6 +1,18 @@
 // Recharts-backed pieces for the Reports screen. Loaded lazily so the chart
 // library only ships when a chart is on screen.
-import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Pie,
+  PieChart,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts'
 import { Money } from '@/components/common/Money'
 import { formatPeriodTick } from '@/lib/dates'
 import { formatMoney } from '@/lib/money'
@@ -38,7 +50,15 @@ export function CategoryDonutChart({
     <div className="relative mx-auto h-52 w-52 shrink-0">
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
-          <Pie data={rows} dataKey="amount" nameKey="name" innerRadius={62} outerRadius={92} paddingAngle={2} stroke="none">
+          <Pie
+            data={rows}
+            dataKey="amount"
+            nameKey="name"
+            innerRadius={62}
+            outerRadius={92}
+            paddingAngle={2}
+            stroke="none"
+          >
             {rows.map((r, i) => (
               <Cell
                 key={`${r.category_id ?? 'none'}-${i}`}
@@ -47,7 +67,10 @@ export function CategoryDonutChart({
               />
             ))}
           </Pie>
-          <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(value, name) => [formatMoney(Number(value), currency), String(name)]} />
+          <Tooltip
+            contentStyle={TOOLTIP_STYLE}
+            formatter={(value, name) => [formatMoney(Number(value), currency), String(name)]}
+          />
         </PieChart>
       </ResponsiveContainer>
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
@@ -59,24 +82,51 @@ export function CategoryDonutChart({
 }
 
 /** Expenses-only bars (daily / weekly spending) with an average line. */
-export function SpendingBars({ rows, average, currency }: { rows: ReportCashFlow[]; average: number; currency: string }) {
+export function SpendingBars({
+  rows,
+  average,
+  currency,
+}: {
+  rows: ReportCashFlow[]
+  average: number
+  currency: string
+}) {
   return (
     <div className="h-56 w-full">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={rows} margin={{ top: 8, right: 4, left: 0, bottom: 0 }} barCategoryGap="25%">
           <CartesianGrid vertical={false} stroke="var(--border)" />
-          <XAxis dataKey="period" tickFormatter={formatPeriodTick} tickLine={false} axisLine={false} tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }} interval="preserveStartEnd" />
-          <YAxis tickFormatter={compact} tickLine={false} axisLine={false} width={40} tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }} />
+          <XAxis
+            dataKey="period"
+            tickFormatter={formatPeriodTick}
+            tickLine={false}
+            axisLine={false}
+            tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }}
+            interval="preserveStartEnd"
+          />
+          <YAxis
+            tickFormatter={compact}
+            tickLine={false}
+            axisLine={false}
+            width={40}
+            tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }}
+          />
           <Tooltip
             cursor={{ fill: 'var(--muted)', opacity: 0.5 }}
             contentStyle={TOOLTIP_STYLE}
             formatter={(value) => [formatMoney(Number(value), currency), 'Spent']}
             labelFormatter={(label) => String(label)}
           />
-          {average > 0 && <ReferenceLine y={average} stroke="var(--muted-foreground)" strokeDasharray="4 4" />}
+          {average > 0 && (
+            <ReferenceLine y={average} stroke="var(--muted-foreground)" strokeDasharray="4 4" />
+          )}
           <Bar dataKey="expenses" name="expenses" radius={[6, 6, 0, 0]} maxBarSize={32}>
             {rows.map((r) => (
-              <Cell key={r.period} fill={r.expenses > average && average > 0 ? 'var(--expense)' : 'var(--chart-1)'} opacity={r.expenses === 0 ? 0.3 : 1} />
+              <Cell
+                key={r.period}
+                fill={r.expenses > average && average > 0 ? 'var(--expense)' : 'var(--chart-1)'}
+                opacity={r.expenses === 0 ? 0.3 : 1}
+              />
             ))}
           </Bar>
         </BarChart>

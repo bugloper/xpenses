@@ -119,7 +119,13 @@ function BankLineRow({ line, currency }: { line: BankTransactionWithStatus; curr
           </p>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
-          <Money minor={amount} currency={currency} tone="auto" sign="always" className="text-sm font-semibold" />
+          <Money
+            minor={amount}
+            currency={currency}
+            tone="auto"
+            sign="always"
+            className="text-sm font-semibold"
+          />
           <BankStatusBadge status={line.status} />
         </div>
       </div>
@@ -162,7 +168,12 @@ function StatementDetailPage() {
 
   if (statement.isPending) return <ListSkeleton rows={6} />
   if (statement.error || !statement.data)
-    return <ErrorState error={statement.error ?? new Error('Not found')} onRetry={() => void statement.refetch()} />
+    return (
+      <ErrorState
+        error={statement.error ?? new Error('Not found')}
+        onRetry={() => void statement.refetch()}
+      />
+    )
   const s = statement.data
   const account = accounts.find((a) => a.id === s.account_id)
   const currency = account?.currency ?? 'BTN'
@@ -192,7 +203,9 @@ function StatementDetailPage() {
             {account && <AccountIcon type={account.type} />}
             <div className="min-w-0">
               <p className="truncate font-medium">{s.account_holder || account?.name || 'Account'}</p>
-              <p className="text-muted-foreground tabular text-xs">{maskAccountNumber(s.account_number) || '—'}</p>
+              <p className="text-muted-foreground tabular text-xs">
+                {maskAccountNumber(s.account_number) || '—'}
+              </p>
             </div>
             <span
               className={cn(
@@ -200,20 +213,44 @@ function StatementDetailPage() {
                 s.balance_verified ? 'text-income' : 'text-warning',
               )}
             >
-              {s.balance_verified ? <CheckCircle2 className="size-3.5" /> : <CircleAlert className="size-3.5" />}
+              {s.balance_verified ? (
+                <CheckCircle2 className="size-3.5" />
+              ) : (
+                <CircleAlert className="size-3.5" />
+              )}
               {s.balance_verified ? 'Balance verified' : 'Balance unverified'}
             </span>
           </div>
           <div className="divide-y">
-            <MetaRow label="Opening balance" value={s.opening_balance === null ? '—' : <Money minor={s.opening_balance} currency={currency} />} />
-            <MetaRow label="Total debits" value={<Money minor={-s.total_debits} currency={currency} tone="expense" />} />
-            <MetaRow label="Total credits" value={<Money minor={s.total_credits} currency={currency} tone="income" sign="always" />} />
-            <MetaRow label="Closing balance" value={s.closing_balance === null ? '—' : <Money minor={s.closing_balance} currency={currency} />} />
+            <MetaRow
+              label="Opening balance"
+              value={
+                s.opening_balance === null ? '—' : <Money minor={s.opening_balance} currency={currency} />
+              }
+            />
+            <MetaRow
+              label="Total debits"
+              value={<Money minor={-s.total_debits} currency={currency} tone="expense" />}
+            />
+            <MetaRow
+              label="Total credits"
+              value={<Money minor={s.total_credits} currency={currency} tone="income" sign="always" />}
+            />
+            <MetaRow
+              label="Closing balance"
+              value={
+                s.closing_balance === null ? '—' : <Money minor={s.closing_balance} currency={currency} />
+              }
+            />
             <MetaRow label="Transactions" value={s.transaction_count} />
             <MetaRow label="Imported" value={formatShortDate(s.imported_at.slice(0, 10))} />
             <MetaRow label="Notes" value={s.notes} />
           </div>
-          <ReconciliationProgress matched={s.matched_count} ignored={s.ignored_count} unmatched={s.unmatched_count} />
+          <ReconciliationProgress
+            matched={s.matched_count}
+            ignored={s.ignored_count}
+            unmatched={s.unmatched_count}
+          />
           <div className="mt-1 flex flex-wrap gap-2">
             <Button variant="outline" size="sm" asChild>
               <a href={statementFileUrl(s.id)} target="_blank" rel="noopener">
@@ -227,7 +264,9 @@ function StatementDetailPage() {
         </section>
 
         <section className="bg-card ring-foreground/10 rounded-2xl ring-1">
-          <h2 className="text-muted-foreground border-b px-3 py-2.5 text-sm font-medium">Bank transactions</h2>
+          <h2 className="text-muted-foreground border-b px-3 py-2.5 text-sm font-medium">
+            Bank transactions
+          </h2>
           {lines.isPending ? (
             <div className="p-3">
               <Skeleton className="h-40 w-full rounded-xl" />

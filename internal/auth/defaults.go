@@ -41,6 +41,15 @@ var DefaultCategories = []defaultCategory{
 	{"Other Income", "coins", "#64748b", "income"},
 }
 
+// SeedDefaultAccount gives a new user a Cash account so quick-add works
+// immediately; they add bank accounts themselves.
+func SeedDefaultAccount(ctx context.Context, db repositories.DBTX, userID, currency string) error {
+	now := models.NowUTC()
+	_, err := db.ExecContext(ctx, `INSERT INTO accounts (user_id, id, name, type, currency, opening_balance, opening_balance_date, account_number, is_active, created_at, updated_at)
+		VALUES (?,?,?,?,?,0,?,'',1,?,?)`, userID, uuid.NewString(), "Cash", models.AccountCash, currency, models.Today(), now, now)
+	return err
+}
+
 // SeedDefaultCategories inserts the default categories for a user.
 func SeedDefaultCategories(ctx context.Context, db repositories.DBTX, userID string) error {
 	now := models.NowUTC()

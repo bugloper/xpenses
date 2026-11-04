@@ -110,7 +110,10 @@ export function PreviewStep({ value, onChange, duplicate, parseWarnings, textExt
         </Field>
         <Field>
           <FieldLabel htmlFor={`${id}-number`} className="text-xs">
-            Account number <span className="text-muted-foreground font-normal">({maskAccountNumber(statement.account_number) || '—'})</span>
+            Account number{' '}
+            <span className="text-muted-foreground font-normal">
+              ({maskAccountNumber(statement.account_number) || '—'})
+            </span>
           </FieldLabel>
           <Input
             id={`${id}-number`}
@@ -202,18 +205,28 @@ export function PreviewStep({ value, onChange, duplicate, parseWarnings, textExt
             aria-label="Skip duplicates"
           />
           Skip duplicates
-          {totals.duplicates > 0 && <span className="text-muted-foreground text-xs">({totals.duplicates})</span>}
+          {totals.duplicates > 0 && (
+            <span className="text-muted-foreground text-xs">({totals.duplicates})</span>
+          )}
         </label>
       </div>
 
       {rows.length === 0 ? (
-        <p className="text-muted-foreground py-6 text-center text-sm">No rows left. Nothing will be imported.</p>
+        <p className="text-muted-foreground py-6 text-center text-sm">
+          No rows left. Nothing will be imported.
+        </p>
       ) : desktop ? (
         <DesktopTable rows={rows} skipDuplicates={skipDuplicates} setRow={setRow} removeRow={removeRow} />
       ) : (
         <ul className="flex flex-col gap-2">
           {rows.map((r) => (
-            <MobileRow key={r._key} row={r} skipDuplicates={skipDuplicates} setRow={setRow} removeRow={removeRow} />
+            <MobileRow
+              key={r._key}
+              row={r}
+              skipDuplicates={skipDuplicates}
+              setRow={setRow}
+              removeRow={removeRow}
+            />
           ))}
         </ul>
       )}
@@ -224,8 +237,8 @@ export function PreviewStep({ value, onChange, duplicate, parseWarnings, textExt
         </span>
         {totals.duplicates > 0 && (
           <span>
-            <strong className="text-foreground">{totals.duplicates}</strong> duplicate{totals.duplicates === 1 ? '' : 's'}{' '}
-            {skipDuplicates ? 'skipped' : 'kept'}
+            <strong className="text-foreground">{totals.duplicates}</strong> duplicate
+            {totals.duplicates === 1 ? '' : 's'} {skipDuplicates ? 'skipped' : 'kept'}
           </span>
         )}
         {problems > 0 && (
@@ -259,7 +272,12 @@ export function ValidationBanner({
         balance_check === 'mismatch' && 'border-expense/40 bg-expense/5',
       )}
     >
-      <Icon className={cn(balance_check === 'ok' && 'text-income', balance_check === 'mismatch' && 'text-expense')} />
+      <Icon
+        className={cn(
+          balance_check === 'ok' && 'text-income',
+          balance_check === 'mismatch' && 'text-expense',
+        )}
+      />
       <AlertTitle>
         {balance_check === 'ok' && 'Balances check out'}
         {balance_check === 'mismatch' && (
@@ -272,7 +290,8 @@ export function ValidationBanner({
       <AlertDescription>
         {computed_closing !== null && (
           <span>
-            Opening + credits − debits = <Money minor={computed_closing} currency={currency} className="text-foreground" />.
+            Opening + credits − debits ={' '}
+            <Money minor={computed_closing} currency={currency} className="text-foreground" />.
           </span>
         )}
         {messages.length > 0 && (
@@ -341,7 +360,11 @@ function DesktopTable({
           {rows.map((r, i) => {
             const skipped = r.is_duplicate && skipDuplicates
             return (
-              <TableRow key={r._key} data-duplicate={r.is_duplicate || undefined} className={cn(skipped && 'opacity-50')}>
+              <TableRow
+                key={r._key}
+                data-duplicate={r.is_duplicate || undefined}
+                className={cn(skipped && 'opacity-50')}
+              >
                 <TableCell className="text-muted-foreground tabular">{i + 1}</TableCell>
                 <TableCell>
                   <Input
@@ -401,7 +424,13 @@ function DesktopTable({
                   />
                 </TableCell>
                 <TableCell>
-                  <Button type="button" variant="ghost" size="icon-sm" aria-label={`Delete row ${i + 1}`} onClick={() => removeRow(r._key)}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={`Delete row ${i + 1}`}
+                    onClick={() => removeRow(r._key)}
+                  >
                     <Trash2 className="text-muted-foreground" />
                   </Button>
                 </TableCell>
@@ -419,7 +448,10 @@ function MobileRow({ row: r, skipDuplicates, setRow, removeRow }: RowProps) {
   return (
     <li
       data-duplicate={r.is_duplicate || undefined}
-      className={cn('bg-card ring-foreground/10 flex flex-col gap-2 rounded-xl p-3 ring-1', skipped && 'opacity-50')}
+      className={cn(
+        'bg-card ring-foreground/10 flex flex-col gap-2 rounded-xl p-3 ring-1',
+        skipped && 'opacity-50',
+      )}
     >
       <div className="flex items-center gap-2">
         <Input
@@ -429,7 +461,13 @@ function MobileRow({ row: r, skipDuplicates, setRow, removeRow }: RowProps) {
           onChange={(e) => setRow(r._key, { transaction_date: e.target.value })}
           className="h-8 flex-1 text-sm"
         />
-        <Button type="button" variant="ghost" size="icon-sm" aria-label="Delete row" onClick={() => removeRow(r._key)}>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Delete row"
+          onClick={() => removeRow(r._key)}
+        >
           <Trash2 className="text-muted-foreground" />
         </Button>
       </div>
@@ -451,15 +489,30 @@ function MobileRow({ row: r, skipDuplicates, setRow, removeRow }: RowProps) {
       <div className="grid grid-cols-3 gap-2">
         <label className="flex flex-col gap-1 text-[11px]">
           <span className="text-expense">Debit</span>
-          <MinorInput value={r.debit} onCommit={(v) => setRow(r._key, { debit: v ?? 0 })} aria-label="Debit" />
+          <MinorInput
+            value={r.debit}
+            onCommit={(v) => setRow(r._key, { debit: v ?? 0 })}
+            aria-label="Debit"
+          />
         </label>
         <label className="flex flex-col gap-1 text-[11px]">
           <span className="text-income">Credit</span>
-          <MinorInput value={r.credit} onCommit={(v) => setRow(r._key, { credit: v ?? 0 })} aria-label="Credit" />
+          <MinorInput
+            value={r.credit}
+            onCommit={(v) => setRow(r._key, { credit: v ?? 0 })}
+            aria-label="Credit"
+          />
         </label>
         <label className="flex flex-col gap-1 text-[11px]">
           <span className="text-muted-foreground">Balance</span>
-          <MinorInput value={r.balance} nullable allowNegative placeholder="—" onCommit={(v) => setRow(r._key, { balance: v })} aria-label="Balance" />
+          <MinorInput
+            value={r.balance}
+            nullable
+            allowNegative
+            placeholder="—"
+            onCommit={(v) => setRow(r._key, { balance: v })}
+            aria-label="Balance"
+          />
         </label>
       </div>
       {r.is_duplicate && <DuplicateTag />}

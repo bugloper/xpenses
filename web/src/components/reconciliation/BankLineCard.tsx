@@ -47,7 +47,8 @@ export function BankLineCard({
   const [expanded, setExpanded] = useState(false)
   const side = bankSide(line)
   const suggestions = useMemo(
-    () => sortSuggestions(line.suggestions).filter((s) => !rejected.has(rejectKey(line.id, s.transaction_id))),
+    () =>
+      sortSuggestions(line.suggestions).filter((s) => !rejected.has(rejectKey(line.id, s.transaction_id))),
     [line.suggestions, line.id, rejected],
   )
   const top = suggestions[0]
@@ -103,9 +104,11 @@ export function BankLineCard({
           <span className="flex min-w-0 items-center gap-1.5">
             <Link2 className="text-muted-foreground size-3.5 shrink-0" />
             <span className="truncate">{transactionTitle(linked)}</span>
-            {linked.category_name && <span className="text-muted-foreground truncate">· {linked.category_name}</span>}
+            {linked.category_name && (
+              <span className="text-muted-foreground truncate">· {linked.category_name}</span>
+            )}
           </span>
-          <span className="text-muted-foreground shrink-0 tabular">
+          <span className="text-muted-foreground tabular shrink-0">
             {rec && ruleLabel(rec.rule)}
             {rec && rec.amount_diff !== 0 && (
               <>
@@ -117,11 +120,21 @@ export function BankLineCard({
           </span>
         </button>
       )}
-      {line.status === 'ignored' && rec?.note && <p className="text-muted-foreground text-xs italic">{rec.note}</p>}
+      {line.status === 'ignored' && rec?.note && (
+        <p className="text-muted-foreground text-xs italic">{rec.note}</p>
+      )}
 
       {line.status === 'unrecorded' && top && (
         <div className="flex flex-col gap-1.5">
-          <SuggestionRow s={top} currency={currency} busy={busy} onConfirm={() => h.onConfirm(top)} onAdjust={() => h.onAdjust(top)} onReject={() => h.onReject(top.transaction_id)} onFocus={() => h.onFocusManual(top.transaction_id)} />
+          <SuggestionRow
+            s={top}
+            currency={currency}
+            busy={busy}
+            onConfirm={() => h.onConfirm(top)}
+            onAdjust={() => h.onAdjust(top)}
+            onReject={() => h.onReject(top.transaction_id)}
+            onFocus={() => h.onFocusManual(top.transaction_id)}
+          />
           {rest.length > 0 && (
             <>
               <button
@@ -131,11 +144,22 @@ export function BankLineCard({
                 className="text-muted-foreground hover:text-foreground flex w-fit items-center gap-1 text-xs"
               >
                 <ChevronDown className={cn('size-3.5 transition-transform', expanded && 'rotate-180')} />
-                {expanded ? 'Fewer suggestions' : `${rest.length} more suggestion${rest.length === 1 ? '' : 's'}`}
+                {expanded
+                  ? 'Fewer suggestions'
+                  : `${rest.length} more suggestion${rest.length === 1 ? '' : 's'}`}
               </button>
               {expanded &&
                 rest.map((s) => (
-                  <SuggestionRow key={s.transaction_id} s={s} currency={currency} busy={busy} onConfirm={() => h.onConfirm(s)} onAdjust={() => h.onAdjust(s)} onReject={() => h.onReject(s.transaction_id)} onFocus={() => h.onFocusManual(s.transaction_id)} />
+                  <SuggestionRow
+                    key={s.transaction_id}
+                    s={s}
+                    currency={currency}
+                    busy={busy}
+                    onConfirm={() => h.onConfirm(s)}
+                    onAdjust={() => h.onAdjust(s)}
+                    onReject={() => h.onReject(s.transaction_id)}
+                    onFocus={() => h.onFocusManual(s.transaction_id)}
+                  />
                 ))}
             </>
           )}
@@ -170,7 +194,11 @@ export function BankLineCard({
         ) : (
           <Button type="button" size="xs" variant="ghost" disabled={busy} onClick={h.onUnmatch}>
             <Undo2 data-icon="inline-start" />
-            {line.status === 'ignored' ? 'Un-ignore' : line.status === 'transfer' ? 'Unlink transfer' : 'Unmatch'}
+            {line.status === 'ignored'
+              ? 'Un-ignore'
+              : line.status === 'transfer'
+                ? 'Unlink transfer'
+                : 'Unmatch'}
           </Button>
         )}
       </div>
@@ -204,18 +232,22 @@ function SuggestionRow({
       <div className="flex items-center gap-2">
         <ConfidencePill value={s.confidence} />
         <span className="text-muted-foreground truncate">{ruleLabel(s.rule)}</span>
-        <span className="ml-auto flex shrink-0 gap-2 tabular">
+        <span className="tabular ml-auto flex shrink-0 gap-2">
           {s.amount_diff !== 0 ? (
             <Money minor={s.amount_diff} currency={currency} sign="always" className="text-warning" />
           ) : (
             <span className="text-income">same amount</span>
           )}
-          <span className="text-muted-foreground">{s.date_diff_days === 0 ? 'same day' : `${s.date_diff_days}d`}</span>
+          <span className="text-muted-foreground">
+            {s.date_diff_days === 0 ? 'same day' : `${s.date_diff_days}d`}
+          </span>
         </span>
       </div>
       <button type="button" onClick={onFocus} className="truncate text-left font-medium hover:underline">
         {tx ? `${transactionTitle(tx)} · ${formatShortDate(tx.transaction_date)}` : s.transaction_id}
-        {tx?.category_name && <span className="text-muted-foreground font-normal"> · {tx.category_name}</span>}
+        {tx?.category_name && (
+          <span className="text-muted-foreground font-normal"> · {tx.category_name}</span>
+        )}
       </button>
       {s.reason && <p className="text-muted-foreground">{s.reason}</p>}
       <div className="flex flex-wrap gap-1.5">
@@ -223,11 +255,25 @@ function SuggestionRow({
           <Check data-icon="inline-start" /> Confirm
         </Button>
         {s.amount_diff !== 0 && (
-          <Button type="button" size="xs" variant="outline" disabled={busy} onClick={onAdjust} title="Match and record the difference as an adjustment">
+          <Button
+            type="button"
+            size="xs"
+            variant="outline"
+            disabled={busy}
+            onClick={onAdjust}
+            title="Match and record the difference as an adjustment"
+          >
             Confirm + adjust
           </Button>
         )}
-        <Button type="button" size="xs" variant="ghost" disabled={busy} onClick={onReject} aria-label="Reject suggestion">
+        <Button
+          type="button"
+          size="xs"
+          variant="ghost"
+          disabled={busy}
+          onClick={onReject}
+          aria-label="Reject suggestion"
+        >
           <X data-icon="inline-start" /> Reject
         </Button>
       </div>

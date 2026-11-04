@@ -137,8 +137,8 @@ func TestDataIsolationBetweenUsers(t *testing.T) {
 	_, tx := a.Do("POST", "/transactions", map[string]any{"type": "expense", "amount": 500, "account_id": aAcct, "category_id": a.Category("Food"), "transaction_date": "2026-11-01", "tags": []string{"shared"}})
 	aTx := testutil.Data(tx)["id"].(string)
 
-	// Bob sees nothing of Alice's.
-	if st, body := b.Do("GET", "/accounts", nil); st != 200 || len(testutil.List(body)) != 0 {
+	// Bob sees nothing of Alice's: only his own seeded Cash account.
+	if st, body := b.Do("GET", "/accounts", nil); st != 200 || len(testutil.List(body)) != 1 || testutil.List(body)[0].(map[string]any)["name"] != "Cash" {
 		t.Fatalf("bob accounts: %d %v", st, body)
 	}
 	if st, body := b.Do("GET", "/transactions", nil); st != 200 || len(body["data"].([]any)) != 0 {

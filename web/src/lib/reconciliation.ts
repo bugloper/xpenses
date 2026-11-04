@@ -11,7 +11,10 @@ export function confidenceTone(confidence: number): ConfidenceTone {
   return 'low'
 }
 
-export const RULE_LABELS: Record<SuggestionRule | 'manual' | 'transfer' | 'created' | 'adjustment' | 'ignored', string> = {
+export const RULE_LABELS: Record<
+  SuggestionRule | 'manual' | 'transfer' | 'created' | 'adjustment' | 'ignored',
+  string
+> = {
   exact_date: 'Same amount & date',
   date_tolerance: 'Same amount, nearby date',
   merchant_similarity: 'Similar merchant',
@@ -93,7 +96,12 @@ export type RankedCandidate<T> = {
  * Candidates on the wrong side (debit vs credit) sink to the bottom because the
  * server rejects them; they are kept so the user can see why nothing fits.
  */
-export function rankManualCandidates<T extends Pick<Transaction, 'id' | 'type' | 'amount' | 'account_id' | 'transfer_account_id' | 'transaction_date'>>(
+export function rankManualCandidates<
+  T extends Pick<
+    Transaction,
+    'id' | 'type' | 'amount' | 'account_id' | 'transfer_account_id' | 'transaction_date'
+  >,
+>(
   bank: Pick<BankTransaction, 'debit' | 'credit' | 'transaction_date' | 'account_id'>,
   candidates: ReadonlyArray<T>,
 ): RankedCandidate<T>[] {
@@ -151,7 +159,8 @@ export function rejectKey(bankId: string, transactionId: string): string {
 }
 
 export type BankStatusFilter = 'all' | 'unrecorded' | 'matched' | 'ignored' | 'transfer' | 'suggested'
-export type ManualStatusFilter = 'all' | 'unmatched' | 'matched' | 'possible_duplicate' | 'ignored' | 'transfer'
+export type ManualStatusFilter =
+  'all' | 'unmatched' | 'matched' | 'possible_duplicate' | 'ignored' | 'transfer'
 
 export function matchesSearch(haystack: ReadonlyArray<string | null | undefined>, q: string): boolean {
   const needle = q.trim().toLowerCase()
@@ -163,8 +172,25 @@ export function matchesSearch(haystack: ReadonlyArray<string | null | undefined>
 // noise/short tokens, Title Case. Used to prefill the payee when creating a
 // transaction from a bank line (the server applies the same rule if left blank).
 const NOISE = new Set([
-  'pos', 'upi', 'imps', 'neft', 'rtgs', 'txn', 'ref', 'mbob', 'trf', 'to', 'from', 'the', 'of', 'and',
-  'at', 'by', 'for', 'a', 'an',
+  'pos',
+  'upi',
+  'imps',
+  'neft',
+  'rtgs',
+  'txn',
+  'ref',
+  'mbob',
+  'trf',
+  'to',
+  'from',
+  'the',
+  'of',
+  'and',
+  'at',
+  'by',
+  'for',
+  'a',
+  'an',
 ])
 
 export function cleanDescription(desc: string): string {

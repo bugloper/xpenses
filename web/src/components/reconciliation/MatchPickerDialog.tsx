@@ -51,7 +51,12 @@ export function MatchPickerDialog({
         line && side ? (
           <>
             {line.description || 'Bank line'} · {formatShortDate(line.transaction_date)} ·{' '}
-            <Money minor={side.isDebit ? -side.amount : side.amount} currency={currency} tone="auto" sign="always" />
+            <Money
+              minor={side.isDebit ? -side.amount : side.amount}
+              currency={currency}
+              tone="auto"
+              sign="always"
+            />
           </>
         ) : undefined
       }
@@ -60,10 +65,18 @@ export function MatchPickerDialog({
       <div className="flex flex-col gap-3">
         <div className="relative">
           <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
-          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search payee, description, category" className="h-10 rounded-xl pl-9" aria-label="Search manual transactions" />
+          <Input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search payee, description, category"
+            className="h-10 rounded-xl pl-9"
+            aria-label="Search manual transactions"
+          />
         </div>
         {ranked.length === 0 ? (
-          <p className="text-muted-foreground py-8 text-center text-sm">No unmatched manual transactions on this account{q ? ' match your search' : ''}.</p>
+          <p className="text-muted-foreground py-8 text-center text-sm">
+            No unmatched manual transactions on this account{q ? ' match your search' : ''}.
+          </p>
         ) : (
           <ul className="flex flex-col gap-1.5" aria-label="Candidates">
             {ranked.map((c) => {
@@ -73,20 +86,43 @@ export function MatchPickerDialog({
                 <li
                   key={t.id}
                   data-candidate={t.id}
-                  className={cn('bg-muted/40 flex flex-col gap-2 rounded-xl p-3', disabledReason && 'opacity-60')}
+                  className={cn(
+                    'bg-muted/40 flex flex-col gap-2 rounded-xl p-3',
+                    disabledReason && 'opacity-60',
+                  )}
                 >
                   <div className="flex items-center gap-3">
-                    <CategoryIcon icon={t.category_icon} color={t.category_color} size="sm" kind={t.type === 'transfer' ? 'transfer' : t.type === 'adjustment' ? 'adjustment' : undefined} />
+                    <CategoryIcon
+                      icon={t.category_icon}
+                      color={t.category_color}
+                      size="sm"
+                      kind={
+                        t.type === 'transfer'
+                          ? 'transfer'
+                          : t.type === 'adjustment'
+                            ? 'adjustment'
+                            : undefined
+                      }
+                    />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">{transactionTitle(t)}</p>
                       <p className="text-muted-foreground truncate text-xs">
-                        {formatShortDate(t.transaction_date)} · {c.dateDiff === 0 ? 'same day' : `${c.dateDiff}d apart`}
+                        {formatShortDate(t.transaction_date)} ·{' '}
+                        {c.dateDiff === 0 ? 'same day' : `${c.dateDiff}d apart`}
                         {t.category_name && <> · {t.category_name}</>}
-                        {t.status === 'possible_duplicate' && <span className="text-expense"> · possible duplicate</span>}
+                        {t.status === 'possible_duplicate' && (
+                          <span className="text-expense"> · possible duplicate</span>
+                        )}
                       </p>
                     </div>
                     <div className="flex shrink-0 flex-col items-end">
-                      <Money minor={t.type === 'expense' ? -t.amount : t.amount} currency={t.currency} tone="auto" sign="always" className="text-sm font-semibold" />
+                      <Money
+                        minor={t.type === 'expense' ? -t.amount : t.amount}
+                        currency={t.currency}
+                        tone="auto"
+                        sign="always"
+                        className="text-sm font-semibold"
+                      />
                       {c.sameAmount ? (
                         <span className="text-income text-[11px]">same amount</span>
                       ) : (
@@ -104,7 +140,14 @@ export function MatchPickerDialog({
                         {c.sameAmount ? 'Match' : 'Match (keep difference)'}
                       </Button>
                       {!c.sameAmount && (
-                        <Button type="button" size="xs" variant="outline" disabled={busy} onClick={() => onAdjust(t.id)} title="Match and create an adjustment transaction for the difference">
+                        <Button
+                          type="button"
+                          size="xs"
+                          variant="outline"
+                          disabled={busy}
+                          onClick={() => onAdjust(t.id)}
+                          title="Match and create an adjustment transaction for the difference"
+                        >
                           Match with adjustment
                         </Button>
                       )}

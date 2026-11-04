@@ -140,3 +140,16 @@ export function relativeTime(iso: string): string {
 }
 
 export { addDays }
+
+/** "4 Nov 2026, 19:13" from an RFC3339 timestamp, in the viewer's local time. */
+export function formatDateTime(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return iso
+  return d.toLocaleString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}

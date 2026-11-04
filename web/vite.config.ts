@@ -52,6 +52,9 @@ export default defineConfig({
   resolve: { alias: { '@': path.resolve(import.meta.dirname, './src') } },
   server: {
     port: 5173,
+    // Fail loudly if another project holds 5173 instead of silently moving to
+    // 5174/5175, which makes "localhost:5173" open the wrong app.
+    strictPort: true,
     proxy: { '/api': { target: 'http://127.0.0.1:8080', changeOrigin: false } },
   },
   build: { outDir: 'dist', sourcemap: false },

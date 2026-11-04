@@ -1,7 +1,8 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Controller, useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod'
+import { ChevronUp, MoreHorizontal } from 'lucide-react'
 import { CategoryIcon } from '@/components/common/CategoryIcon'
 import { DateField } from '@/components/common/DateField'
 import { Segmented } from '@/components/common/Segmented'
@@ -105,6 +106,17 @@ export function fromTransaction(tx: Transaction): TransactionFormValues {
     notes: tx.notes,
     tags: (tx.tags ?? []).join(', '),
   }
+}
+
+const ACCOUNT_RANK: Record<string, number> = {
+  bank: 0,
+  cash: 1,
+  mobile_wallet: 2,
+  savings: 3,
+  credit_card: 4,
+}
+function rank(type: string) {
+  return ACCOUNT_RANK[type] ?? 9
 }
 
 export function defaultValues(preset: Partial<TransactionFormValues> = {}): TransactionFormValues {
@@ -218,6 +230,33 @@ export function TransactionForm({
   }, [categoryId, categoryType, categories, setValue])
 
   const activeAccounts = accounts.filter((a) => a.is_active || a.id === accountId)
+
+  // Quick entry must not stall on the account picker: when creating and no
+  // valid account is chosen, fall back to the remembered one, else the only
+  // active account, else the first active one (bank/cash first).
+  useEffect(() => {
+    if (mode !== 'create' || activeAccounts.length === 0) return
+    const valid = (id?: string) => !!id && activeAccounts.some((a) => a.id === id)
+    if (valid(accountId)) return
+    const last = getLastUsed(type).account_id
+    const preferred =
+      (valid(last) ? last : undefined) ??
+      [...activeAccounts].sort((a, b) => rank(a.type) - rank(b.type))[0]?.id
+    if (preferred) setValue('account_id', preferred, { shouldValidate: formState.isSubmitted })
+  }, [mode, activeAccounts, accountId, type, setValue, formState.isSubmitted])
+
+  const [showAllCategories, setShowAllCategories] = useState(false)
+  const COMPACT_COUNT = 8
+  const compactCategories = useMemo(() => {
+    if (showAllCategories || visibleCategories.length <= COMPACT_COUNT) return visibleCategories
+    const head = visibleCategories.slice(0, COMPACT_COUNT)
+    // Keep the selected category visible even when it sits further down the list.
+    if (categoryId && !head.some((c) => c.id === categoryId)) {
+      const selected = visibleCategories.find((c) => c.id === categoryId)
+      if (selected) return [...head.slice(0, COMPACT_COUNT - 1), selected]
+    }
+    return head
+  }, [showAllCategories, visibleCategories, categoryId])
   const tone = type === 'expense' ? 'expense' : type === 'income' || type === 'refund' ? 'income' : 'neutral'
 
   const submit = (addAnother: boolean) =>
@@ -323,7 +362,7 @@ export function TransactionForm({
                   role="radiogroup"
                   aria-label="Category"
                 >
-                  {visibleCategories.map((c) => {
+                  {compactCategories.map((c) => {
                     const active = field.value === c.id
                     return (
                       <button
@@ -344,6 +383,21 @@ export function TransactionForm({
                       </button>
                     )
                   })}
+                  {visibleCategories.length > COMPACT_COUNT && (
+                    <button
+                      type="button"
+                      onClick={() => setShowAllCategories((v) => !v)}
+                      className="bg-muted/50 hover:bg-muted text-muted-foreground flex flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-transparent p-2 text-center text-[11px] font-medium"
+                      aria-expanded={showAllCategories}
+                    >
+                      {showAllCategories ? (
+                        <ChevronUp className="size-5" />
+                      ) : (
+                        <MoreHorizontal className="size-5" />
+                      )}
+                      {showAllCategories ? 'Less' : `All ${visibleCategories.length}`}
+                    </button>
+                  )}
                 </div>
               )}
               <FieldError errors={[err.category_id]} />

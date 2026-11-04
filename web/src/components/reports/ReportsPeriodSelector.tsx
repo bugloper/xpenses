@@ -13,7 +13,11 @@ export function ReportsPeriodSelector({
   onChange: (preset: ReportPeriodPreset, range: DateRange) => void
 }) {
   return (
-    <div className="-mx-4 flex scrollbar-none items-center gap-2 overflow-x-auto px-4 lg:mx-0 lg:px-0" role="group" aria-label="Report period">
+    <div
+      className="-mx-4 flex scrollbar-none items-center gap-2 overflow-x-auto px-4 lg:mx-0 lg:px-0"
+      role="group"
+      aria-label="Report period"
+    >
       {REPORT_PRESETS.map((p) => (
         <button
           key={p.value}
@@ -22,7 +26,9 @@ export function ReportsPeriodSelector({
           onClick={() => onChange(p.value, reportPresetRange(p.value))}
           className={cn(
             'h-9 shrink-0 rounded-full border px-3.5 text-sm font-medium transition-colors',
-            preset === p.value ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:bg-muted hover:text-foreground',
+            preset === p.value
+              ? 'border-primary bg-primary/10 text-primary'
+              : 'border-border text-muted-foreground hover:bg-muted hover:text-foreground',
           )}
         >
           {p.label}
@@ -32,7 +38,10 @@ export function ReportsPeriodSelector({
         value={preset === 'custom' ? range : null}
         placeholder="Custom"
         onChange={(r) => (r ? onChange('custom', r) : onChange('month', reportPresetRange('month')))}
-        className={cn('h-9 shrink-0 rounded-full', preset === 'custom' && 'border-primary bg-primary/10 text-primary')}
+        className={cn(
+          'h-9 shrink-0 rounded-full',
+          preset === 'custom' && 'border-primary bg-primary/10 text-primary',
+        )}
       />
       <span className="sr-only">{rangeLabel(range)}</span>
     </div>

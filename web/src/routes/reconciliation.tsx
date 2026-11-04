@@ -16,7 +16,10 @@ function ReconciliationPage() {
   const { data, isPending, error, refetch } = useReconciliationOverview()
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="Reconciliation" description="Match bank statement lines against your manual transactions." />
+      <PageHeader
+        title="Reconciliation"
+        description="Match bank statement lines against your manual transactions."
+      />
       {isPending ? (
         <ListSkeleton rows={4} />
       ) : error ? (
@@ -58,11 +61,21 @@ function ReconciliationPage() {
                           {s.account_name} · {rangeLabel({ from: s.period_start, to: s.period_end })}
                         </p>
                       </div>
-                      <span className={cn('flex shrink-0 items-center gap-1 text-xs font-medium', s.unrecorded > 0 ? 'text-warning' : 'text-income')}>
-                        {s.unrecorded > 0 ? `${s.unrecorded} to review` : 'Complete'} <ArrowRight className="size-3.5" />
+                      <span
+                        className={cn(
+                          'flex shrink-0 items-center gap-1 text-xs font-medium',
+                          s.unrecorded > 0 ? 'text-warning' : 'text-income',
+                        )}
+                      >
+                        {s.unrecorded > 0 ? `${s.unrecorded} to review` : 'Complete'}{' '}
+                        <ArrowRight className="size-3.5" />
                       </span>
                     </div>
-                    <ReconciliationProgress matched={s.matched + s.transfer} ignored={s.ignored} unmatched={s.unrecorded} />
+                    <ReconciliationProgress
+                      matched={s.matched + s.transfer}
+                      ignored={s.ignored}
+                      unmatched={s.unrecorded}
+                    />
                     <p className="text-muted-foreground text-[11px]">
                       {s.total} line{s.total === 1 ? '' : 's'}
                       {s.transfer > 0 && ` · ${s.transfer} transfer${s.transfer === 1 ? '' : 's'}`}
@@ -81,7 +94,9 @@ function ReconciliationPage() {
 function GlobalCount({ label, value }: { label: string; value: number }) {
   return (
     <div className="bg-card ring-foreground/10 flex flex-col rounded-2xl px-4 py-3 ring-1">
-      <span className={cn('tabular text-2xl font-semibold', value > 0 ? 'text-warning' : 'text-income')}>{value}</span>
+      <span className={cn('tabular text-2xl font-semibold', value > 0 ? 'text-warning' : 'text-income')}>
+        {value}
+      </span>
       <span className="text-muted-foreground text-xs">{label}</span>
     </div>
   )

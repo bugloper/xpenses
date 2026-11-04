@@ -2,7 +2,16 @@ import { test, expect } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import { createAccount, loginAs } from './helpers'
 
-const PAGES = ['/', '/transactions', '/accounts', '/categories', '/statements', '/reconciliation', '/reports', '/settings']
+const PAGES = [
+  '/',
+  '/transactions',
+  '/accounts',
+  '/categories',
+  '/statements',
+  '/reconciliation',
+  '/reports',
+  '/settings',
+]
 
 test.describe('accessibility', () => {
   test.beforeEach(async ({ page }) => {
@@ -18,7 +27,13 @@ test.describe('accessibility', () => {
       const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze()
       const blocking = results.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical')
       expect(
-        blocking.map((v) => `${v.id} (${v.impact}): ${v.nodes.map((n) => n.target.join(' ')).slice(0, 3).join(', ')}`),
+        blocking.map(
+          (v) =>
+            `${v.id} (${v.impact}): ${v.nodes
+              .map((n) => n.target.join(' '))
+              .slice(0, 3)
+              .join(', ')}`,
+        ),
       ).toEqual([])
     })
   }

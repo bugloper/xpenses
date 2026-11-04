@@ -2,7 +2,31 @@ import { useEffect } from 'react'
 import { toast } from 'sonner'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 
+/**
+ * In development Vite serves no service worker (devOptions is off), so
+ * registering would fetch index.html as a script. Worse, a production worker
+ * left behind on the same origin (e.g. from `vite preview`) would keep serving
+ * stale precached assets. Dev therefore unregisters everything instead.
+ */
 export function PwaUpdatePrompt() {
+  if (import.meta.env.DEV) return <DevServiceWorkerCleanup />
+  return <ProdUpdatePrompt />
+}
+
+function DevServiceWorkerCleanup() {
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return
+    void navigator.serviceWorker.getRegistrations().then((regs) => {
+      regs.forEach((r) => void r.unregister())
+    })
+    if (typeof caches !== 'undefined') {
+      void caches.keys().then((keys) => keys.forEach((k) => void caches.delete(k)))
+    }
+  }, [])
+  return null
+}
+
+function ProdUpdatePrompt() {
   const {
     needRefresh: [needRefresh, setNeedRefresh],
     updateServiceWorker,

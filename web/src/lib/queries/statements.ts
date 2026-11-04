@@ -27,8 +27,7 @@ export function useStatement(id: string) {
 export function useStatementTransactions(id: string) {
   return useQuery({
     queryKey: keys.statements.transactions(id),
-    queryFn: ({ signal }) =>
-      api.get<BankTransactionWithStatus[]>(`/statements/${id}/transactions`, signal),
+    queryFn: ({ signal }) => api.get<BankTransactionWithStatus[]>(`/statements/${id}/transactions`, signal),
     enabled: !!id,
   })
 }

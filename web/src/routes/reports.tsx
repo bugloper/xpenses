@@ -14,11 +14,25 @@ import { SpendingTab } from '@/components/reports/SpendingTab'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { currentMonth, rangeLabel, rangeMonth } from '@/lib/dates'
 import { useDefaultCurrency, useStatements } from '@/lib/queries'
-import { defaultGranularity, isMonth, periodSearch, resolveReportRange, type ExportParams } from '@/lib/reports'
+import {
+  defaultGranularity,
+  isMonth,
+  periodSearch,
+  resolveReportRange,
+  type ExportParams,
+} from '@/lib/reports'
 import type { ExportReport } from '@/types/api'
 import { appRoute } from './__root'
 
-const TABS = ['overview', 'categories', 'spending', 'merchants', 'accounts', 'budgets', 'reconciliation'] as const
+const TABS = [
+  'overview',
+  'categories',
+  'spending',
+  'merchants',
+  'accounts',
+  'budgets',
+  'reconciliation',
+] as const
 type Tab = (typeof TABS)[number]
 const TAB_LABELS: Record<Tab, string> = {
   overview: 'Overview',
@@ -66,7 +80,8 @@ function ReportsPage() {
   const statements = useStatements()
   const statementId = search.statement ?? statements.data?.[0]?.id
 
-  const patch = (p: Partial<ReportsSearchParams>) => void navigate({ search: (s) => ({ ...s, ...p }), replace: true })
+  const patch = (p: Partial<ReportsSearchParams>) =>
+    void navigate({ search: (s) => ({ ...s, ...p }), replace: true })
 
   const exportParams: ExportParams = {
     from: range.from,
@@ -82,12 +97,26 @@ function ReportsPage() {
     <div className="flex flex-col gap-5">
       <PageHeader
         title="Reports"
-        description={periodless ? (tab === 'budgets' ? 'Monthly budgets' : 'Statement reconciliation') : rangeLabel(range)}
-        actions={<ExportButtons report={TAB_REPORT[tab]} params={exportParams} disabled={tab === 'reconciliation' && !statementId} />}
+        description={
+          periodless
+            ? tab === 'budgets'
+              ? 'Monthly budgets'
+              : 'Statement reconciliation'
+            : rangeLabel(range)
+        }
+        actions={
+          <ExportButtons
+            report={TAB_REPORT[tab]}
+            params={exportParams}
+            disabled={tab === 'reconciliation' && !statementId}
+          />
+        }
       />
-      {!periodless && <ReportsPeriodSelector preset={preset} range={range} onChange={(p, r) => patch(periodSearch(p, r))} />}
+      {!periodless && (
+        <ReportsPeriodSelector preset={preset} range={range} onChange={(p, r) => patch(periodSearch(p, r))} />
+      )}
       <Tabs value={tab} onValueChange={(v) => patch({ tab: v === 'overview' ? undefined : (v as Tab) })}>
-        <div className="-mx-4 overflow-x-auto px-4 scrollbar-none lg:mx-0 lg:px-0">
+        <div className="-mx-4 scrollbar-none overflow-x-auto px-4 lg:mx-0 lg:px-0">
           <TabsList aria-label="Report" className="w-max min-w-full lg:w-fit lg:min-w-0">
             {TABS.map((t) => (
               <TabsTrigger key={t} value={t} className="px-3">
@@ -97,25 +126,65 @@ function ReportsPage() {
           </TabsList>
         </div>
         <TabsContent value="overview" className="mt-2">
-          {tab === 'overview' && <OverviewTab range={range} granularity={granularity} onGranularity={(g) => patch({ gran: g })} currency={currency} />}
+          {tab === 'overview' && (
+            <OverviewTab
+              range={range}
+              granularity={granularity}
+              onGranularity={(g) => patch({ gran: g })}
+              currency={currency}
+            />
+          )}
         </TabsContent>
         <TabsContent value="categories" className="mt-2">
-          {tab === 'categories' && <CategoriesTab range={range} type={type} onType={(t) => patch({ type: t === 'expense' ? undefined : t })} currency={currency} />}
+          {tab === 'categories' && (
+            <CategoriesTab
+              range={range}
+              type={type}
+              onType={(t) => patch({ type: t === 'expense' ? undefined : t })}
+              currency={currency}
+            />
+          )}
         </TabsContent>
         <TabsContent value="spending" className="mt-2">
-          {tab === 'spending' && <SpendingTab range={range} granularity={spend} onGranularity={(g) => patch({ spend: g === 'day' ? undefined : g })} currency={currency} />}
+          {tab === 'spending' && (
+            <SpendingTab
+              range={range}
+              granularity={spend}
+              onGranularity={(g) => patch({ spend: g === 'day' ? undefined : g })}
+              currency={currency}
+            />
+          )}
         </TabsContent>
         <TabsContent value="merchants" className="mt-2">
-          {tab === 'merchants' && <MerchantsTab range={range} type={type} onType={(t) => patch({ type: t === 'expense' ? undefined : t })} currency={currency} />}
+          {tab === 'merchants' && (
+            <MerchantsTab
+              range={range}
+              type={type}
+              onType={(t) => patch({ type: t === 'expense' ? undefined : t })}
+              currency={currency}
+            />
+          )}
         </TabsContent>
         <TabsContent value="accounts" className="mt-2">
           {tab === 'accounts' && <AccountsTab range={range} />}
         </TabsContent>
         <TabsContent value="budgets" className="mt-2">
-          {tab === 'budgets' && <BudgetsTab month={month} onMonth={(m) => patch({ month: m === currentMonth() ? undefined : m })} currency={currency} />}
+          {tab === 'budgets' && (
+            <BudgetsTab
+              month={month}
+              onMonth={(m) => patch({ month: m === currentMonth() ? undefined : m })}
+              currency={currency}
+            />
+          )}
         </TabsContent>
         <TabsContent value="reconciliation" className="mt-2">
-          {tab === 'reconciliation' && <ReconciliationTab statementId={statementId} onStatement={(id) => patch({ statement: id })} currency={currency} />}
+          {tab === 'reconciliation' && (
+            <ReconciliationTab
+              statementId={statementId}
+              onStatement={(id) => patch({ statement: id })}
+              currency={currency}
+            />
+          )}
         </TabsContent>
       </Tabs>
     </div>

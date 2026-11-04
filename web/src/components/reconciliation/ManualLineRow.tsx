@@ -46,7 +46,10 @@ export function ManualLineRow({
       <button
         type="button"
         onClick={onSelect}
-        className={cn('flex w-full items-center gap-3 text-left', linked ? 'cursor-pointer' : 'cursor-default')}
+        className={cn(
+          'flex w-full items-center gap-3 text-left',
+          linked ? 'cursor-pointer' : 'cursor-default',
+        )}
         title={linked ? 'Show the matched bank line' : undefined}
       >
         <CategoryIcon
@@ -64,7 +67,13 @@ export function ManualLineRow({
           </p>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
-          <Money minor={amount} currency={line.currency} tone="auto" sign="always" className="text-sm font-semibold" />
+          <Money
+            minor={amount}
+            currency={line.currency}
+            tone="auto"
+            sign="always"
+            className="text-sm font-semibold"
+          />
           <ManualStatusBadge status={line.status} />
         </div>
       </button>
@@ -79,7 +88,12 @@ export function ManualLineRow({
       )}
       {(line.status === 'unmatched' || line.status === 'possible_duplicate') && (
         <div className="flex flex-wrap gap-1.5">
-          <Button type="button" size="xs" variant="outline" onClick={() => onFindInBank(side?.amount ?? line.amount)}>
+          <Button
+            type="button"
+            size="xs"
+            variant="outline"
+            onClick={() => onFindInBank(side?.amount ?? line.amount)}
+          >
             <Search data-icon="inline-start" /> Find in bank
           </Button>
           <Button type="button" size="xs" variant="ghost" asChild>

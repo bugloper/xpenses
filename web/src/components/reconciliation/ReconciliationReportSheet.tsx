@@ -13,7 +13,13 @@ import { transactionTitle } from '@/lib/transactions'
 import { cn } from '@/lib/utils'
 import type { ExportFormat } from '@/types/api'
 
-export function ReconciliationExportButtons({ statementId, size = 'sm' }: { statementId: string; size?: 'sm' | 'xs' }) {
+export function ReconciliationExportButtons({
+  statementId,
+  size = 'sm',
+}: {
+  statementId: string
+  size?: 'sm' | 'xs'
+}) {
   const run = async (format: ExportFormat) => {
     try {
       await downloadFile(
@@ -46,7 +52,13 @@ function Stat({ label, value, className }: { label: string; value: React.ReactNo
 }
 
 /** Inline report body; reused by the workspace sheet and the Reports tab. */
-export function ReconciliationReportView({ statementId, currency }: { statementId: string; currency: string }) {
+export function ReconciliationReportView({
+  statementId,
+  currency,
+}: {
+  statementId: string
+  currency: string
+}) {
   const { data, isPending, error, refetch } = useReconciliationReport(statementId)
   if (isPending) return <Skeleton className="h-64 w-full rounded-xl" />
   if (error) return <ErrorState error={error} onRetry={() => void refetch()} compact />
@@ -56,20 +68,47 @@ export function ReconciliationReportView({ statementId, currency }: { statementI
     <div className="flex flex-col gap-5">
       <div>
         <p className="font-medium">{r.statement.file_name}</p>
-        <p className="text-muted-foreground text-xs">{rangeLabel({ from: r.statement.period_start, to: r.statement.period_end })}</p>
+        <p className="text-muted-foreground text-xs">
+          {rangeLabel({ from: r.statement.period_start, to: r.statement.period_end })}
+        </p>
       </div>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-        <Stat label="Statement debits" value={<Money minor={-r.total_debits} currency={currency} tone="expense" />} />
-        <Stat label="Statement credits" value={<Money minor={r.total_credits} currency={currency} tone="income" sign="always" />} />
+        <Stat
+          label="Statement debits"
+          value={<Money minor={-r.total_debits} currency={currency} tone="expense" />}
+        />
+        <Stat
+          label="Statement credits"
+          value={<Money minor={r.total_credits} currency={currency} tone="income" sign="always" />}
+        />
         <Stat label="Matched" value={r.matched} />
-        <Stat label="Manual expenses" value={<Money minor={-r.manual_expenses} currency={currency} tone="expense" />} />
-        <Stat label="Manual income" value={<Money minor={r.manual_income} currency={currency} tone="income" sign="always" />} />
-        <Stat label="Discrepancies" value={r.amount_discrepancies.length} className={r.amount_discrepancies.length ? 'text-warning' : ''} />
+        <Stat
+          label="Manual expenses"
+          value={<Money minor={-r.manual_expenses} currency={currency} tone="expense" />}
+        />
+        <Stat
+          label="Manual income"
+          value={<Money minor={r.manual_income} currency={currency} tone="income" sign="always" />}
+        />
+        <Stat
+          label="Discrepancies"
+          value={r.amount_discrepancies.length}
+          className={r.amount_discrepancies.length ? 'text-warning' : ''}
+        />
       </div>
 
-      <section className={cn('rounded-xl border px-3 py-2.5 text-sm', b.verified ? 'border-income/40 bg-income/5' : 'border-warning/40 bg-warning/5')}>
+      <section
+        className={cn(
+          'rounded-xl border px-3 py-2.5 text-sm',
+          b.verified ? 'border-income/40 bg-income/5' : 'border-warning/40 bg-warning/5',
+        )}
+      >
         <p className="flex items-center gap-1.5 font-medium">
-          {b.verified ? <CheckCircle2 className="text-income size-4" /> : <CircleAlert className="text-warning size-4" />}
+          {b.verified ? (
+            <CheckCircle2 className="text-income size-4" />
+          ) : (
+            <CircleAlert className="text-warning size-4" />
+          )}
           {b.verified ? 'Closing balance verified' : 'Closing balance not verified'}
         </p>
         <p className="text-muted-foreground mt-1 text-xs">
@@ -87,9 +126,16 @@ export function ReconciliationReportView({ statementId, currency }: { statementI
             {r.unrecorded_bank.map((t) => (
               <li key={t.id} className="flex items-center justify-between gap-3 py-1.5">
                 <span className="min-w-0 truncate">
-                  <span className="text-muted-foreground">{formatShortDate(t.transaction_date)}</span> {t.description}
+                  <span className="text-muted-foreground">{formatShortDate(t.transaction_date)}</span>{' '}
+                  {t.description}
                 </span>
-                <Money minor={t.debit > 0 ? -t.debit : t.credit} currency={currency} tone="auto" sign="always" className="shrink-0" />
+                <Money
+                  minor={t.debit > 0 ? -t.debit : t.credit}
+                  currency={currency}
+                  tone="auto"
+                  sign="always"
+                  className="shrink-0"
+                />
               </li>
             ))}
           </ul>
@@ -104,9 +150,16 @@ export function ReconciliationReportView({ statementId, currency }: { statementI
             {r.unmatched_manual.map((t) => (
               <li key={t.id} className="flex items-center justify-between gap-3 py-1.5">
                 <span className="min-w-0 truncate">
-                  <span className="text-muted-foreground">{formatShortDate(t.transaction_date)}</span> {transactionTitle(t)}
+                  <span className="text-muted-foreground">{formatShortDate(t.transaction_date)}</span>{' '}
+                  {transactionTitle(t)}
                 </span>
-                <Money minor={t.type === 'expense' ? -t.amount : t.amount} currency={t.currency} tone="auto" sign="always" className="shrink-0" />
+                <Money
+                  minor={t.type === 'expense' ? -t.amount : t.amount}
+                  currency={t.currency}
+                  tone="auto"
+                  sign="always"
+                  className="shrink-0"
+                />
               </li>
             ))}
           </ul>
@@ -123,7 +176,12 @@ export function ReconciliationReportView({ statementId, currency }: { statementI
                 <span className="min-w-0 truncate">
                   {d.bank_transaction.description} ↔ {transactionTitle(d.transaction)}
                 </span>
-                <Money minor={d.difference} currency={currency} sign="always" className="text-warning shrink-0" />
+                <Money
+                  minor={d.difference}
+                  currency={currency}
+                  sign="always"
+                  className="text-warning shrink-0"
+                />
               </li>
             ))}
           </ul>
@@ -165,7 +223,11 @@ export function ReconciliationReportSheet({
       desktopWidth="sm:max-w-xl"
       footer={<ReconciliationExportButtons statementId={statementId} />}
     >
-      {open ? <ReconciliationReportView statementId={statementId} currency={currency} /> : <EmptyState title="" />}
+      {open ? (
+        <ReconciliationReportView statementId={statementId} currency={currency} />
+      ) : (
+        <EmptyState title="" />
+      )}
     </ResponsiveSheet>
   )
 }

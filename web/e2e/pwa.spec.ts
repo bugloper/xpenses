@@ -18,7 +18,11 @@ test.describe('PWA', () => {
     const res = await page.request.get(href!)
     expect(res.status()).toBe(200)
     expect(res.headers()['content-type']).toContain('application/manifest+json')
-    const manifest = (await res.json()) as { name: string; display: string; icons: Array<{ sizes: string; purpose?: string }> }
+    const manifest = (await res.json()) as {
+      name: string
+      display: string
+      icons: Array<{ sizes: string; purpose?: string }>
+    }
     expect(manifest.name).toBe('Xpensiv')
     expect(manifest.display).toBe('standalone')
     expect(manifest.icons.some((i) => i.sizes === '512x512' && i.purpose === 'maskable')).toBe(true)
@@ -87,7 +91,9 @@ test.describe('PWA', () => {
     const install = page.getByRole('button', { name: 'Install app' })
     await expect(install).toBeVisible()
     await install.click()
-    await expect.poll(() => page.evaluate(() => (window as unknown as { __installCalls: number }).__installCalls)).toBe(1)
+    await expect
+      .poll(() => page.evaluate(() => (window as unknown as { __installCalls: number }).__installCalls))
+      .toBe(1)
     await expect(page.getByText('Installed')).toBeVisible()
   })
 })

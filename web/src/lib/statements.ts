@@ -175,7 +175,9 @@ export function recomputeValidation(
 }
 
 /** Totals for the preview footer. */
-export function previewTotals(rows: ReadonlyArray<Pick<PreviewTransaction, 'debit' | 'credit' | 'is_duplicate'>>) {
+export function previewTotals(
+  rows: ReadonlyArray<Pick<PreviewTransaction, 'debit' | 'credit' | 'is_duplicate'>>,
+) {
   let debits = 0
   let credits = 0
   let duplicates = 0

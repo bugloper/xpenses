@@ -26,7 +26,8 @@ export function MinorInput({
   'aria-label'?: string
   placeholder?: string
 }) {
-  const external = value === null ? '' : value === 0 && nullable ? '0.00' : value === 0 ? '' : minorToDecimalString(value)
+  const external =
+    value === null ? '' : value === 0 && nullable ? '0.00' : value === 0 ? '' : minorToDecimalString(value)
   const [draft, setDraft] = useState(external)
   const [invalid, setInvalid] = useState(false)
   // Resync the draft when the committed value changes from outside (row reset, undo).

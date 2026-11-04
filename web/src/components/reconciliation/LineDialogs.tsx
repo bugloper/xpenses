@@ -13,7 +13,14 @@ import { formatShortDate } from '@/lib/dates'
 import { bankSide, cleanDescription, rankManualCandidates } from '@/lib/reconciliation'
 import { transactionTitle } from '@/lib/transactions'
 import { cn } from '@/lib/utils'
-import type { Account, BankLine, Category, CreateFromBankRequest, ManualLine, MarkTransferRequest } from '@/types/api'
+import type {
+  Account,
+  BankLine,
+  Category,
+  CreateFromBankRequest,
+  ManualLine,
+  MarkTransferRequest,
+} from '@/types/api'
 
 function LineSummary({ line, currency }: { line: BankLine; currency: string }) {
   const side = bankSide(line)
@@ -26,7 +33,13 @@ function LineSummary({ line, currency }: { line: BankLine; currency: string }) {
           {line.reference && ` · ${line.reference}`}
         </p>
       </div>
-      <Money minor={side.isDebit ? -side.amount : side.amount} currency={currency} tone="auto" sign="always" className="shrink-0 font-semibold" />
+      <Money
+        minor={side.isDebit ? -side.amount : side.amount}
+        currency={currency}
+        tone="auto"
+        sign="always"
+        className="shrink-0 font-semibold"
+      />
     </div>
   )
 }
@@ -71,7 +84,14 @@ export function IgnoreDialog({
         {line && <LineSummary line={line} currency={currency} />}
         <Field>
           <FieldLabel htmlFor="ignore-note">Note (optional)</FieldLabel>
-          <Textarea id="ignore-note" value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} rows={3} placeholder="e.g. monthly SMS charge" />
+          <Textarea
+            id="ignore-note"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            maxLength={500}
+            rows={3}
+            placeholder="e.g. monthly SMS charge"
+          />
         </Field>
       </div>
     </ResponsiveSheet>
@@ -125,7 +145,13 @@ export function MarkTransferDialog({
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>
               Cancel
             </Button>
-            <Button type="button" disabled={busy || !line || !otherAccount} onClick={() => line && onConfirm({ bank_transaction_id: line.id, transfer_account_id: otherAccount })}>
+            <Button
+              type="button"
+              disabled={busy || !line || !otherAccount}
+              onClick={() =>
+                line && onConfirm({ bank_transaction_id: line.id, transfer_account_id: otherAccount })
+              }
+            >
               Create transfer
             </Button>
           </div>
@@ -139,32 +165,52 @@ export function MarkTransferDialog({
           value={mode}
           onChange={setMode}
           options={[
-            { value: 'existing', label: `Existing transfer${transfers.length ? ` (${transfers.length})` : ''}` },
+            {
+              value: 'existing',
+              label: `Existing transfer${transfers.length ? ` (${transfers.length})` : ''}`,
+            },
             { value: 'new', label: 'Create new' },
           ]}
         />
         {mode === 'existing' ? (
           ranked.length === 0 ? (
-            <p className="text-muted-foreground py-6 text-center text-sm">No unmatched transfers on this account in the statement window. Create one instead.</p>
+            <p className="text-muted-foreground py-6 text-center text-sm">
+              No unmatched transfers on this account in the statement window. Create one instead.
+            </p>
           ) : (
             <ul className="flex flex-col gap-1.5">
               {ranked.map((c) => (
-                <li key={c.tx.id} className={cn('bg-muted/40 flex items-center gap-3 rounded-xl p-3', !c.sameDirection && 'opacity-60')}>
+                <li
+                  key={c.tx.id}
+                  className={cn(
+                    'bg-muted/40 flex items-center gap-3 rounded-xl p-3',
+                    !c.sameDirection && 'opacity-60',
+                  )}
+                >
                   <CategoryIcon kind="transfer" size="sm" />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{transactionTitle(c.tx)}</p>
                     <p className="text-muted-foreground text-xs">
-                      {formatShortDate(c.tx.transaction_date)} · {c.dateDiff === 0 ? 'same day' : `${c.dateDiff}d apart`}
+                      {formatShortDate(c.tx.transaction_date)} ·{' '}
+                      {c.dateDiff === 0 ? 'same day' : `${c.dateDiff}d apart`}
                       {!c.sameAmount && (
                         <>
-                          {' '}· diff <Money minor={c.amountDiff} currency={currency} sign="always" />
+                          {' '}
+                          · diff <Money minor={c.amountDiff} currency={currency} sign="always" />
                         </>
                       )}
                       {!c.sameDirection && ' · opposite direction'}
                     </p>
                   </div>
                   <Money minor={c.tx.amount} currency={c.tx.currency} className="text-sm font-semibold" />
-                  <Button type="button" size="xs" disabled={busy || !c.sameDirection} onClick={() => line && onConfirm({ bank_transaction_id: line.id, transaction_id: c.tx.id })}>
+                  <Button
+                    type="button"
+                    size="xs"
+                    disabled={busy || !c.sameDirection}
+                    onClick={() =>
+                      line && onConfirm({ bank_transaction_id: line.id, transaction_id: c.tx.id })
+                    }
+                  >
                     Link
                   </Button>
                 </li>
@@ -173,7 +219,9 @@ export function MarkTransferDialog({
           )
         ) : (
           <Field>
-            <FieldLabel htmlFor="transfer-other">{side?.isDebit ? 'Money went to' : 'Money came from'}</FieldLabel>
+            <FieldLabel htmlFor="transfer-other">
+              {side?.isDebit ? 'Money went to' : 'Money came from'}
+            </FieldLabel>
             <Select value={otherAccount} onValueChange={setOtherAccount}>
               <SelectTrigger id="transfer-other" className="w-full">
                 <SelectValue placeholder="Select the other account" />
@@ -219,9 +267,23 @@ export function CreateFromBankDialog({
   onConfirm: (body: CreateFromBankRequest) => void
 }) {
   return (
-    <ResponsiveSheet open={open} onOpenChange={onOpenChange} title="Create transaction" description="Records this bank line as a transaction and matches it." desktopWidth="sm:max-w-lg">
+    <ResponsiveSheet
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Create transaction"
+      description="Records this bank line as a transaction and matches it."
+      desktopWidth="sm:max-w-lg"
+    >
       {open && line && (
-        <CreateForm key={line.id} line={line} categories={categories} currency={currency} busy={busy} onConfirm={onConfirm} onCancel={() => onOpenChange(false)} />
+        <CreateForm
+          key={line.id}
+          line={line}
+          categories={categories}
+          currency={currency}
+          busy={busy}
+          onConfirm={onConfirm}
+          onCancel={() => onOpenChange(false)}
+        />
       )}
     </ResponsiveSheet>
   )
@@ -266,7 +328,8 @@ function CreateForm({
       <LineSummary line={line} currency={currency} />
       <p className="text-muted-foreground text-xs">
         Creates {wanted === 'expense' ? 'an expense' : 'an income'} of{' '}
-        <Money minor={side.amount} currency={currency} className="text-foreground" /> on {formatShortDate(line.transaction_date)}.
+        <Money minor={side.amount} currency={currency} className="text-foreground" /> on{' '}
+        {formatShortDate(line.transaction_date)}.
       </p>
       <Field>
         <FieldLabel>Category</FieldLabel>
@@ -302,11 +365,22 @@ function CreateForm({
       </Field>
       <Field>
         <FieldLabel htmlFor="create-description">Description</FieldLabel>
-        <Input id="create-description" value={description} maxLength={500} onChange={(e) => setDescription(e.target.value)} />
+        <Input
+          id="create-description"
+          value={description}
+          maxLength={500}
+          onChange={(e) => setDescription(e.target.value)}
+        />
       </Field>
       <Field>
         <FieldLabel htmlFor="create-notes">Notes</FieldLabel>
-        <Textarea id="create-notes" value={notes} maxLength={2000} rows={2} onChange={(e) => setNotes(e.target.value)} />
+        <Textarea
+          id="create-notes"
+          value={notes}
+          maxLength={2000}
+          rows={2}
+          onChange={(e) => setNotes(e.target.value)}
+        />
       </Field>
       <div className="flex justify-end gap-2">
         <Button type="button" variant="ghost" onClick={onCancel} disabled={busy}>

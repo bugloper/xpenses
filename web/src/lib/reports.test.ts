@@ -25,19 +25,32 @@ describe('reportPresetRange', () => {
 
 describe('resolveReportRange', () => {
   it('defaults to this month', () => {
-    expect(resolveReportRange({}, now)).toEqual({ preset: 'month', range: { from: '2026-11-01', to: '2026-11-30' } })
+    expect(resolveReportRange({}, now)).toEqual({
+      preset: 'month',
+      range: { from: '2026-11-01', to: '2026-11-30' },
+    })
   })
   it('honours a valid custom range and rejects an invalid one', () => {
     expect(resolveReportRange({ period: 'custom', from: '2026-01-05', to: '2026-02-01' }, now)).toEqual({
       preset: 'custom',
       range: { from: '2026-01-05', to: '2026-02-01' },
     })
-    expect(resolveReportRange({ period: 'custom', from: '2026-02-01', to: '2026-01-05' }, now).preset).toBe('month')
+    expect(resolveReportRange({ period: 'custom', from: '2026-02-01', to: '2026-01-05' }, now).preset).toBe(
+      'month',
+    )
     expect(resolveReportRange({ period: 'custom', from: 'nope' }, now).preset).toBe('month')
   })
   it('writes minimal search params', () => {
-    expect(periodSearch('month', { from: 'x', to: 'y' })).toEqual({ period: undefined, from: undefined, to: undefined })
-    expect(periodSearch('last3', { from: 'x', to: 'y' })).toEqual({ period: 'last3', from: undefined, to: undefined })
+    expect(periodSearch('month', { from: 'x', to: 'y' })).toEqual({
+      period: undefined,
+      from: undefined,
+      to: undefined,
+    })
+    expect(periodSearch('last3', { from: 'x', to: 'y' })).toEqual({
+      period: 'last3',
+      from: undefined,
+      to: undefined,
+    })
     expect(periodSearch('custom', { from: '2026-01-01', to: '2026-01-31' })).toEqual({
       period: 'custom',
       from: '2026-01-01',
@@ -47,9 +60,18 @@ describe('resolveReportRange', () => {
 })
 
 describe('exportPath', () => {
-  const p = { from: '2026-11-01', to: '2026-11-30', granularity: 'week' as const, type: 'income' as const, month: '2026-11', statement_id: 'st1' }
+  const p = {
+    from: '2026-11-01',
+    to: '2026-11-30',
+    granularity: 'week' as const,
+    type: 'income' as const,
+    month: '2026-11',
+    statement_id: 'st1',
+  }
   it('only sends the params each report understands', () => {
-    expect(exportPath('summary', 'csv', p)).toBe('/reports/export?report=summary&format=csv&from=2026-11-01&to=2026-11-30')
+    expect(exportPath('summary', 'csv', p)).toBe(
+      '/reports/export?report=summary&format=csv&from=2026-11-01&to=2026-11-30',
+    )
     expect(exportPath('categories', 'pdf', p)).toBe(
       '/reports/export?report=categories&format=pdf&from=2026-11-01&to=2026-11-30&type=income',
     )
@@ -57,8 +79,12 @@ describe('exportPath', () => {
       '/reports/export?report=cash-flow&format=csv&from=2026-11-01&to=2026-11-30&granularity=week',
     )
     expect(exportPath('budgets', 'csv', p)).toBe('/reports/export?report=budgets&format=csv&month=2026-11')
-    expect(exportPath('reconciliation', 'pdf', p)).toBe('/reports/export?report=reconciliation&format=pdf&statement_id=st1')
-    expect(exportPath('accounts', 'csv', p)).toBe('/reports/export?report=accounts&format=csv&from=2026-11-01&to=2026-11-30')
+    expect(exportPath('reconciliation', 'pdf', p)).toBe(
+      '/reports/export?report=reconciliation&format=pdf&statement_id=st1',
+    )
+    expect(exportPath('accounts', 'csv', p)).toBe(
+      '/reports/export?report=accounts&format=csv&from=2026-11-01&to=2026-11-30',
+    )
   })
   it('names the file by report and params', () => {
     expect(exportFileName('merchants', 'csv', p)).toBe('merchants-2026-11-01_2026-11-30.csv')

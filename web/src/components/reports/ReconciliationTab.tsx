@@ -8,11 +8,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { rangeLabel } from '@/lib/dates'
 import { useAccounts, useStatements } from '@/lib/queries'
 
-export function ReconciliationTab({ statementId, onStatement, currency }: { statementId: string | undefined; onStatement: (id: string) => void; currency: string }) {
+export function ReconciliationTab({
+  statementId,
+  onStatement,
+  currency,
+}: {
+  statementId: string | undefined
+  onStatement: (id: string) => void
+  currency: string
+}) {
   const statements = useStatements()
   const { data: accounts = [] } = useAccounts(true)
   if (statements.isPending) return <ListSkeleton rows={3} />
-  if (statements.error) return <ErrorState error={statements.error} onRetry={() => void statements.refetch()} compact />
+  if (statements.error)
+    return <ErrorState error={statements.error} onRetry={() => void statements.refetch()} compact />
   const list = statements.data
   if (list.length === 0)
     return (
@@ -24,7 +33,9 @@ export function ReconciliationTab({ statementId, onStatement, currency }: { stat
           className="py-8"
           action={
             <Button size="sm" asChild>
-              <Link to="/statements" search={{ import: '1' }}>Import statement</Link>
+              <Link to="/statements" search={{ import: '1' }}>
+                Import statement
+              </Link>
             </Button>
           }
         />
@@ -45,7 +56,8 @@ export function ReconciliationTab({ statementId, onStatement, currency }: { stat
               const acc = accounts.find((a) => a.id === s.account_id)
               return (
                 <SelectItem key={s.id} value={s.id}>
-                  {s.file_name} · {acc?.name ?? 'Account'} · {rangeLabel({ from: s.period_start, to: s.period_end })}
+                  {s.file_name} · {acc?.name ?? 'Account'} ·{' '}
+                  {rangeLabel({ from: s.period_start, to: s.period_end })}
                 </SelectItem>
               )
             })}

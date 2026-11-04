@@ -43,7 +43,15 @@ window.addEventListener(CSRF_REJECTED_EVENT, () => {
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ThemeProvider>
-      <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
+      <PersistQueryClientProvider
+        client={queryClient}
+        persistOptions={persistOptions}
+        // Restored data renders instantly, but it is last-known data: refetch
+        // everything in the background so a reload never shows a stale ledger.
+        onSuccess={() => {
+          void queryClient.resumePausedMutations().then(() => queryClient.invalidateQueries())
+        }}
+      >
         <RouterProvider router={router} />
       </PersistQueryClientProvider>
     </ThemeProvider>
