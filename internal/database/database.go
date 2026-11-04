@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"embed"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -71,9 +72,29 @@ func pragmaSuffix(path string) string {
 	return "?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_txlock=immediate"
 }
 
+// ErrStaleSchema is returned when the database was created by a pre-release
+// build whose initial migration predates user accounts. Such files cannot be
+// upgraded in place; the data directory must be moved aside.
+var ErrStaleSchema = errors.New("database predates user accounts (created by a pre-release build); move or delete the data directory and restart")
+
 // Migrate applies every embedded migration that has not yet been applied, in
 // filename order, each inside its own transaction.
 func Migrate(ctx context.Context, db *sql.DB) error {
+	if err := migrate(ctx, db); err != nil {
+		return err
+	}
+	// Fail fast on a stale pre-release database rather than 500 on every request.
+	var n int
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'users'`).Scan(&n); err != nil {
+		return err
+	}
+	if n == 0 {
+		return ErrStaleSchema
+	}
+	return nil
+}
+
+func migrate(ctx context.Context, db *sql.DB) error {
 	if _, err := db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS schema_migrations (
 		version TEXT PRIMARY KEY,
 		applied_at TEXT NOT NULL
