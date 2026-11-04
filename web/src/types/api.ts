@@ -68,6 +68,28 @@ export const TRANSACTION_TYPES: TransactionType[] = ['expense', 'income', 'trans
 export type TransactionStatus = 'cleared' | 'pending' | 'void'
 export type TransactionOrigin = 'manual' | 'imported' | 'adjustment'
 
+/** Details read from a payment app's success screen. Every field may be ''. */
+export type Receipt = {
+  bank: string
+  reference: string
+  payment_type: string
+  date: string
+  time: string
+}
+
+/** POST /receipts/scan result: what OCR made of a screenshot (nothing stored). */
+export type ScannedReceipt = {
+  recognised: boolean
+  bank: string
+  amount: number
+  journal_no: string
+  from_account: string
+  to_account: string
+  payment_type: string
+  date: string
+  time: string
+}
+
 export type Transaction = {
   id: string
   type: TransactionType
@@ -87,6 +109,8 @@ export type Transaction = {
   notes: string
   origin: TransactionOrigin
   has_attachment: boolean
+  /** What the attached payment screenshot said; null when unknown. */
+  receipt: Receipt | null
   status: TransactionStatus
   recurring_id: string | null
   client_id?: string | null
@@ -109,6 +133,7 @@ export type CreateTransactionRequest = {
   tags?: string[]
   status?: TransactionStatus
   client_id?: string
+  receipt?: Receipt | null
 }
 
 export type UpdateTransactionRequest = {
@@ -126,6 +151,8 @@ export type UpdateTransactionRequest = {
   status?: TransactionStatus
   clear_category?: boolean
   clear_transfer_account?: boolean
+  receipt?: Receipt | null
+  clear_receipt?: boolean
 }
 
 export type TransactionSort = 'date' | 'amount' | 'created_at' | 'payee'

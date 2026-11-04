@@ -65,8 +65,11 @@ func (s *TransactionService) AttachFile(ctx context.Context, id string, r io.Rea
 	if err := s.Repo.SetAttachmentMime(ctx, s.DB, t.UserID, t.ID, mime); err != nil {
 		return apperr.Internal(err)
 	}
+	s.fillReceiptFromImage(ctx, t, final)
 	return nil
 }
+
+func userIDOf(ctx context.Context) string { return auth.UserID(ctx) }
 
 // Attachment returns the stored image's path and media type.
 func (s *TransactionService) Attachment(ctx context.Context, id string) (path, mime string, err error) {
@@ -107,6 +110,3 @@ func (s *TransactionService) removeAttachmentFile(userID, txID string) {
 	}
 	_ = os.Remove(s.attachmentPath(userID, txID))
 }
-
-// UserID helper kept close to the attachment code that needs it in handlers.
-var _ = auth.UserID

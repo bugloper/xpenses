@@ -15,7 +15,8 @@ type TransactionRepo struct{}
 const txCols = `t.user_id, t.id, t.type, t.amount, t.currency, t.account_id, a.name, t.transfer_account_id, COALESCE(ta.name,''),
 	t.category_id, COALESCE(c.name,''), COALESCE(c.icon,''), COALESCE(c.color,''),
 	t.description, t.payee, t.transaction_date, t.notes, t.origin, t.status, t.recurring_id,
-	t.client_id, t.created_at, t.updated_at, t.attachment_mime`
+	t.client_id, t.created_at, t.updated_at, t.attachment_mime,
+	t.receipt_bank, t.receipt_reference, t.receipt_payment_type, t.receipt_date, t.receipt_time`
 
 const txFrom = ` FROM transactions t
 	JOIN accounts a ON a.id = t.account_id
@@ -25,10 +26,12 @@ const txFrom = ` FROM transactions t
 func scanTx(s interface{ Scan(...any) error }) (*models.Transaction, error) {
 	var t models.Transaction
 	var transferID, catID, recID, clientID sql.NullString
+	var rc models.Receipt
 	if err := s.Scan(&t.UserID, &t.ID, &t.Type, &t.Amount, &t.Currency, &t.AccountID, &t.AccountName, &transferID, &t.TransferAccountName,
 		&catID, &t.CategoryName, &t.CategoryIcon, &t.CategoryColor,
 		&t.Description, &t.Payee, &t.TransactionDate, &t.Notes, &t.Origin, &t.Status, &recID,
-		&clientID, &t.CreatedAt, &t.UpdatedAt, &t.AttachmentMime); err != nil {
+		&clientID, &t.CreatedAt, &t.UpdatedAt, &t.AttachmentMime,
+		&rc.Bank, &rc.Reference, &rc.PaymentType, &rc.Date, &rc.Time); err != nil {
 		return nil, err
 	}
 	t.TransferAccountID = strPtr(transferID)
@@ -37,6 +40,9 @@ func scanTx(s interface{ Scan(...any) error }) (*models.Transaction, error) {
 	t.ClientID = strPtr(clientID)
 	t.Tags = []string{}
 	t.HasAttachment = t.AttachmentMime != ""
+	if !rc.IsEmpty() {
+		t.Receipt = &rc
+	}
 	return &t, nil
 }
 
@@ -53,8 +59,8 @@ func buildFilter(f dto.TransactionFilter) (string, []any) {
 	args := []any{f.UserID}
 	if f.Search != "" {
 		like := "%" + strings.ToLower(f.Search) + "%"
-		where = append(where, `(LOWER(t.description) LIKE ? OR LOWER(t.payee) LIKE ? OR LOWER(t.notes) LIKE ? OR LOWER(COALESCE(c.name,'')) LIKE ?)`)
-		args = append(args, like, like, like, like)
+		where = append(where, `(LOWER(t.description) LIKE ? OR LOWER(t.payee) LIKE ? OR LOWER(t.notes) LIKE ? OR LOWER(COALESCE(c.name,'')) LIKE ? OR LOWER(t.receipt_reference) LIKE ?)`)
+		args = append(args, like, like, like, like, like)
 	}
 	if f.DateFrom != "" {
 		where = append(where, `t.transaction_date >= ?`)
@@ -185,19 +191,49 @@ func (TransactionRepo) GetByClientID(ctx context.Context, db DBTX, userID, clien
 func (TransactionRepo) Insert(ctx context.Context, db DBTX, t *models.Transaction) error {
 	_, err := db.ExecContext(ctx, `INSERT INTO transactions
 		(user_id, id, type, amount, currency, account_id, transfer_account_id, category_id, description, payee,
-		 transaction_date, notes, origin, status, recurring_id, client_id, created_at, updated_at)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		 transaction_date, notes, origin, status, recurring_id, client_id, created_at, updated_at,
+		 receipt_bank, receipt_reference, receipt_payment_type, receipt_date, receipt_time)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		t.UserID, t.ID, t.Type, t.Amount, t.Currency, t.AccountID, nullStr(t.TransferAccountID), nullStr(t.CategoryID),
 		t.Description, t.Payee, t.TransactionDate, t.Notes, t.Origin, t.Status, nullStr(t.RecurringID),
-		nullStr(t.ClientID), t.CreatedAt, t.UpdatedAt)
+		nullStr(t.ClientID), t.CreatedAt, t.UpdatedAt,
+		rcField(t.Receipt, 0), rcField(t.Receipt, 1), rcField(t.Receipt, 2), rcField(t.Receipt, 3), rcField(t.Receipt, 4))
 	return err
 }
 
 func (TransactionRepo) Update(ctx context.Context, db DBTX, t *models.Transaction) error {
 	_, err := db.ExecContext(ctx, `UPDATE transactions SET type=?, amount=?, currency=?, account_id=?, transfer_account_id=?,
-		category_id=?, description=?, payee=?, transaction_date=?, notes=?, status=?, updated_at=? WHERE id=? AND user_id=?`,
+		category_id=?, description=?, payee=?, transaction_date=?, notes=?, status=?, updated_at=?,
+		receipt_bank=?, receipt_reference=?, receipt_payment_type=?, receipt_date=?, receipt_time=? WHERE id=? AND user_id=?`,
 		t.Type, t.Amount, t.Currency, t.AccountID, nullStr(t.TransferAccountID), nullStr(t.CategoryID),
-		t.Description, t.Payee, t.TransactionDate, t.Notes, t.Status, t.UpdatedAt, t.ID, t.UserID)
+		t.Description, t.Payee, t.TransactionDate, t.Notes, t.Status, t.UpdatedAt,
+		rcField(t.Receipt, 0), rcField(t.Receipt, 1), rcField(t.Receipt, 2), rcField(t.Receipt, 3), rcField(t.Receipt, 4), t.ID, t.UserID)
+	return err
+}
+
+// rcField reads one receipt column value, "" for a missing receipt.
+func rcField(r *models.Receipt, i int) string {
+	if r == nil {
+		return ""
+	}
+	switch i {
+	case 0:
+		return r.Bank
+	case 1:
+		return r.Reference
+	case 2:
+		return r.PaymentType
+	case 3:
+		return r.Date
+	default:
+		return r.Time
+	}
+}
+
+// SetReceipt stores (nil clears) the details read from the attached screenshot.
+func (TransactionRepo) SetReceipt(ctx context.Context, db DBTX, userID, id string, r *models.Receipt) error {
+	_, err := db.ExecContext(ctx, `UPDATE transactions SET receipt_bank=?, receipt_reference=?, receipt_payment_type=?, receipt_date=?, receipt_time=? WHERE id=? AND user_id=?`,
+		rcField(r, 0), rcField(r, 1), rcField(r, 2), rcField(r, 3), rcField(r, 4), id, userID)
 	return err
 }
 

@@ -1,8 +1,14 @@
+import fs from 'node:fs'
+import path from 'node:path'
 import { expect, test } from '@playwright/test'
 import { createAccount, listTransactions, loginAsNewUser, waitForServiceWorker } from './helpers'
 
 // A 1×1 PNG, base64.
 const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
+// A code-drawn mBoB success screen (Nu. 10, journal 551-428182, 05 Nov 2026 01:38:10 AM).
+const MBOB = fs
+  .readFileSync(path.resolve(import.meta.dirname, '../../testdata/receipts/mbob_synthetic.png'))
+  .toString('base64')
 
 // The Web Share Target: Android posts the shared image to /share, the service
 // worker parks it and opens the add screen with it attached. The POST is
@@ -16,6 +22,9 @@ test('a screenshot shared into the app lands on the add screen and is saved with
   await page.goto('/')
   await waitForServiceWorker(page)
 
+  const ocr = (
+    (await (await page.request.get('/api/v1/receipts/capabilities')).json()) as { data: { ocr: boolean } }
+  ).data.ocr
   const landed = await page.evaluate(async (b64) => {
     const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))
     const form = new FormData()
@@ -23,14 +32,22 @@ test('a screenshot shared into the app lands on the add screen and is saved with
     form.append('screenshot', new File([bytes], 'mbob.png', { type: 'image/png' }))
     const res = await fetch('/share', { method: 'POST', body: form })
     return res.url
-  }, PNG)
+  }, MBOB)
   expect(landed).toMatch(/\/add\?shared=[^&]+$/)
 
   await page.goto(new URL(landed).pathname + new URL(landed).search)
   await expect(page.getByTestId('attachment')).toContainText('Screenshot attached')
   await expect(page.getByTestId('attachment').locator('img')).toBeVisible()
 
-  await page.getByLabel('Amount').fill('10')
+  if (ocr) {
+    // The server read the screen: journal number shown, amount and date prefilled.
+    await expect(page.getByTestId('receipt')).toContainText('551-428182', { timeout: 30_000 })
+    await expect(page.getByTestId('receipt')).toContainText('mBoB')
+    await expect(page.getByTestId('receipt')).toContainText('Personal Transfer')
+    await expect(page.getByLabel('Amount')).toHaveValue('10.00')
+  } else {
+    await page.getByLabel('Amount').fill('10')
+  }
   await page.getByRole('button', { name: 'Category', exact: true }).click()
   await page.getByRole('button', { name: 'Family & Social' }).click()
   await page.getByRole('radio', { name: 'Family support' }).click()
@@ -44,10 +61,25 @@ test('a screenshot shared into the app lands on the add screen and is saved with
     has_attachment: boolean
   }
   expect(saved?.has_attachment).toBe(true)
+  if (ocr) {
+    const detail = (await (await page.request.get(`/api/v1/transactions/${saved.id}`)).json()) as {
+      data: { transaction_date: string; receipt: { reference: string; bank: string } | null }
+    }
+    // The date read from the screen became the transaction date, and the receipt was kept.
+    expect(detail.data.transaction_date).toBe('2026-11-05')
+    expect(detail.data.receipt?.reference).toBe('551-428182')
+    expect(detail.data.receipt?.bank).toBe('mBoB')
+  }
 
-  // The transaction page shows the image, served by the API.
+  // The transaction page shows the image, served by the API, and what it said.
   await page.goto(`/transactions/${saved.id}`)
   await expect(page.getByRole('heading', { name: 'Screenshot' })).toBeVisible()
+  if (ocr) {
+    await expect(page.getByTestId('receipt')).toContainText('551-428182')
+    // The journal number is searchable.
+    const found = await page.request.get('/api/v1/transactions?search=428182')
+    expect(((await found.json()) as { data: { id: string }[] }).data.map((t) => t.id)).toContain(saved.id)
+  }
   const img = page.getByRole('img', { name: 'Payment screenshot' })
   await expect(img).toBeVisible()
   const res = await page.request.get(`/api/v1/transactions/${saved.id}/attachment`)

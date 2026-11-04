@@ -64,6 +64,20 @@ type Category struct {
 	UpdatedAt string  `json:"updated_at"`
 }
 
+// Receipt is the detail read from a payment app's success screen.
+type Receipt struct {
+	Bank        string `json:"bank"`
+	Reference   string `json:"reference"`
+	PaymentType string `json:"payment_type"`
+	Date        string `json:"date"`
+	Time        string `json:"time"`
+}
+
+// IsEmpty is true when no field is known.
+func (r *Receipt) IsEmpty() bool {
+	return r == nil || (r.Bank == "" && r.Reference == "" && r.PaymentType == "" && r.Date == "" && r.Time == "")
+}
+
 type Transaction struct {
 	UserID              string   `json:"-"`
 	ID                  string   `json:"id"`
@@ -90,8 +104,10 @@ type Transaction struct {
 	// AttachmentMime is the stored image's media type, "" when none.
 	AttachmentMime string `json:"-"`
 	HasAttachment  bool   `json:"has_attachment"`
-	CreatedAt      string `json:"created_at"`
-	UpdatedAt      string `json:"updated_at"`
+	// Receipt holds what the attached payment screenshot said; nil when nothing is known.
+	Receipt   *Receipt `json:"receipt"`
+	CreatedAt string   `json:"created_at"`
+	UpdatedAt string   `json:"updated_at"`
 }
 
 type RecurringTransaction struct {

@@ -14,7 +14,7 @@ Multi-user with fully isolated data, installable as a PWA, with offline expense 
 - Recurring transactions (daily/weekly/monthly/yearly) generated as drafts or real entries, never duplicated.
 - Reports (monthly, daily, weekly, category, merchant, income vs expense, accounts, budgets) with CSV and PDF export.
 - PWA: installable, offline shell, offline transaction queue with sync indicator, update notifications.
-- Share a payment screenshot from mBoB, mPay or any app straight into Xpensiv (Android, installed app): it opens the add screen with the image attached; you type the amount and save. The image is kept with the transaction.
+- Share a payment screenshot from mBoB, mPay or any app straight into Xpensiv (Android, installed app): it opens the add screen with the image attached. mBoB success screens are read on the server (Tesseract OCR): the amount and date are prefilled and the bank, journal number, payment type and time are kept with the transaction and searchable.
 - Backup/restore (optionally AES-256-GCM encrypted), admin only.
 - Accounts: first-run owner setup, Argon2id passwords, cookie sessions, login throttling, invite-only or open registration, admin user management. Every user sees only their own data.
 
@@ -76,6 +76,7 @@ Configuration is via environment variables (see `.env.example`):
 | `XPENSIV_CORS_ORIGIN` | `http://localhost:5173` | Dev-server origin allowed for CORS (set empty in production) |
 | `XPENSIV_DEFAULT_CURRENCY` | `BTN` | Currency for new accounts |
 | `XPENSIV_SECURE_COOKIES` | `auto` | `auto` marks the session cookie Secure only over HTTPS; `true`/`false` force it |
+| `XPENSIV_TESSERACT` | `tesseract` | OCR binary for payment screenshots; empty disables |
 | `XPENSIV_TRUSTED_PROXY` | `false` | `true` only behind your own reverse proxy: trusts `X-Forwarded-For`/`X-Forwarded-Proto` |
 
 ### Docker
@@ -154,6 +155,12 @@ the add screen with the screenshot attached; enter the amount and save. Offline,
 with the transaction and uploaded when the queue syncs. Attachments live under
 `data/attachments/<user>/<transaction id>` and are removed with the transaction or the user. iOS does
 not support web share targets; attach the image from the add screen or the transaction page instead.
+
+**Reading the screenshot.** The server runs Tesseract (installed in the Docker image; `apt install
+tesseract-ocr` or `brew install tesseract` for a bare install) on every attached image and matches
+it against known success screens — mBoB for now. The amount and date prefill the form for you to
+check; the bank, journal number, payment type and time are saved as the transaction's receipt and
+shown on its page. `XPENSIV_TESSERACT` names the binary (`XPENSIV_TESSERACT=` turns OCR off).
 
 ## Backup and restore
 

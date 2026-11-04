@@ -17,7 +17,9 @@ RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /xpensiv ./cmd/server
 
 # ---- runtime ----
 FROM alpine:3.21
-RUN addgroup -S xpensiv && adduser -S -G xpensiv xpensiv \
+# Tesseract reads payment screenshots (receipt details); ca-certificates for TLS.
+RUN apk add --no-cache tesseract-ocr tesseract-ocr-data-eng ca-certificates \
+ && addgroup -S xpensiv && adduser -S -G xpensiv xpensiv \
  && mkdir -p /data /app/web/dist && chown -R xpensiv:xpensiv /data /app
 WORKDIR /app
 COPY --from=go /xpensiv /app/xpensiv

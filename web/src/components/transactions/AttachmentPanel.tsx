@@ -1,18 +1,22 @@
-import { ImagePlus, Trash2 } from 'lucide-react'
+import { ImagePlus, ScanLine, Trash2 } from 'lucide-react'
 import { useRef } from 'react'
 import { toast } from 'sonner'
 import { Panel } from '@/components/common/kit'
 import { Button } from '@/components/ui/button'
 import { errorMessage } from '@/lib/api'
 import { attachmentProblem, attachmentUrl, useRemoveAttachment, useUploadAttachment } from '@/lib/attachments'
+import { useReceiptCapabilities, useScanAttachment } from '@/lib/receipts'
 import type { Transaction } from '@/types/api'
+import { ReceiptDetails } from './ReceiptCard'
 
 /** The screenshot stored with a transaction, with attach / replace / remove. */
 export function AttachmentPanel({ tx }: { tx: Transaction }) {
   const upload = useUploadAttachment()
   const remove = useRemoveAttachment()
+  const scan = useScanAttachment()
+  const caps = useReceiptCapabilities()
   const input = useRef<HTMLInputElement>(null)
-  const busy = upload.isPending || remove.isPending
+  const busy = upload.isPending || remove.isPending || scan.isPending
   // Bust the browser cache after a replacement.
   const src = `${attachmentUrl(tx.id)}?v=${encodeURIComponent(tx.updated_at)}`
 
@@ -69,13 +73,35 @@ export function AttachmentPanel({ tx }: { tx: Transaction }) {
       }
     >
       {tx.has_attachment ? (
-        <a href={src} target="_blank" rel="noreferrer" className="block" aria-label="Open the screenshot">
-          <img
-            src={src}
-            alt="Payment screenshot"
-            className="bg-muted mx-auto max-h-96 rounded-xl object-contain"
-          />
-        </a>
+        <div className="flex flex-col gap-4">
+          <a href={src} target="_blank" rel="noreferrer" className="block" aria-label="Open the screenshot">
+            <img
+              src={src}
+              alt="Payment screenshot"
+              className="bg-muted mx-auto max-h-96 rounded-xl object-contain"
+            />
+          </a>
+          {tx.receipt && <ReceiptDetails receipt={tx.receipt} />}
+          {caps.data?.ocr && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="self-start"
+              disabled={busy}
+              onClick={() =>
+                scan.mutate(tx.id, {
+                  onSuccess: (r) =>
+                    r.recognised
+                      ? toast.success('Payment details read')
+                      : toast.info('No payment details recognised'),
+                  onError: (e) => toast.error(errorMessage(e)),
+                })
+              }
+            >
+              <ScanLine data-icon="inline-start" /> {tx.receipt ? 'Read again' : 'Read payment details'}
+            </Button>
+          )}
+        </div>
       ) : (
         <p className="text-muted-foreground text-sm">
           No screenshot. Share one from your banking app into Xpensiv, or attach it here.

@@ -28,6 +28,42 @@ func (h *TransactionHandler) Register(g *echo.Group) {
 	g.PUT("/transactions/:id/attachment", h.Attach)
 	g.GET("/transactions/:id/attachment", h.Attachment)
 	g.DELETE("/transactions/:id/attachment", h.DetachFile)
+	g.POST("/transactions/:id/attachment/scan", h.ScanAttachment)
+	g.POST("/receipts/scan", h.ScanReceipt)
+	g.GET("/receipts/capabilities", h.ReceiptCapabilities)
+}
+
+// ReceiptCapabilities tells the app whether this server can read screenshots.
+func (h *TransactionHandler) ReceiptCapabilities(c echo.Context) error {
+	return JSON(c, http.StatusOK, map[string]any{"ocr": h.Svc.OCRAvailable(), "banks": []string{"mBoB"}})
+}
+
+// ScanReceipt reads an uploaded screenshot (multipart "file") and returns what
+// it says, without storing anything. The add screen uses it to prefill.
+func (h *TransactionHandler) ScanReceipt(c echo.Context) error {
+	fh, err := c.FormFile("file")
+	if err != nil {
+		return apperr.BadRequest("an image is required (multipart field 'file')")
+	}
+	f, err := fh.Open()
+	if err != nil {
+		return apperr.BadRequest("could not read the uploaded file")
+	}
+	defer f.Close()
+	r, err := h.Svc.ScanImage(c.Request().Context(), f)
+	if err != nil {
+		return err
+	}
+	return JSON(c, http.StatusOK, r)
+}
+
+// ScanAttachment re-reads the stored screenshot and saves its details.
+func (h *TransactionHandler) ScanAttachment(c echo.Context) error {
+	r, err := h.Svc.ScanAttachment(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return err
+	}
+	return JSON(c, http.StatusOK, r)
 }
 
 // Attach stores an image (multipart field "file") on the transaction.

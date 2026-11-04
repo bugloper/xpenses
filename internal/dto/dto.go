@@ -62,6 +62,15 @@ type UpdateCategoryRequest struct {
 	SortOrder *int    `json:"sort_order"`
 }
 
+// Receipt is what a payment app's success screen said; every field optional.
+type Receipt struct {
+	Bank        string `json:"bank"`
+	Reference   string `json:"reference"`
+	PaymentType string `json:"payment_type"`
+	Date        string `json:"date"`
+	Time        string `json:"time"`
+}
+
 type CreateTransactionRequest struct {
 	Type              string   `json:"type"`
 	Amount            int64    `json:"amount"`
@@ -78,6 +87,8 @@ type CreateTransactionRequest struct {
 	// ClientID is an optional client-generated id used by the offline queue so
 	// that a retried POST is idempotent.
 	ClientID *string `json:"client_id"`
+	// Receipt carries the details read from an attached payment screenshot.
+	Receipt *Receipt `json:"receipt"`
 }
 
 type UpdateTransactionRequest struct {
@@ -96,6 +107,9 @@ type UpdateTransactionRequest struct {
 	// Set to true to clear the category / transfer account explicitly.
 	ClearCategory        bool `json:"clear_category"`
 	ClearTransferAccount bool `json:"clear_transfer_account"`
+	// Receipt replaces the stored receipt details; ClearReceipt drops them.
+	Receipt      *Receipt `json:"receipt"`
+	ClearReceipt bool     `json:"clear_receipt"`
 }
 
 // TransactionFilter is the query model for GET /transactions.

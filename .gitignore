@@ -26,3 +26,6 @@ web/.vite/
 .DS_Store
 .idea/
 .vscode/
+
+# A real banking screenshot used only for local OCR checks; never committed.
+testdata/receipts/mbob_success.png

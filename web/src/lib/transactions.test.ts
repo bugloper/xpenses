@@ -20,6 +20,7 @@ function tx(partial: Partial<Transaction>): Transaction {
     status: 'cleared',
     recurring_id: null,
     has_attachment: false,
+    receipt: null,
     tags: [],
     created_at: '2026-11-04T10:00:00Z',
     updated_at: '2026-11-04T10:00:00Z',

@@ -19,6 +19,7 @@ import (
 	"github.com/bugloper/xpensiv/internal/config"
 	"github.com/bugloper/xpensiv/internal/handlers"
 	"github.com/bugloper/xpensiv/internal/middleware"
+	"github.com/bugloper/xpensiv/internal/ocr"
 	"github.com/bugloper/xpensiv/internal/services"
 )
 
@@ -36,11 +37,19 @@ type Deps struct {
 }
 
 // NewDeps constructs the service graph over db.
+// ocrEngine builds the screenshot reader; XPENSIV_TESSERACT= switches it off.
+func ocrEngine(cfg config.Config) *ocr.Engine {
+	if cfg.Tesseract == "" {
+		return nil
+	}
+	return ocr.New(cfg.Tesseract)
+}
+
 func NewDeps(cfg config.Config, db *sql.DB) *Deps {
 	d := &Deps{
 		Accounts:     &services.AccountService{DB: db, DefaultCurrency: cfg.DefaultCurrency},
 		Categories:   &services.CategoryService{DB: db},
-		Transactions: &services.TransactionService{DB: db, DefaultCurrency: cfg.DefaultCurrency, AttachmentsDir: cfg.AttachmentsDir(), MaxUploadBytes: cfg.MaxUploadBytes},
+		Transactions: &services.TransactionService{DB: db, DefaultCurrency: cfg.DefaultCurrency, AttachmentsDir: cfg.AttachmentsDir(), MaxUploadBytes: cfg.MaxUploadBytes, OCR: ocrEngine(cfg)},
 		Budgets:      &services.BudgetService{DB: db},
 		Recurring:    &services.RecurringService{DB: db, DefaultCurrency: cfg.DefaultCurrency},
 		Settings:     &services.SettingsService{DB: db},

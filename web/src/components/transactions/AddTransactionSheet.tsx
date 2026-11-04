@@ -1,4 +1,6 @@
 import { AttachmentField } from './AttachmentField'
+import { ReceiptCard } from './ReceiptCard'
+import { toReceipt, useReceiptScan } from '@/lib/receipts'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
@@ -127,6 +129,11 @@ function SheetBody({ preset }: { preset: AddPreset | null }) {
   const { data: editing, isLoading: loadingEdit } = useTransaction(editId)
   const [pendingItem, setPendingItem] = useState<PendingTransaction | null>(null)
   const [attachment, setAttachment] = useState<File | null>(null)
+  const scan = useReceiptScan(attachment)
+  const receipt = toReceipt(scan.result)
+  const prefillAmount =
+    scan.result?.recognised && scan.result.amount > 0 ? minorToDecimalString(scan.result.amount) : ''
+  const prefillDate = scan.result?.recognised && scan.result.date ? scan.result.date : ''
 
   useEffect(() => {
     if (!pendingClientId) return
@@ -162,8 +169,10 @@ function SheetBody({ preset }: { preset: AddPreset | null }) {
       account_id: preset?.account_id,
       transfer_account_id: preset?.transfer_account_id,
       category_id: preset?.category_id,
+      ...(prefillAmount ? { amount: prefillAmount } : {}),
+      ...(prefillDate ? { transaction_date: prefillDate } : {}),
     })
-  }, [editId, editing, pendingClientId, pendingItem, preset])
+  }, [editId, editing, pendingClientId, pendingItem, preset, prefillAmount, prefillDate])
 
   async function handleSubmit(values: TransactionFormValues, opts: { addAnother: boolean }) {
     if (mode === 'edit' && editing) {
@@ -187,7 +196,7 @@ function SheetBody({ preset }: { preset: AddPreset | null }) {
       uiStore.closeAdd()
       return
     }
-    const result = await create(toCreateRequest(values, currency), attachment)
+    const result = await create({ ...toCreateRequest(values, currency), receipt }, attachment)
     if (result === 'error') return
     setAttachment(null)
     if (!opts.addAnother) uiStore.closeAdd()
@@ -198,8 +207,9 @@ function SheetBody({ preset }: { preset: AddPreset | null }) {
   return (
     <>
       {mode === 'create' && !pendingItem && (
-        <div className="mb-4">
+        <div className="mb-4 flex flex-col gap-3">
           <AttachmentField file={attachment} onChange={setAttachment} compact />
+          <ReceiptCard scan={scan} receipt={receipt} />
         </div>
       )}
       <TransactionForm

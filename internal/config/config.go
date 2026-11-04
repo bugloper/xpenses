@@ -21,6 +21,8 @@ type Config struct {
 	SecureCookies string
 	// TrustedProxy: honour X-Forwarded-For / X-Forwarded-Proto from a reverse proxy.
 	TrustedProxy bool
+	// Tesseract is the OCR binary used to read payment screenshots ("" disables).
+	Tesseract string
 }
 
 // Load reads configuration from the environment, applying defaults.
@@ -35,6 +37,7 @@ func Load() (Config, error) {
 		DefaultCurrency: getenv("XPENSIV_DEFAULT_CURRENCY", "BTN"),
 		SecureCookies:   getenv("XPENSIV_SECURE_COOKIES", "auto"),
 		TrustedProxy:    getenv("XPENSIV_TRUSTED_PROXY", "false") == "true",
+		Tesseract:       tesseractBinary(),
 	}
 	switch cfg.SecureCookies {
 	case "auto", "true", "false":
@@ -67,6 +70,14 @@ func corsOrigin() string {
 		return v
 	}
 	return "http://localhost:5173"
+}
+
+// tesseractBinary honours an explicitly empty XPENSIV_TESSERACT= (OCR off).
+func tesseractBinary() string {
+	if v, ok := os.LookupEnv("XPENSIV_TESSERACT"); ok {
+		return v
+	}
+	return "tesseract"
 }
 
 func getenv(key, def string) string {

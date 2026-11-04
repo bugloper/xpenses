@@ -7,6 +7,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/labstack/echo/v4 v4.16.3
 	golang.org/x/crypto v0.58.0
+	golang.org/x/image v0.47.0
 	modernc.org/sqlite v1.61.1
 )
 

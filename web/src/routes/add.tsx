@@ -5,8 +5,11 @@ import { z } from 'zod'
 import { PageHeader } from '@/components/common/PageHeader'
 import { useSaveTransaction } from '@/components/transactions/AddTransactionSheet'
 import { AttachmentField } from '@/components/transactions/AttachmentField'
+import { ReceiptCard } from '@/components/transactions/ReceiptCard'
 import { TransactionForm, defaultValues, toCreateRequest } from '@/components/transactions/TransactionForm'
+import { minorToDecimalString } from '@/lib/money'
 import { useDefaultCurrency } from '@/lib/queries'
+import { toReceipt, useReceiptScan } from '@/lib/receipts'
 import { SHARE_PARAM, takeSharedFile } from '@/lib/share'
 import { appRoute } from './__root'
 
@@ -24,6 +27,8 @@ function AddPage() {
   const currency = useDefaultCurrency()
   const { create, submitting, serverErrors } = useSaveTransaction()
   const [attachment, setAttachment] = useState<File | null>(null)
+  const scan = useReceiptScan(attachment)
+  const receipt = toReceipt(scan.result)
   const sharedId = search[SHARE_PARAM]
 
   // Opened from the share sheet: collect the screenshot the worker parked.
@@ -50,16 +55,28 @@ function AddPage() {
     }
   }, [sharedId, navigate])
 
+  // A recognised screenshot prefills the amount and the date; the rest is the user's.
+  const prefillAmount =
+    scan.result?.recognised && scan.result.amount > 0 ? minorToDecimalString(scan.result.amount) : ''
+  const prefillDate = scan.result?.recognised && scan.result.date ? scan.result.date : ''
   const initial = useMemo(
-    () => defaultValues({ type: search.type, account_id: search.account, category_id: search.category }),
-    [search.type, search.account, search.category],
+    () =>
+      defaultValues({
+        type: search.type,
+        account_id: search.account,
+        category_id: search.category,
+        ...(prefillAmount ? { amount: prefillAmount } : {}),
+        ...(prefillDate ? { transaction_date: prefillDate } : {}),
+      }),
+    [search.type, search.account, search.category, prefillAmount, prefillDate],
   )
   return (
     <div className="mx-auto flex max-w-xl flex-col gap-5">
       <PageHeader title="Add transaction" description="Quick entry. Works offline." />
       <div className="bg-card rounded-[1.25rem] border p-4 sm:p-6">
-        <div className="mb-4">
+        <div className="mb-4 flex flex-col gap-3">
           <AttachmentField file={attachment} onChange={setAttachment} />
+          <ReceiptCard scan={scan} receipt={receipt} />
         </div>
         <TransactionForm
           initial={initial}
@@ -69,7 +86,7 @@ function AddPage() {
           serverErrors={serverErrors}
           onCancel={() => void navigate({ to: '/' })}
           onSubmit={async (values, { addAnother }) => {
-            const result = await create(toCreateRequest(values, currency), attachment)
+            const result = await create({ ...toCreateRequest(values, currency), receipt }, attachment)
             if (result === 'error') return
             setAttachment(null)
             if (!addAnother) void navigate({ to: '/transactions' })

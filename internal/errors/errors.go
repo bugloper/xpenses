@@ -53,6 +53,11 @@ func Validation(msg string, details map[string]string) *Error {
 	return &Error{Status: http.StatusUnprocessableEntity, Code: "validation_error", Message: msg, Details: details}
 }
 
+// NotImplemented marks a capability this server was built without (e.g. OCR).
+func NotImplemented(msg string) *Error {
+	return &Error{Status: http.StatusNotImplemented, Code: "not_implemented", Message: msg}
+}
+
 func Conflict(msg string) *Error {
 	return &Error{Status: http.StatusConflict, Code: "conflict", Message: msg}
 }

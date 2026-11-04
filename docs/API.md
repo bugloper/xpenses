@@ -39,6 +39,9 @@ Status codes: 200 OK, 201 Created, 204 No Content, 400 bad_request, 404 not_foun
 | PUT/POST | /transactions/:id/attachment | multipart `file`: one JPEG/PNG/WebP image (sniffed, ≤ XPENSIV_MAX_UPLOAD_BYTES) stored under `DATA_DIR/attachments/<user>/<id>`; replaces an earlier one → Transaction with `has_attachment: true` |
 | GET | /transactions/:id/attachment | the image bytes (`Cache-Control: private`) |
 | DELETE | /transactions/:id/attachment | → 204 |
+| POST | /transactions/:id/attachment/scan | OCRs the stored screenshot, saves what it says as `receipt` → the parsed scan (see /receipts/scan). 501 when the server has no Tesseract |
+| POST | /receipts/scan | multipart `file` → `{recognised, bank, amount, journal_no, from_account, to_account, payment_type, date, time}`; nothing stored. Templates: mBoB. 501 without Tesseract |
+| GET | /receipts/capabilities | `{ocr: boolean, banks: ["mBoB"]}` |
 | GET | /budgets | `[{id,category_id,amount}]` monthly amount per expense category |
 | POST | /budgets | `{category_id, amount}` (409 if exists) |
 | PATCH/DELETE | /budgets/:id | |
@@ -57,7 +60,7 @@ Status codes: 200 OK, 201 Created, 204 No Content, 400 bad_request, 404 not_foun
   "account_id":"...","account_name":"BOB Savings","transfer_account_id":null,"transfer_account_name":"",
   "category_id":"cat-food","category_name":"Food","category_icon":"utensils","category_color":"#f97316",
   "description":"Lunch","payee":"Ambient Cafe","transaction_date":"2026-11-04","notes":"",
-  "origin":"manual|adjustment","status":"cleared|pending|void","recurring_id":null,"tags":["work"],"has_attachment":false,
+  "origin":"manual|adjustment","status":"cleared|pending|void","recurring_id":null,"tags":["work"],"has_attachment":false,"receipt":{"bank":"mBoB","reference":"551-428182","payment_type":"Personal Transfer","date":"2026-11-05","time":"01:38:10"},
   "created_at":"...","updated_at":"..."
 }
 ```
@@ -68,6 +71,7 @@ Rules enforced by the server:
 - expense categories only on expense; income categories on income/refund.
 - Only `status = cleared` counts toward balances/reports. `pending` = draft (recurring drafts). `void` is hidden by default.
 - `client_id` (optional UUID from the offline queue) makes POST idempotent.
+- `receipt` (optional on POST/PATCH; `clear_receipt:true` on PATCH drops it) holds what the payment screenshot said. Uploading an attachment fills it automatically when OCR is available and nothing is set yet; `search` also matches `receipt.reference`.
 
 ## Reports
 

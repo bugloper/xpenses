@@ -9,6 +9,7 @@ import (
 	"github.com/bugloper/xpensiv/internal/dto"
 	apperr "github.com/bugloper/xpensiv/internal/errors"
 	"github.com/bugloper/xpensiv/internal/models"
+	"github.com/bugloper/xpensiv/internal/ocr"
 	"github.com/bugloper/xpensiv/internal/repositories"
 	"github.com/bugloper/xpensiv/internal/validators"
 )
@@ -24,6 +25,8 @@ type TransactionService struct {
 	// AttachmentsDir holds one image per transaction (see attachments.go).
 	AttachmentsDir string
 	MaxUploadBytes int64
+	// OCR reads payment screenshots; nil or unavailable means receipts are typed by hand.
+	OCR *ocr.Engine
 }
 
 func (s *TransactionService) List(ctx context.Context, f dto.TransactionFilter) ([]models.Transaction, int, error) {
@@ -168,6 +171,7 @@ func (s *TransactionService) Create(ctx context.Context, req dto.CreateTransacti
 		if err := s.validate(ctx, tx, t); err != nil {
 			return err
 		}
+		t.Receipt = cleanReceipt(req.Receipt)
 		if err := s.Repo.Insert(ctx, tx, t); err != nil {
 			return apperr.Internal(err)
 		}
@@ -221,6 +225,11 @@ func (s *TransactionService) Update(ctx context.Context, id string, req dto.Upda
 	}
 	if req.Status != nil {
 		t.Status = *req.Status
+	}
+	if req.ClearReceipt {
+		t.Receipt = nil
+	} else if req.Receipt != nil {
+		t.Receipt = cleanReceipt(req.Receipt)
 	}
 	t.UpdatedAt = models.NowUTC()
 	err = repositories.WithTx(ctx, s.DB, func(tx *sql.Tx) error {
