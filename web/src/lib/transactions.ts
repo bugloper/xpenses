@@ -60,6 +60,7 @@ export function pendingToTransaction(item: PendingTransaction): Transaction {
     origin: 'manual',
     status: p.status ?? 'cleared',
     recurring_id: null,
+    has_attachment: false,
     client_id: item.client_id,
     tags: p.tags ?? [],
     created_at: item.created_at,

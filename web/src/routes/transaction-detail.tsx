@@ -13,6 +13,7 @@ import { formatDateTime, formatShortDate } from '@/lib/dates'
 import { useCategories, useDeleteTransaction, useDuplicateTransaction, useTransaction } from '@/lib/queries'
 import { displayAmount, transactionTitle } from '@/lib/transactions'
 import { uiStore } from '@/lib/ui-store'
+import { AttachmentPanel } from '@/components/transactions/AttachmentPanel'
 import { categoryLabel } from '@/lib/categories'
 import { appRoute } from './__root'
 
@@ -112,6 +113,7 @@ function TransactionDetailPage() {
         <Row label="Description" value={tx.description} />
         <Row label="Created" value={formatDateTime(tx.created_at)} />
       </div>
+      <AttachmentPanel tx={tx} />
       <div className="grid grid-cols-3 gap-2">
         <Button
           variant="outline"

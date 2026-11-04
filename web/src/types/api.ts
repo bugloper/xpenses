@@ -86,6 +86,7 @@ export type Transaction = {
   transaction_date: string
   notes: string
   origin: TransactionOrigin
+  has_attachment: boolean
   status: TransactionStatus
   recurring_id: string | null
   client_id?: string | null

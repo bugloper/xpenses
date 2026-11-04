@@ -54,6 +54,9 @@ func Load() (Config, error) {
 // DBPath returns the SQLite file path.
 func (c Config) DBPath() string { return c.DataDir + "/xpensiv.db" }
 
+// AttachmentsDir returns where transaction images are kept.
+func (c Config) AttachmentsDir() string { return c.DataDir + "/attachments" }
+
 // BackupsDir returns where backups are written.
 func (c Config) BackupsDir() string { return c.DataDir + "/backups" }
 

@@ -7,6 +7,8 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"net/mail"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -41,6 +43,8 @@ type Service struct {
 	Repo Repo
 	// DefaultCurrency is used for the seeded Cash account.
 	DefaultCurrency string
+	// AttachmentsDir holds transaction images; a user's folder goes with the user.
+	AttachmentsDir string
 
 	// signup serialises Setup and Register. SQLite resolves two concurrent
 	// read-then-write transactions by failing one with SQLITE_BUSY, which would
@@ -513,6 +517,10 @@ func (s *Service) DeleteUser(ctx context.Context, actor *models.User, id string)
 	})
 	if err != nil {
 		return apperr.Internal(err)
+	}
+	// Their attached images live on disk, outside the cascade.
+	if s.AttachmentsDir != "" {
+		_ = os.RemoveAll(filepath.Join(s.AttachmentsDir, id))
 	}
 	return nil
 }

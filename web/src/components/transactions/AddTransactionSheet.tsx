@@ -1,3 +1,4 @@
+import { AttachmentField } from './AttachmentField'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
@@ -36,11 +37,14 @@ export function useSaveTransaction() {
   const [submitting, setSubmitting] = useState(false)
   const [serverErrors, setServerErrors] = useState<Record<string, string> | undefined>()
 
-  async function create(payload: CreateTransactionRequest): Promise<'saved' | 'queued' | 'error'> {
+  async function create(
+    payload: CreateTransactionRequest,
+    attachment: File | null = null,
+  ): Promise<'saved' | 'queued' | 'error'> {
     setSubmitting(true)
     setServerErrors(undefined)
     try {
-      const res = await submitTransaction(payload)
+      const res = await submitTransaction(payload, attachment)
       for (const k of transactionDependentKeys) void qc.invalidateQueries({ queryKey: k })
       // Remember last used on the server too (best effort, never blocks).
       const patch: Record<string, string> = { 'ui.last_account_id': payload.account_id }
@@ -122,6 +126,7 @@ function SheetBody({ preset }: { preset: AddPreset | null }) {
   const pendingClientId = preset?.pendingClientId ?? ''
   const { data: editing, isLoading: loadingEdit } = useTransaction(editId)
   const [pendingItem, setPendingItem] = useState<PendingTransaction | null>(null)
+  const [attachment, setAttachment] = useState<File | null>(null)
 
   useEffect(() => {
     if (!pendingClientId) return
@@ -182,24 +187,32 @@ function SheetBody({ preset }: { preset: AddPreset | null }) {
       uiStore.closeAdd()
       return
     }
-    const result = await create(toCreateRequest(values, currency))
+    const result = await create(toCreateRequest(values, currency), attachment)
     if (result === 'error') return
+    setAttachment(null)
     if (!opts.addAnother) uiStore.closeAdd()
   }
 
   const loading = (mode === 'edit' && loadingEdit) || (!!pendingClientId && !pendingItem)
   if (loading || !initial) return <ListSkeleton rows={4} />
   return (
-    <TransactionForm
-      formId="sheet-transaction-form"
-      initial={initial}
-      mode={mode}
-      currency={editing?.currency || currency}
-      submitting={submitting}
-      serverErrors={serverErrors}
-      onSubmit={handleSubmit}
-      onCancel={uiStore.closeAdd}
-      allowAddAnother={mode === 'create' && !pendingItem}
-    />
+    <>
+      {mode === 'create' && !pendingItem && (
+        <div className="mb-4">
+          <AttachmentField file={attachment} onChange={setAttachment} compact />
+        </div>
+      )}
+      <TransactionForm
+        formId="sheet-transaction-form"
+        initial={initial}
+        mode={mode}
+        currency={editing?.currency || currency}
+        submitting={submitting}
+        serverErrors={serverErrors}
+        onSubmit={handleSubmit}
+        onCancel={uiStore.closeAdd}
+        allowAddAnother={mode === 'create' && !pendingItem}
+      />
+    </>
   )
 }

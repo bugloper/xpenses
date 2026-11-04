@@ -118,6 +118,11 @@ func (c *Client) DoRaw(req *http.Request) (int, map[string]any) {
 
 // Multipart sends a multipart form with the given fields and one file.
 func (c *Client) Multipart(path string, fields map[string]string, fileField, fileName string, content []byte) (int, map[string]any) {
+	return c.MultipartMethod("POST", path, fields, fileField, fileName, content)
+}
+
+// MultipartMethod is Multipart with the HTTP method of your choice.
+func (c *Client) MultipartMethod(method, path string, fields map[string]string, fileField, fileName string, content []byte) (int, map[string]any) {
 	c.Env.T.Helper()
 	var buf bytes.Buffer
 	w := multipart.NewWriter(&buf)
@@ -129,7 +134,7 @@ func (c *Client) Multipart(path string, fields map[string]string, fileField, fil
 		_, _ = fw.Write(content)
 	}
 	_ = w.Close()
-	req, _ := http.NewRequest("POST", c.Env.Srv.URL+"/api/v1"+path, &buf)
+	req, _ := http.NewRequest(method, c.Env.Srv.URL+"/api/v1"+path, &buf)
 	req.Header.Set("Content-Type", w.FormDataContentType())
 	req.Header.Set(auth.ClientHeader, "test")
 	return c.send(req)

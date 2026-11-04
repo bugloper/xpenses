@@ -21,6 +21,9 @@ type TransactionService struct {
 	Accounts        repositories.AccountRepo
 	Categories      repositories.CategoryRepo
 	DefaultCurrency string
+	// AttachmentsDir holds one image per transaction (see attachments.go).
+	AttachmentsDir string
+	MaxUploadBytes int64
 }
 
 func (s *TransactionService) List(ctx context.Context, f dto.TransactionFilter) ([]models.Transaction, int, error) {
@@ -239,11 +242,15 @@ func (s *TransactionService) Update(ctx context.Context, id string, req dto.Upda
 }
 
 func (s *TransactionService) Delete(ctx context.Context, id string) error {
-	if _, err := s.Get(ctx, id); err != nil {
+	t, err := s.Get(ctx, id)
+	if err != nil {
 		return err
 	}
 	if err := s.Repo.Delete(ctx, s.DB, auth.UserID(ctx), id); err != nil {
 		return apperr.Internal(err)
+	}
+	if t.AttachmentMime != "" {
+		s.removeAttachmentFile(t.UserID, t.ID)
 	}
 	return nil
 }

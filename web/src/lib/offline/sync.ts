@@ -1,9 +1,11 @@
 import { api, isApiError, type ApiError } from '@/lib/api'
+import { uploadAttachment } from '@/lib/attachments'
 import { authStore, currentUserId } from '@/lib/auth'
 import type { CreateTransactionRequest, Transaction } from '@/types/api'
 import {
   backoffMs,
   claimOrphanedPending,
+  getPendingAttachment,
   listPendingForUser,
   removePending,
   subscribeQueue,
@@ -201,6 +203,10 @@ class SyncManager {
     await updatePending(item.client_id, { status: 'syncing' })
     try {
       const tx = await api.post<Transaction>('/transactions', item.payload as CreateTransactionRequest)
+      // The create is idempotent (client_id), so if this upload fails the whole
+      // push simply runs again later.
+      const image = await getPendingAttachment(item.client_id)
+      if (image) await uploadAttachment(tx.id, image)
       await removePending(item.client_id)
       this.onSynced?.(tx, item)
       return true

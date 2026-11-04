@@ -1,8 +1,8 @@
 import { currentUserId } from '@/lib/auth'
-import { getDB, type PendingStatus, type PendingTransaction } from './db'
+import { getDB, type PendingAttachment, type PendingStatus, type PendingTransaction } from './db'
 import type { CreateTransactionRequest } from '@/types/api'
 
-export type { PendingTransaction, PendingStatus }
+export type { PendingTransaction, PendingStatus, PendingAttachment }
 
 type Listener = () => void
 const listeners = new Set<Listener>()
@@ -30,9 +30,13 @@ export function newClientId(): string {
 export async function enqueueTransaction(
   payload: CreateTransactionRequest,
   clientId?: string,
+  attachment?: File | null,
 ): Promise<PendingTransaction> {
   const db = await getDB()
   const id = clientId ?? payload.client_id ?? newClientId()
+  if (attachment) {
+    await db.put('pendingAttachments', { client_id: id, blob: attachment, name: attachment.name, type: attachment.type })
+  }
   const now = new Date().toISOString()
   const item: PendingTransaction = {
     client_id: id,
@@ -49,6 +53,18 @@ export async function enqueueTransaction(
   await db.put('pendingTransactions', item)
   notify()
   return item
+}
+
+/** The image queued with a transaction, if any. */
+export async function getPendingAttachment(clientId: string): Promise<File | null> {
+  const db = await getDB()
+  const rec = await db.get('pendingAttachments', clientId)
+  return rec ? new File([rec.blob], rec.name, { type: rec.type }) : null
+}
+
+export async function removePendingAttachment(clientId: string): Promise<void> {
+  const db = await getDB()
+  await db.delete('pendingAttachments', clientId)
 }
 
 /** Every queued item, all users, oldest first. UI code should use `listPendingForUser`. */
@@ -158,6 +174,7 @@ export async function retryPending(clientId: string) {
 }
 
 export async function removePending(clientId: string): Promise<void> {
+  await removePendingAttachment(clientId)
   const db = await getDB()
   await db.delete('pendingTransactions', clientId)
   notify()

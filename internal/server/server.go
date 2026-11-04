@@ -40,7 +40,7 @@ func NewDeps(cfg config.Config, db *sql.DB) *Deps {
 	d := &Deps{
 		Accounts:     &services.AccountService{DB: db, DefaultCurrency: cfg.DefaultCurrency},
 		Categories:   &services.CategoryService{DB: db},
-		Transactions: &services.TransactionService{DB: db, DefaultCurrency: cfg.DefaultCurrency},
+		Transactions: &services.TransactionService{DB: db, DefaultCurrency: cfg.DefaultCurrency, AttachmentsDir: cfg.AttachmentsDir(), MaxUploadBytes: cfg.MaxUploadBytes},
 		Budgets:      &services.BudgetService{DB: db},
 		Recurring:    &services.RecurringService{DB: db, DefaultCurrency: cfg.DefaultCurrency},
 		Settings:     &services.SettingsService{DB: db},
@@ -48,6 +48,7 @@ func NewDeps(cfg config.Config, db *sql.DB) *Deps {
 	}
 	d.Auth = auth.NewService(db)
 	d.Auth.DefaultCurrency = cfg.DefaultCurrency
+	d.Auth.AttachmentsDir = cfg.AttachmentsDir()
 	d.AuthMW = &auth.Middleware{Svc: d.Auth, SecureCookies: cfg.SecureCookies, TrustedProxy: cfg.TrustedProxy, AllowedOrigin: cfg.CORSOrigin}
 	return d
 }
@@ -79,6 +80,9 @@ func New(cfg config.Config, log *slog.Logger, deps *Deps, extra ...Registrar) *e
 	// Installed at the top level on purpose: group middleware adds catch-all
 	// routes that turn 405s into 404s.
 	e.Use(deps.AuthMW.Protect())
+	// The PWA's share target posts the shared image to /share; the service worker
+	// normally answers it. When it reaches the server, just open the add screen.
+	e.POST("/share", func(c echo.Context) error { return c.Redirect(http.StatusSeeOther, "/add?shared=missing") })
 
 	api := e.Group(auth.APIPrefix)
 	api.GET("/health", func(c echo.Context) error {

@@ -3,11 +3,13 @@ package handlers
 import (
 	"encoding/csv"
 	"net/http"
+	"os"
 	"strconv"
 
 	"github.com/labstack/echo/v4"
 
 	"github.com/bugloper/xpensiv/internal/dto"
+	apperr "github.com/bugloper/xpensiv/internal/errors"
 	"github.com/bugloper/xpensiv/internal/models"
 	"github.com/bugloper/xpensiv/internal/services"
 )
@@ -22,6 +24,54 @@ func (h *TransactionHandler) Register(g *echo.Group) {
 	g.PATCH("/transactions/:id", h.Update)
 	g.DELETE("/transactions/:id", h.Delete)
 	g.POST("/transactions/:id/duplicate", h.Duplicate)
+	g.POST("/transactions/:id/attachment", h.Attach)
+	g.PUT("/transactions/:id/attachment", h.Attach)
+	g.GET("/transactions/:id/attachment", h.Attachment)
+	g.DELETE("/transactions/:id/attachment", h.DetachFile)
+}
+
+// Attach stores an image (multipart field "file") on the transaction.
+func (h *TransactionHandler) Attach(c echo.Context) error {
+	fh, err := c.FormFile("file")
+	if err != nil {
+		return apperr.BadRequest("an image is required (multipart field 'file')")
+	}
+	f, err := fh.Open()
+	if err != nil {
+		return apperr.BadRequest("could not read the uploaded file")
+	}
+	defer f.Close()
+	if err := h.Svc.AttachFile(c.Request().Context(), c.Param("id"), f); err != nil {
+		return err
+	}
+	t, err := h.Svc.Get(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return err
+	}
+	return JSON(c, http.StatusOK, t)
+}
+
+// Attachment serves the stored image to its owner.
+func (h *TransactionHandler) Attachment(c echo.Context) error {
+	path, mime, err := h.Svc.Attachment(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return err
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return apperr.NotFound("attachment")
+	}
+	defer f.Close()
+	c.Response().Header().Set("Cache-Control", "private, max-age=3600")
+	c.Response().Header().Set("X-Content-Type-Options", "nosniff")
+	return c.Stream(http.StatusOK, mime, f)
+}
+
+func (h *TransactionHandler) DetachFile(c echo.Context) error {
+	if err := h.Svc.RemoveAttachment(c.Request().Context(), c.Param("id")); err != nil {
+		return err
+	}
+	return c.NoContent(http.StatusNoContent)
 }
 
 func filterFromQuery(c echo.Context) dto.TransactionFilter {

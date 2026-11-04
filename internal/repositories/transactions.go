@@ -15,7 +15,7 @@ type TransactionRepo struct{}
 const txCols = `t.user_id, t.id, t.type, t.amount, t.currency, t.account_id, a.name, t.transfer_account_id, COALESCE(ta.name,''),
 	t.category_id, COALESCE(c.name,''), COALESCE(c.icon,''), COALESCE(c.color,''),
 	t.description, t.payee, t.transaction_date, t.notes, t.origin, t.status, t.recurring_id,
-	t.client_id, t.created_at, t.updated_at`
+	t.client_id, t.created_at, t.updated_at, t.attachment_mime`
 
 const txFrom = ` FROM transactions t
 	JOIN accounts a ON a.id = t.account_id
@@ -28,7 +28,7 @@ func scanTx(s interface{ Scan(...any) error }) (*models.Transaction, error) {
 	if err := s.Scan(&t.UserID, &t.ID, &t.Type, &t.Amount, &t.Currency, &t.AccountID, &t.AccountName, &transferID, &t.TransferAccountName,
 		&catID, &t.CategoryName, &t.CategoryIcon, &t.CategoryColor,
 		&t.Description, &t.Payee, &t.TransactionDate, &t.Notes, &t.Origin, &t.Status, &recID,
-		&clientID, &t.CreatedAt, &t.UpdatedAt); err != nil {
+		&clientID, &t.CreatedAt, &t.UpdatedAt, &t.AttachmentMime); err != nil {
 		return nil, err
 	}
 	t.TransferAccountID = strPtr(transferID)
@@ -36,6 +36,7 @@ func scanTx(s interface{ Scan(...any) error }) (*models.Transaction, error) {
 	t.RecurringID = strPtr(recID)
 	t.ClientID = strPtr(clientID)
 	t.Tags = []string{}
+	t.HasAttachment = t.AttachmentMime != ""
 	return &t, nil
 }
 
@@ -197,6 +198,12 @@ func (TransactionRepo) Update(ctx context.Context, db DBTX, t *models.Transactio
 		category_id=?, description=?, payee=?, transaction_date=?, notes=?, status=?, updated_at=? WHERE id=? AND user_id=?`,
 		t.Type, t.Amount, t.Currency, t.AccountID, nullStr(t.TransferAccountID), nullStr(t.CategoryID),
 		t.Description, t.Payee, t.TransactionDate, t.Notes, t.Status, t.UpdatedAt, t.ID, t.UserID)
+	return err
+}
+
+// SetAttachmentMime records (or with "" clears) the transaction's attached image type.
+func (TransactionRepo) SetAttachmentMime(ctx context.Context, db DBTX, userID, id, mime string) error {
+	_, err := db.ExecContext(ctx, `UPDATE transactions SET attachment_mime = ? WHERE id = ? AND user_id = ?`, mime, id, userID)
 	return err
 }
 

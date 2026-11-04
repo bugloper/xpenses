@@ -36,6 +36,9 @@ Status codes: 200 OK, 201 Created, 204 No Content, 400 bad_request, 404 not_foun
 | POST | /transactions | see below. Returns 201, or 200 if `client_id` was already seen (idempotent replay) |
 | GET/PATCH/DELETE | /transactions/:id | PATCH is partial; `clear_category:true` / `clear_transfer_account:true` to null those. |
 | POST | /transactions/:id/duplicate | body `{transaction_date?}` default today → 201 |
+| PUT/POST | /transactions/:id/attachment | multipart `file`: one JPEG/PNG/WebP image (sniffed, ≤ XPENSIV_MAX_UPLOAD_BYTES) stored under `DATA_DIR/attachments/<user>/<id>`; replaces an earlier one → Transaction with `has_attachment: true` |
+| GET | /transactions/:id/attachment | the image bytes (`Cache-Control: private`) |
+| DELETE | /transactions/:id/attachment | → 204 |
 | GET | /budgets | `[{id,category_id,amount}]` monthly amount per expense category |
 | POST | /budgets | `{category_id, amount}` (409 if exists) |
 | PATCH/DELETE | /budgets/:id | |
@@ -54,7 +57,7 @@ Status codes: 200 OK, 201 Created, 204 No Content, 400 bad_request, 404 not_foun
   "account_id":"...","account_name":"BOB Savings","transfer_account_id":null,"transfer_account_name":"",
   "category_id":"cat-food","category_name":"Food","category_icon":"utensils","category_color":"#f97316",
   "description":"Lunch","payee":"Ambient Cafe","transaction_date":"2026-11-04","notes":"",
-  "origin":"manual|adjustment","status":"cleared|pending|void","recurring_id":null,"tags":["work"],
+  "origin":"manual|adjustment","status":"cleared|pending|void","recurring_id":null,"tags":["work"],"has_attachment":false,
   "created_at":"...","updated_at":"..."
 }
 ```

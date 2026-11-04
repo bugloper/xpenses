@@ -87,8 +87,11 @@ type Transaction struct {
 	RecurringID         *string  `json:"recurring_id"`
 	ClientID            *string  `json:"client_id,omitempty"`
 	Tags                []string `json:"tags"`
-	CreatedAt           string   `json:"created_at"`
-	UpdatedAt           string   `json:"updated_at"`
+	// AttachmentMime is the stored image's media type, "" when none.
+	AttachmentMime string `json:"-"`
+	HasAttachment  bool   `json:"has_attachment"`
+	CreatedAt      string `json:"created_at"`
+	UpdatedAt      string `json:"updated_at"`
 }
 
 type RecurringTransaction struct {

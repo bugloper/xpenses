@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { CloudUpload, AlertTriangle } from 'lucide-react'
+import { AlertTriangle, CloudUpload, Paperclip } from 'lucide-react'
 import { CategoryIcon } from '@/components/common/CategoryIcon'
 import { Money } from '@/components/common/Money'
 import { Badge } from '@/components/ui/badge'
@@ -50,6 +50,11 @@ export function TransactionRow({
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
           <p className="truncate text-sm font-medium">{transactionTitle(tx)}</p>
+          {tx.has_attachment && (
+            <span className="text-muted-foreground" title="Has a screenshot">
+              <Paperclip className="size-3.5" />
+            </span>
+          )}
           {pending && (
             <Badge
               variant={row.item.status === 'failed' ? 'destructive' : 'secondary'}

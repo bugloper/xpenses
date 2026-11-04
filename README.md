@@ -14,6 +14,7 @@ Multi-user with fully isolated data, installable as a PWA, with offline expense 
 - Recurring transactions (daily/weekly/monthly/yearly) generated as drafts or real entries, never duplicated.
 - Reports (monthly, daily, weekly, category, merchant, income vs expense, accounts, budgets) with CSV and PDF export.
 - PWA: installable, offline shell, offline transaction queue with sync indicator, update notifications.
+- Share a payment screenshot from mBoB, mPay or any app straight into Xpensiv (Android, installed app): it opens the add screen with the image attached; you type the amount and save. The image is kept with the transaction.
 - Backup/restore (optionally AES-256-GCM encrypted), admin only.
 - Accounts: first-run owner setup, Argon2id passwords, cookie sessions, login throttling, invite-only or open registration, admin user management. Every user sees only their own data.
 
@@ -145,11 +146,20 @@ ssh myserver 'cp /opt/xpensiv/deploy/xpensiv.caddy /opt/proxy/sites/ && docker e
 
 Data lives in the `xpensiv-data` volume and survives rebuilds.
 
+## Sharing a payment screenshot
+
+On Android, once Xpensiv is installed to the home screen, it appears in the system share sheet for
+images (the `share_target` in the web manifest). Sharing the success screen from mBoB or mPay opens
+the add screen with the screenshot attached; enter the amount and save. Offline, the image is queued
+with the transaction and uploaded when the queue syncs. Attachments live under
+`data/attachments/<user>/<transaction id>` and are removed with the transaction or the user. iOS does
+not support web share targets; attach the image from the add screen or the transaction page instead.
+
 ## Backup and restore
 
 - **Backup (admin only):** Settings → Backup, or `GET /api/v1/backup` (`?passphrase=...` or header `X-Backup-Passphrase` to receive an encrypted `.db.enc`). Snapshots are produced with `VACUUM INTO`, so they are consistent even while the app is running, and are written with `0600` permissions.
 - **Restore:** Settings → Restore (upload the `.db` or `.db.enc` plus passphrase), or `POST /api/v1/restore` (multipart `file`, `passphrase`). The current database is snapshotted to `data/backups/` first, then the snapshot's tables are copied in inside one transaction. The backup must be from the same schema version.
-- **Manual:** stop the server and copy `data/xpensiv.db` (also copy `-wal`/`-shm` if present).
+- **Manual:** stop the server and copy `data/xpensiv.db` (also copy `-wal`/`-shm` if present) and `data/attachments/`.
 
 Encrypted backups use PBKDF2-SHA256 (200k iterations) + AES-256-GCM.
 
