@@ -106,9 +106,12 @@ Encrypt issues a normal certificate for it. Put the variable in a `.env` file ne
 files so `docker compose` picks it up on every run. When you later get a real domain, change
 `XPENSIV_DOMAIN` and run the same `up -d` command; Caddy fetches the new certificate itself.
 
-To redeploy after a change, copy the new source to the server and rebuild:
+To redeploy after a change, replace the source on the server and rebuild. Clear the old tree
+first (keeping `.env`): extracting over it would leave behind files that were deleted from the
+repo, and a stale file can break the build.
 
 ```sh
+ssh myserver 'find /opt/xpensiv -mindepth 1 -maxdepth 1 ! -name .env -exec rm -rf {} +'
 git archive HEAD | ssh myserver 'tar -x -C /opt/xpensiv'
 ssh myserver 'cd /opt/xpensiv && docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build'
 ```
