@@ -9,6 +9,7 @@ import { uiStore, useUIStore } from '@/lib/ui-store'
 import { AddTransactionSheet } from '@/components/transactions/AddTransactionSheet'
 import { ALL_NAV, MORE_NAV, PRIMARY_NAV, visibleNav, type NavItem } from './nav'
 import { PendingSheet } from './PendingSheet'
+import { PwaInstallPrompt } from './PwaInstallPrompt'
 import { PwaUpdatePrompt } from './PwaUpdatePrompt'
 import { SyncPill } from './SyncPill'
 import { ThemeToggle } from './ThemeToggle'
@@ -206,6 +207,7 @@ export function AppShell() {
       <PendingSheet />
       <LogoutDialog />
       <PwaUpdatePrompt />
+      <PwaInstallPrompt />
     </div>
   )
 }
