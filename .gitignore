@@ -1,0 +1,28 @@
+# Go
+/bin/
+/dist/
+*.test
+*.out
+
+# Data (SQLite db, uploaded statements, backups)
+/data/
+*.db
+*.db-wal
+*.db-shm
+
+# Env
+.env
+.env.local
+
+# Frontend
+web/node_modules/
+web/dist/
+web/dev-dist/
+web/playwright-report/
+web/test-results/
+web/.vite/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
