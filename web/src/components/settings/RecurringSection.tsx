@@ -100,7 +100,7 @@ function RecurringFormSheet({
     generate_as: 'cleared',
   }
   const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: empty })
-  const { control, handleSubmit, reset, formState } = form
+  const { control, handleSubmit, reset, formState, setValue } = form
   useEffect(() => {
     if (!open) return
     reset(
@@ -126,9 +126,17 @@ function RecurringFormSheet({
   }, [open, item, reset])
   const type = useWatch({ control, name: 'type' })
   const accountId = useWatch({ control, name: 'account_id' })
+  const categoryId = useWatch({ control, name: 'category_id' })
   const err = formState.errors
   const busy = create.isPending || update.isPending
-  const cats = categories.filter((c) => c.type === (type === 'income' ? 'income' : 'expense') && c.is_active)
+  const categoryType = type === 'income' ? 'income' : 'expense'
+  const cats = categories.filter((c) => c.type === categoryType && c.is_active)
+  // Switching expense <-> income must not keep a category of the other type (server rejects it).
+  useEffect(() => {
+    if (!categoryId || categories.length === 0) return
+    if (!categories.some((c) => c.id === categoryId && c.type === categoryType))
+      setValue('category_id', undefined)
+  }, [categoryId, categoryType, categories, setValue])
 
   const submit = handleSubmit(async (v) => {
     const common = {

@@ -8,6 +8,7 @@ import {
   listPending,
   removePending,
   retryPending,
+  reviseAndRequeue,
   updatePending,
 } from './queue'
 import { syncManager } from './sync'
@@ -138,6 +139,84 @@ describe('syncManager', () => {
     expect(items[0]?.status).toBe('failed')
     expect(items[0]?.last_error).toContain('category_id must match type')
     expect(syncManager.getState().failed).toBe(1)
+  })
+
+  it('retries a lost-response POST with the same client_id and accepts the 200 replay', async () => {
+    // First attempt: the server may have stored it, but the response never arrived.
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    const res = await submitTransaction(payload)
+    expect(res.queued).toBe(true)
+    const clientId = res.queued ? res.pending.client_id : ''
+    expect(JSON.parse(fetchSpy.mock.calls[0]![1]?.body as string).client_id).toBe(clientId)
+
+    // Replay: the Go handler finds the client_id and answers 200 with the existing row.
+    fetchSpy.mockResolvedValueOnce(
+      jsonResponse(200, { data: { id: 'tx-1', ...payload, client_id: clientId } }),
+    )
+    const synced = vi.fn()
+    syncManager.setOnSynced(synced)
+    await syncManager.syncNow({ force: true })
+    expect(fetchSpy).toHaveBeenCalledTimes(2)
+    expect(JSON.parse(fetchSpy.mock.calls[1]![1]?.body as string).client_id).toBe(clientId)
+    expect(await listPending()).toHaveLength(0)
+    expect(synced).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not POST twice when two drains are requested concurrently', async () => {
+    await enqueueTransaction(payload)
+    let release: (r: Response) => void = () => {}
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(() => new Promise<Response>((resolve) => (release = resolve)))
+    const first = syncManager.syncNow({ force: true })
+    const second = syncManager.syncNow({ force: true })
+    // Let the first drain reach fetch before releasing it.
+    await new Promise((r) => setTimeout(r, 20))
+    release(jsonResponse(201, { data: { id: 'tx-1', ...payload } }))
+    await Promise.all([first, second])
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    expect(await listPending()).toHaveLength(0)
+  })
+
+  it('keeps items pending (not failed) on a 5xx and backs off', async () => {
+    await enqueueTransaction(payload)
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(500, { error: { code: 'internal_error', message: 'boom' } }),
+    )
+    await syncManager.syncNow({ force: true })
+    const items = await listPending()
+    expect(items[0]?.status).toBe('pending')
+    expect(items[0]?.attempts).toBe(1)
+    expect(items[0]?.next_attempt_at).toBeGreaterThan(Date.now())
+    expect(syncManager.getState().failed).toBe(0)
+  })
+
+  it('never retries a failed (4xx) item on later drains until the user acts', async () => {
+    const a = await enqueueTransaction(payload)
+    await updatePending(a.client_id, { status: 'failed', last_error: 'validation failed' })
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    await syncManager.syncNow({ force: true })
+    expect(fetchSpy).not.toHaveBeenCalled()
+    expect((await listPending())[0]?.status).toBe('failed')
+  })
+
+  it('reviseAndRequeue keeps the client_id so the fixed item is still idempotent', async () => {
+    const a = await enqueueTransaction(payload)
+    await updatePending(a.client_id, { status: 'failed', attempts: 3, last_error: 'nope' })
+    await reviseAndRequeue(a.client_id, { ...payload, amount: 999, client_id: 'must-be-ignored' })
+    const [item] = await listPending()
+    expect(item).toMatchObject({ client_id: a.client_id, status: 'pending', attempts: 0, last_error: null })
+    expect(item?.payload.client_id).toBe(a.client_id)
+    expect(item?.payload.amount).toBe(999)
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(jsonResponse(201, { data: { id: 'tx-2' } }))
+    await syncManager.syncNow({ force: true })
+    expect(JSON.parse(fetchSpy.mock.calls[0]![1]?.body as string)).toMatchObject({
+      client_id: a.client_id,
+      amount: 999,
+    })
+    expect(await listPending()).toHaveLength(0)
   })
 
   it('keeps items pending with backoff on network failure', async () => {

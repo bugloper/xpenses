@@ -134,15 +134,23 @@ export async function request<T>(path: string, opts: RequestOptions = {}): Promi
   return JSON.parse(text) as T
 }
 
+/**
+ * Unwraps `{data}`; a 204 / empty body (e.g. POST /reconciliation/unmatch)
+ * resolves to undefined instead of throwing on `undefined.data`.
+ */
+function unwrap<T>(r: Envelope<T> | undefined): T {
+  return r === undefined ? (undefined as T) : r.data
+}
+
 export const api = {
-  get: <T>(path: string, signal?: AbortSignal) => request<Envelope<T>>(path, { signal }).then((r) => r.data),
+  get: <T>(path: string, signal?: AbortSignal) => request<Envelope<T>>(path, { signal }).then(unwrap),
   getPage: <T>(path: string, signal?: AbortSignal) => request<Paginated<T>>(path, { signal }),
   post: <T>(path: string, body?: unknown) =>
-    request<Envelope<T>>(path, { method: 'POST', body }).then((r) => r.data),
+    request<Envelope<T>>(path, { method: 'POST', body }).then(unwrap),
   postForm: <T>(path: string, form: FormData) =>
-    request<Envelope<T>>(path, { method: 'POST', form }).then((r) => r.data),
+    request<Envelope<T>>(path, { method: 'POST', form }).then(unwrap),
   patch: <T>(path: string, body: unknown) =>
-    request<Envelope<T>>(path, { method: 'PATCH', body }).then((r) => r.data),
+    request<Envelope<T>>(path, { method: 'PATCH', body }).then(unwrap),
   delete: (path: string) => request<void>(path, { method: 'DELETE' }),
 }
 

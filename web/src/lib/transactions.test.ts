@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { groupByDay, pendingToTransaction, transactionTitle } from './transactions'
+import { groupByDay, pendingToTransaction, transactionTitle, transactionsSearchSchema } from './transactions'
 import type { PendingTransaction } from './offline/queue'
 import type { Transaction } from '@/types/api'
 
@@ -60,6 +60,29 @@ describe('groupByDay', () => {
     expect(groups[0]?.expense).toBe(1100)
   })
 
+  it('drops a pending row once the server list already carries its client_id', () => {
+    // The POST reached the server but the response was lost: the server row and
+    // the queued copy share a client_id and must not both be shown.
+    const pending: PendingTransaction = {
+      client_id: 'c-lost',
+      payload: { type: 'expense', amount: 1000, account_id: 'a', transaction_date: '2026-11-04' },
+      status: 'pending',
+      attempts: 1,
+      last_error: null,
+      error_code: null,
+      created_at: '2026-11-04T09:00:00Z',
+      updated_at: '2026-11-04T09:00:00Z',
+      next_attempt_at: 0,
+    }
+    const groups = groupByDay([tx({ amount: 1000, client_id: 'c-lost' })], [pending])
+    expect(groups[0]?.rows).toHaveLength(1)
+    expect(groups[0]?.rows[0]?.kind).toBe('tx')
+    expect(groups[0]?.expense).toBe(1000)
+    // A different client_id is still merged in.
+    const other = groupByDay([tx({ amount: 1000, client_id: 'c-other' })], [pending])
+    expect(other[0]?.rows).toHaveLength(2)
+  })
+
   it('supports ascending order', () => {
     const groups = groupByDay(
       [tx({ transaction_date: '2026-11-01' }), tx({ transaction_date: '2026-11-02' })],
@@ -67,6 +90,35 @@ describe('groupByDay', () => {
       { order: 'asc' },
     )
     expect(groups.map((g) => g.date)).toEqual(['2026-11-01', '2026-11-02'])
+  })
+})
+
+describe('transactionsSearchSchema', () => {
+  it('keeps valid keys as the drill-down links write them', () => {
+    expect(
+      transactionsSearchSchema.parse({
+        category: 'cat-1',
+        from: '2026-11-01',
+        to: '2026-11-30',
+        tab: 'expense',
+        q: 'Cafe',
+      }),
+    ).toEqual({ category: 'cat-1', from: '2026-11-01', to: '2026-11-30', tab: 'expense', q: 'Cafe' })
+  })
+
+  it('drops garbage instead of crashing or forwarding it to the API', () => {
+    const parsed = transactionsSearchSchema.parse({
+      page: 'abc',
+      from: 'yesterday',
+      to: '2026-11-30',
+      tab: 'nope',
+      type: 'gift',
+      status: 42,
+      sort: 'x',
+      order: 'sideways',
+    })
+    expect(parsed).toEqual({ to: '2026-11-30' })
+    expect(transactionsSearchSchema.parse({ from: ['2026-11-01'] })).toEqual({})
   })
 })
 

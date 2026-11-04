@@ -1,6 +1,33 @@
+import { z } from 'zod'
 import type { PendingTransaction } from '@/lib/offline/queue'
 import { signedAmount } from '@/lib/money'
 import type { Transaction } from '@/types/api'
+
+const isoDate = () =>
+  z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional()
+    .catch(undefined)
+
+/**
+ * `/transactions?…` search params. Every key tolerates garbage (`?page=abc`,
+ * `?from=yesterday`) by dropping it instead of crashing or forwarding it to the
+ * API, where a malformed date would turn the whole list into an error state.
+ */
+export const transactionsSearchSchema = z.object({
+  tab: z.enum(['all', 'income', 'expense']).optional().catch(undefined),
+  q: z.string().optional().catch(undefined),
+  from: isoDate(),
+  to: isoDate(),
+  account: z.string().optional().catch(undefined),
+  category: z.string().optional().catch(undefined),
+  type: z.enum(['expense', 'income', 'transfer', 'refund', 'adjustment']).optional().catch(undefined),
+  status: z.enum(['cleared', 'pending', 'void']).optional().catch(undefined),
+  sort: z.enum(['date', 'amount', 'created_at', 'payee']).optional().catch(undefined),
+  order: z.enum(['asc', 'desc']).optional().catch(undefined),
+})
+export type TransactionsSearch = z.infer<typeof transactionsSearchSchema>
 
 /** A row in the transactions list: either a server transaction or an offline-queued one. */
 export type ListRow =
@@ -57,6 +84,9 @@ export function dayContribution(tx: Transaction): number {
 /**
  * Groups rows by `transaction_date` (desc) and computes per-day totals.
  * Pending (offline) items are merged in and sorted alongside server rows.
+ * A pending item whose `client_id` already appears on a server row is dropped:
+ * the POST reached the server but its response was lost, so the retry will be
+ * a no-op and showing both would double-count it.
  */
 export function groupByDay(
   transactions: Transaction[],
@@ -64,8 +94,12 @@ export function groupByDay(
   opts: { order?: 'asc' | 'desc' } = {},
 ): DayGroup[] {
   const order = opts.order ?? 'desc'
+  const synced = new Set<string>()
+  for (const tx of transactions) if (tx.client_id) synced.add(tx.client_id)
   const rows: ListRow[] = [
-    ...pending.map((item): ListRow => ({ kind: 'pending', item, tx: pendingToTransaction(item) })),
+    ...pending
+      .filter((item) => !synced.has(item.client_id))
+      .map((item): ListRow => ({ kind: 'pending', item, tx: pendingToTransaction(item) })),
     ...transactions.map((tx): ListRow => ({ kind: 'tx', tx })),
   ]
   const byDate = new Map<string, ListRow[]>()

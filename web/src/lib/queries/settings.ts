@@ -15,7 +15,12 @@ export function useUpdateSettings() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (patch: Record<string, string>) => api.patch<Settings>('/settings', patch),
-    onSuccess: (data) => qc.setQueryData(keys.settings.all, data),
+    onSuccess: (data, patch) => {
+      qc.setQueryData(keys.settings.all, data)
+      // The tolerance changes which manual transactions the workspace suggests.
+      if ('reconciliation.date_tolerance_days' in patch)
+        void qc.invalidateQueries({ queryKey: keys.reconciliation.all })
+    },
   })
 }
 

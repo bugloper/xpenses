@@ -23,7 +23,11 @@ export function useCreateAccount() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (body: CreateAccountRequest) => api.post<Account>('/accounts', body),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.accounts.all }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: keys.accounts.all })
+      // The opening balance feeds the dashboard total and the accounts report.
+      void qc.invalidateQueries({ queryKey: keys.reports.all })
+    },
   })
 }
 
@@ -35,6 +39,9 @@ export function useUpdateAccount() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: keys.accounts.all })
       void qc.invalidateQueries({ queryKey: keys.reports.all })
+      // Name/currency are denormalised onto transaction rows and the reconciliation workspace.
+      void qc.invalidateQueries({ queryKey: keys.transactions.all })
+      void qc.invalidateQueries({ queryKey: keys.reconciliation.all })
     },
   })
 }

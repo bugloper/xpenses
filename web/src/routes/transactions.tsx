@@ -2,7 +2,6 @@ import { createRoute } from '@tanstack/react-router'
 import { Download, Search, SlidersHorizontal, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
-import { z } from 'zod'
 import { PageHeader } from '@/components/common/PageHeader'
 import { Segmented } from '@/components/common/Segmented'
 import { Badge } from '@/components/ui/badge'
@@ -18,23 +17,11 @@ import { useDebouncedValue } from '@/hooks/useDebounce'
 import { downloadFile, errorMessage, toQuery } from '@/lib/api'
 import { usePendingTransactions } from '@/lib/offline'
 import { useDefaultCurrency, useInfiniteTransactions } from '@/lib/queries'
-import { groupByDay } from '@/lib/transactions'
+import { groupByDay, transactionsSearchSchema } from '@/lib/transactions'
 import type { TransactionFilter } from '@/types/api'
 import { rootRoute } from './__root'
 
-const searchSchema = z.object({
-  tab: z.enum(['all', 'income', 'expense']).optional().catch(undefined),
-  q: z.string().optional().catch(undefined),
-  from: z.string().optional().catch(undefined),
-  to: z.string().optional().catch(undefined),
-  account: z.string().optional().catch(undefined),
-  category: z.string().optional().catch(undefined),
-  type: z.enum(['expense', 'income', 'transfer', 'refund', 'adjustment']).optional().catch(undefined),
-  status: z.enum(['cleared', 'pending', 'void']).optional().catch(undefined),
-  sort: z.enum(['date', 'amount', 'created_at', 'payee']).optional().catch(undefined),
-  order: z.enum(['asc', 'desc']).optional().catch(undefined),
-})
-export type TransactionsSearch = z.infer<typeof searchSchema>
+export type { TransactionsSearch } from '@/lib/transactions'
 
 function TransactionsPage() {
   const search = transactionsRoute.useSearch()
@@ -111,8 +98,10 @@ function TransactionsPage() {
 
   // Merge offline-queued items (only on the unfiltered first view so they aren't mis-filtered).
   const visiblePending = useMemo(() => {
-    if (search.q || filters.from || filters.account || filters.category || filters.status) return []
-    return pending.filter((p) => tab === 'all' || p.payload.type === tab)
+    if (search.q || filters.from || filters.to || filters.account || filters.category || filters.status)
+      return []
+    const wantType = tab === 'all' ? filters.type : tab
+    return pending.filter((p) => !wantType || p.payload.type === wantType)
   }, [pending, search.q, filters, tab])
 
   const groups = useMemo(
@@ -225,6 +214,6 @@ function TransactionsPage() {
 export const transactionsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/transactions',
-  validateSearch: searchSchema,
+  validateSearch: transactionsSearchSchema,
   component: TransactionsPage,
 })
