@@ -1,3 +1,4 @@
+import { currentUserId } from '@/lib/auth'
 import { getDB, type PendingStatus, type PendingTransaction } from './db'
 import type { CreateTransactionRequest } from '@/types/api'
 
@@ -35,6 +36,7 @@ export async function enqueueTransaction(
   const now = new Date().toISOString()
   const item: PendingTransaction = {
     client_id: id,
+    user_id: currentUserId(),
     payload: { ...payload, client_id: id },
     status: 'pending',
     attempts: 0,
@@ -49,10 +51,35 @@ export async function enqueueTransaction(
   return item
 }
 
+/** Every queued item, all users, oldest first. UI code should use `listPendingForUser`. */
 export async function listPending(): Promise<PendingTransaction[]> {
   const db = await getDB()
   const all = await db.getAllFromIndex('pendingTransactions', 'by-created')
-  return all
+  return all.map((i) => (i.user_id === undefined ? { ...i, user_id: null } : i))
+}
+
+/**
+ * True when `item` may be shown to / synced for `userId`. Items without an owner
+ * (queued before the account system existed) belong to whoever is signed in;
+ * nothing is visible while signed out.
+ */
+export function belongsToUser(item: Pick<PendingTransaction, 'user_id'>, userId: string | null): boolean {
+  if (userId === null) return false
+  return item.user_id === null || item.user_id === userId
+}
+
+export function filterForUser<T extends Pick<PendingTransaction, 'user_id'>>(
+  items: T[],
+  userId: string | null,
+): T[] {
+  return items.filter((i) => belongsToUser(i, userId))
+}
+
+/** The current user's queued items (other users' items stay in the store, hidden). */
+export async function listPendingForUser(
+  userId: string | null = currentUserId(),
+): Promise<PendingTransaction[]> {
+  return filterForUser(await listPending(), userId)
 }
 
 export async function getPending(clientId: string): Promise<PendingTransaction | undefined> {
@@ -60,8 +87,10 @@ export async function getPending(clientId: string): Promise<PendingTransaction |
   return db.get('pendingTransactions', clientId)
 }
 
-export async function countPending(): Promise<{ pending: number; syncing: number; failed: number }> {
-  const items = await listPending()
+export async function countPending(
+  userId: string | null = currentUserId(),
+): Promise<{ pending: number; syncing: number; failed: number }> {
+  const items = await listPendingForUser(userId)
   return {
     pending: items.filter((i) => i.status === 'pending').length,
     syncing: items.filter((i) => i.status === 'syncing').length,
@@ -85,6 +114,26 @@ export async function updatePending(
   await tx.done
   notify()
   return next
+}
+
+/**
+ * Assigns ownerless items (queued before accounts existed) to `userId`. Run on
+ * the first drain after login so they sync under that user and stop being
+ * visible to anyone else. Returns how many were claimed.
+ */
+export async function claimOrphanedPending(userId: string): Promise<number> {
+  const db = await getDB()
+  const tx = db.transaction('pendingTransactions', 'readwrite')
+  let claimed = 0
+  for (const item of await tx.store.getAll()) {
+    if (item.user_id === null || item.user_id === undefined) {
+      await tx.store.put({ ...item, user_id: userId, updated_at: new Date().toISOString() })
+      claimed++
+    }
+  }
+  await tx.done
+  if (claimed > 0) notify()
+  return claimed
 }
 
 /** Replace the payload of a failed item (user fixed it) and put it back in the queue. */

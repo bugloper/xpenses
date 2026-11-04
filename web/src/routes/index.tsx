@@ -27,7 +27,7 @@ import {
   useReportSummary,
 } from '@/lib/queries'
 import { groupByDay } from '@/lib/transactions'
-import { rootRoute } from './__root'
+import { appRoute } from './__root'
 
 // Recharts is the heaviest dependency: load it only when the dashboard renders.
 const CashFlowChart = lazy(() =>
@@ -169,7 +169,7 @@ function DashboardPage() {
 }
 
 export const dashboardRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => appRoute,
   path: '/',
   validateSearch: searchSchema,
   component: DashboardPage,

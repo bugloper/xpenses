@@ -27,7 +27,7 @@ import { maskAccountNumber } from '@/lib/statements'
 import { transactionTitle } from '@/lib/transactions'
 import { cn } from '@/lib/utils'
 import type { BankTransactionWithStatus } from '@/types/api'
-import { rootRoute } from './__root'
+import { appRoute } from './__root'
 
 const listSearch = z.object({ import: z.enum(['1']).optional().catch(undefined) })
 
@@ -270,13 +270,13 @@ function StatementDetailPage() {
 }
 
 export const statementsRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => appRoute,
   path: '/statements',
   validateSearch: listSearch,
   component: StatementsPage,
 })
 export const statementDetailRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => appRoute,
   path: '/statements/$id',
   component: StatementDetailPage,
 })

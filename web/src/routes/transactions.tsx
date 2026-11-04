@@ -19,7 +19,7 @@ import { usePendingTransactions } from '@/lib/offline'
 import { useDefaultCurrency, useInfiniteTransactions } from '@/lib/queries'
 import { groupByDay, transactionsSearchSchema } from '@/lib/transactions'
 import type { TransactionFilter } from '@/types/api'
-import { rootRoute } from './__root'
+import { appRoute } from './__root'
 
 export type { TransactionsSearch } from '@/lib/transactions'
 
@@ -212,7 +212,7 @@ function TransactionsPage() {
 }
 
 export const transactionsRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => appRoute,
   path: '/transactions',
   validateSearch: transactionsSearchSchema,
   component: TransactionsPage,

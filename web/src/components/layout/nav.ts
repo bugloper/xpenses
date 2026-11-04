@@ -5,12 +5,13 @@ import {
   PieChart,
   Settings,
   Shapes,
+  ShieldCheck,
   Wallet,
   Scale,
   type LucideIcon,
 } from 'lucide-react'
 
-export type NavItem = { to: string; label: string; icon: LucideIcon; exact?: boolean }
+export type NavItem = { to: string; label: string; icon: LucideIcon; exact?: boolean; adminOnly?: boolean }
 
 export const PRIMARY_NAV: NavItem[] = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, exact: true },
@@ -23,7 +24,13 @@ export const MORE_NAV: NavItem[] = [
   { to: '/categories', label: 'Categories', icon: Shapes },
   { to: '/statements', label: 'Bank Statements', icon: FileText },
   { to: '/reconciliation', label: 'Reconciliation', icon: Scale },
+  { to: '/admin', label: 'Admin', icon: ShieldCheck, adminOnly: true },
   { to: '/settings', label: 'Settings', icon: Settings },
 ]
 
 export const ALL_NAV: NavItem[] = [...PRIMARY_NAV, ...MORE_NAV]
+
+/** Entries visible to the signed-in user (admin-only ones are dropped for users). */
+export function visibleNav(items: NavItem[], isAdmin: boolean): NavItem[] {
+  return isAdmin ? items : items.filter((i) => !i.adminOnly)
+}

@@ -406,11 +406,7 @@ export type BankTransactionWithStatus = BankTransaction & {
 // Reconciliation workspace. Mirrors internal/reconciliation/service.go.
 // ---------------------------------------------------------------------------
 export type SuggestionRule =
-  | 'exact_date'
-  | 'date_tolerance'
-  | 'merchant_similarity'
-  | 'description_similarity'
-  | 'amount_mismatch'
+  'exact_date' | 'date_tolerance' | 'merchant_similarity' | 'description_similarity' | 'amount_mismatch'
 export type Suggestion = {
   transaction_id: string
   transaction: Transaction | null
@@ -479,17 +475,68 @@ export type ReconciliationReport = {
   matched: number
   unmatched_manual: Transaction[]
   unrecorded_bank: BankTransaction[]
-  amount_discrepancies: Array<{ bank_transaction: BankTransaction; transaction: Transaction; difference: number }>
-  balance: { opening: number | null; closing: number | null; computed_closing: number | null; verified: boolean }
+  amount_discrepancies: Array<{
+    bank_transaction: BankTransaction
+    transaction: Transaction
+    difference: number
+  }>
+  balance: {
+    opening: number | null
+    closing: number | null
+    computed_closing: number | null
+    verified: boolean
+  }
 }
 export type ExportReport =
-  | 'summary'
-  | 'categories'
-  | 'cash-flow'
-  | 'merchants'
-  | 'accounts'
-  | 'budgets'
-  | 'reconciliation'
+  'summary' | 'categories' | 'cash-flow' | 'merchants' | 'accounts' | 'budgets' | 'reconciliation'
 export type ExportFormat = 'csv' | 'pdf'
 export type CashFlowGranularity = 'day' | 'week' | 'month'
 export type FlowType = 'expense' | 'income'
+
+// ---------------------------------------------------------------------------
+// Authentication & multi-user. Mirrors docs/AUTH.md.
+// ---------------------------------------------------------------------------
+export type UserRole = 'admin' | 'user'
+export type User = {
+  id: string
+  name: string
+  email: string
+  role: UserRole
+  is_active: boolean
+  created_at: string
+  last_login_at: string | null
+}
+export type AuthStatus = { setup_required: boolean; registration_open: boolean; authenticated: boolean }
+export type LoginRequest = { email: string; password: string }
+export type SetupRequest = { name: string; email: string; password: string }
+export type RegisterRequest = { name: string; email: string; password: string; invite_token?: string }
+export type UpdateProfileRequest = { name?: string }
+export type ChangePasswordRequest = { current_password: string; new_password: string }
+export type AuthSession = {
+  id: string
+  created_at: string
+  last_seen_at: string
+  user_agent: string
+  current: boolean
+}
+
+export type AdminUser = User & { account_count: number; transaction_count: number }
+export type UpdateAdminUserRequest = { is_active?: boolean; role?: UserRole }
+export type AdminSettings = { registration_open: boolean }
+export type CreateInviteRequest = { email?: string; expires_in_hours?: number }
+/** POST /admin/invites response: the token is only ever returned here. */
+export type CreatedInvite = {
+  id: string
+  token: string
+  email: string
+  expires_at: string
+  register_path: string
+}
+export type Invite = {
+  id: string
+  email: string
+  created_at: string
+  expires_at: string
+  used_at: string | null
+  used_by_email: string | null
+}

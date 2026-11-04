@@ -14,7 +14,7 @@ import { usePendingTransactions } from '@/lib/offline'
 import { useAccount, useInfiniteTransactions } from '@/lib/queries'
 import { groupByDay } from '@/lib/transactions'
 import { uiStore } from '@/lib/ui-store'
-import { rootRoute } from './__root'
+import { appRoute } from './__root'
 
 function AccountDetailPage() {
   const { id } = accountDetailRoute.useParams()
@@ -100,7 +100,7 @@ function AccountDetailPage() {
 }
 
 export const accountDetailRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => appRoute,
   path: '/accounts/$id',
   component: AccountDetailPage,
 })

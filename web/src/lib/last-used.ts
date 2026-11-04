@@ -32,3 +32,14 @@ export function setLastUsed(
     // storage unavailable (private mode) - ignore
   }
 }
+
+export const LAST_USED_STORAGE_KEY = KEY
+
+/** Forgets the remembered ids (called on logout so the next user does not inherit them). */
+export function clearLastUsed() {
+  try {
+    localStorage.removeItem(KEY)
+  } catch {
+    // storage unavailable - nothing to clear
+  }
+}

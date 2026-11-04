@@ -21,7 +21,7 @@ import { Switch } from '@/components/ui/switch'
 import { errorMessage } from '@/lib/api'
 import { useBudgets, useCategories, useDefaultCurrency, useUpdateCategory } from '@/lib/queries'
 import type { Category, CategoryType } from '@/types/api'
-import { rootRoute } from './__root'
+import { appRoute } from './__root'
 
 const searchSchema = z.object({ type: z.enum(['expense', 'income']).optional().catch(undefined) })
 
@@ -144,7 +144,7 @@ function CategoriesPage() {
 }
 
 export const categoriesRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => appRoute,
   path: '/categories',
   validateSearch: searchSchema,
   component: CategoriesPage,

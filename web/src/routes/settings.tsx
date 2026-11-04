@@ -7,19 +7,22 @@ import { PageHeader } from '@/components/common/PageHeader'
 import { Segmented } from '@/components/common/Segmented'
 import { ErrorState } from '@/components/common/States'
 import { useTheme } from '@/components/layout/ThemeProvider'
+import { AccountSection } from '@/components/settings/AccountSection'
 import { BackupSection } from '@/components/settings/BackupSection'
 import { RecurringSection } from '@/components/settings/RecurringSection'
+import { SessionsSection } from '@/components/settings/SessionsSection'
 import { Button } from '@/components/ui/button'
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { errorMessage } from '@/lib/api'
+import { useAuth } from '@/lib/auth'
 import { relativeTime } from '@/lib/dates'
 import { syncManager, useSyncState } from '@/lib/offline'
 import { usePwaInstall } from '@/lib/pwa-install'
 import { useSettings, useUpdateSettings } from '@/lib/queries'
 import { uiStore } from '@/lib/ui-store'
-import { rootRoute } from './__root'
+import { appRoute } from './__root'
 
 function SettingRow({
   label,
@@ -186,10 +189,17 @@ function InstallRow() {
 
 function SettingsPage() {
   const { theme, setTheme } = useTheme()
+  const { isAdmin } = useAuth()
   const version = __APP_VERSION__
   return (
     <div className="flex flex-col gap-8">
       <PageHeader title="Settings" />
+      <Section title="Account">
+        <AccountSection />
+      </Section>
+      <Section title="Sessions">
+        <SessionsSection />
+      </Section>
       <Section title="Appearance">
         <div className="bg-card ring-foreground/10 rounded-2xl px-4 ring-1">
           <SettingRow label="Theme">
@@ -211,9 +221,11 @@ function SettingsPage() {
       <Section title="Recurring">
         <RecurringSection />
       </Section>
-      <Section title="Backup & restore">
-        <BackupSection />
-      </Section>
+      {isAdmin && (
+        <Section title="Backup & restore">
+          <BackupSection />
+        </Section>
+      )}
       <Section title="Offline">
         <OfflineRow />
       </Section>
@@ -231,7 +243,7 @@ function SettingsPage() {
 }
 
 export const settingsRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => appRoute,
   path: '/settings',
   component: SettingsPage,
 })

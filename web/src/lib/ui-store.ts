@@ -18,9 +18,17 @@ type UIState = {
   addPreset: AddPreset | null
   moreOpen: boolean
   pendingOpen: boolean
+  /** The logout confirmation / unsynced-items dialog. */
+  logoutOpen: boolean
 }
 
-let state: UIState = { addOpen: false, addPreset: null, moreOpen: false, pendingOpen: false }
+let state: UIState = {
+  addOpen: false,
+  addPreset: null,
+  moreOpen: false,
+  pendingOpen: false,
+  logoutOpen: false,
+}
 const listeners = new Set<() => void>()
 
 function set(patch: Partial<UIState>) {
@@ -45,6 +53,13 @@ export const uiStore = {
   },
   setPending(open: boolean) {
     set({ pendingOpen: open })
+  },
+  /** Starts the logout flow (checks for unsynced items first, see LogoutDialog). */
+  requestLogout() {
+    set({ logoutOpen: true, moreOpen: false })
+  },
+  setLogout(open: boolean) {
+    set({ logoutOpen: open })
   },
 }
 

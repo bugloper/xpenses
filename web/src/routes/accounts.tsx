@@ -20,7 +20,7 @@ import { Switch } from '@/components/ui/switch'
 import { errorMessage } from '@/lib/api'
 import { useAccounts, useDefaultCurrency, useUpdateAccount } from '@/lib/queries'
 import type { Account } from '@/types/api'
-import { rootRoute } from './__root'
+import { appRoute } from './__root'
 
 function AccountsPage() {
   const [showInactive, setShowInactive] = useState(false)
@@ -159,7 +159,7 @@ function AccountsPage() {
 }
 
 export const accountsRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => appRoute,
   path: '/accounts',
   component: AccountsPage,
 })

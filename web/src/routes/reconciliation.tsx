@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { rangeLabel } from '@/lib/dates'
 import { useReconciliationOverview, useReconciliationWorkspace } from '@/lib/queries'
 import { cn } from '@/lib/utils'
-import { rootRoute } from './__root'
+import { appRoute } from './__root'
 
 function ReconciliationPage() {
   const { data, isPending, error, refetch } = useReconciliationOverview()
@@ -117,12 +117,12 @@ function ReconciliationWorkspacePage() {
 }
 
 export const reconciliationRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => appRoute,
   path: '/reconciliation',
   component: ReconciliationPage,
 })
 export const reconciliationWorkspaceRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => appRoute,
   path: '/reconciliation/$statementId',
   validateSearch: workspaceSearch,
   component: ReconciliationWorkspacePage,

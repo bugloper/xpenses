@@ -45,6 +45,7 @@ describe('groupByDay', () => {
   it('merges pending offline items first within their day', () => {
     const pending: PendingTransaction = {
       client_id: 'c1',
+      user_id: 'u1',
       payload: { type: 'expense', amount: 1000, account_id: 'a', transaction_date: '2026-11-04' },
       status: 'pending',
       attempts: 0,
@@ -65,6 +66,7 @@ describe('groupByDay', () => {
     // the queued copy share a client_id and must not both be shown.
     const pending: PendingTransaction = {
       client_id: 'c-lost',
+      user_id: 'u1',
       payload: { type: 'expense', amount: 1000, account_id: 'a', transaction_date: '2026-11-04' },
       status: 'pending',
       attempts: 1,
@@ -126,6 +128,7 @@ describe('pendingToTransaction', () => {
   it('fills defaults', () => {
     const t = pendingToTransaction({
       client_id: 'x',
+      user_id: 'u1',
       payload: { type: 'income', amount: 5, account_id: 'a', transaction_date: '2026-01-01' },
       status: 'pending',
       attempts: 0,

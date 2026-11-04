@@ -13,7 +13,7 @@ import { formatShortDate } from '@/lib/dates'
 import { useDeleteTransaction, useDuplicateTransaction, useTransaction } from '@/lib/queries'
 import { displayAmount, transactionTitle } from '@/lib/transactions'
 import { uiStore } from '@/lib/ui-store'
-import { rootRoute } from './__root'
+import { appRoute } from './__root'
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   if (value === null || value === undefined || value === '') return null
@@ -187,7 +187,7 @@ function TransactionDetailPage() {
 }
 
 export const transactionDetailRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => appRoute,
   path: '/transactions/$id',
   component: TransactionDetailPage,
 })

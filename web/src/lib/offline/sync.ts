@@ -1,13 +1,18 @@
 import { api, isApiError, type ApiError } from '@/lib/api'
+import { authStore, currentUserId } from '@/lib/auth'
 import type { CreateTransactionRequest, Transaction } from '@/types/api'
 import {
   backoffMs,
-  listPending,
+  claimOrphanedPending,
+  listPendingForUser,
   removePending,
   subscribeQueue,
   updatePending,
   type PendingTransaction,
 } from './queue'
+
+/** Shown on an item the server refused because the session is gone. */
+export const SIGN_IN_TO_SYNC = 'Sign in to sync'
 
 export type SyncState = {
   online: boolean
@@ -29,6 +34,10 @@ type Listener = () => void
  * - Network / 5xx failures keep the item `pending` with a backoff.
  * - 4xx responses (validation, conflict) mark the item `failed` with the
  *   server message so the user can fix or discard it. Nothing is dropped silently.
+ * - Only the signed-in user's items are drained or counted. Items of other users
+ *   on a shared device stay in IndexedDB untouched until their owner signs in.
+ * - A 401 (session expired between queueing and syncing) keeps the item
+ *   `pending` with "Sign in to sync" and no attempt-count penalty.
  */
 class SyncManager {
   private state: SyncState = {
@@ -45,6 +54,7 @@ class SyncManager {
   private inFlight: Promise<void> | null = null
   private onSynced: ((tx: Transaction, item: PendingTransaction) => void) | null = null
   private unsubscribeQueue: (() => void) | null = null
+  private unsubscribeAuth: (() => void) | null = null
 
   getState = (): SyncState => this.state
 
@@ -67,6 +77,7 @@ class SyncManager {
     document.addEventListener('visibilitychange', this.handleVisibility)
     window.addEventListener('xpensiv:request-ok', this.handleRequestOk)
     this.unsubscribeQueue = subscribeQueue(() => void this.refreshCounts())
+    this.unsubscribeAuth = authStore.subscribe(this.handleUserChange)
     void this.refreshCounts()
     void this.syncNow()
   }
@@ -81,6 +92,8 @@ class SyncManager {
     window.removeEventListener('xpensiv:request-ok', this.handleRequestOk)
     this.unsubscribeQueue?.()
     this.unsubscribeQueue = null
+    this.unsubscribeAuth?.()
+    this.unsubscribeAuth = null
     if (this.timer) clearTimeout(this.timer)
     this.timer = null
   }
@@ -95,6 +108,16 @@ class SyncManager {
     void this.syncNow()
   }
   private handleOffline = () => this.setState({ online: false })
+  private lastUserId: string | null = currentUserId()
+  /** Counts are per user; a login also drains what that user queued earlier. */
+  private handleUserChange = () => {
+    const uid = currentUserId()
+    if (uid === this.lastUserId) return
+    this.lastUserId = uid
+    this.setState({ lastError: null })
+    void this.refreshCounts()
+    if (uid !== null) void this.syncNow()
+  }
   private handleFocus = () => void this.syncNow()
   private handleVisibility = () => {
     if (document.visibilityState === 'visible') void this.syncNow()
@@ -108,7 +131,7 @@ class SyncManager {
   }
 
   async refreshCounts() {
-    const items = await listPending()
+    const items = await listPendingForUser(currentUserId())
     const pending = items.filter((i) => i.status === 'pending' || i.status === 'syncing').length
     const failed = items.filter((i) => i.status === 'failed').length
     if (pending !== this.state.pending || failed !== this.state.failed) this.setState({ pending, failed })
@@ -139,7 +162,16 @@ class SyncManager {
       await this.refreshCounts()
       return
     }
-    const items = (await listPending()).filter((i) => i.status === 'pending' || i.status === 'syncing')
+    const userId = currentUserId()
+    if (userId === null) {
+      // Nobody signed in: nothing may be sent (and nothing is shown).
+      await this.refreshCounts()
+      return
+    }
+    await claimOrphanedPending(userId)
+    const items = (await listPendingForUser(userId)).filter(
+      (i) => i.status === 'pending' || i.status === 'syncing',
+    )
     const now = Date.now()
     const due = items.filter((i) => force || i.next_attempt_at <= now)
     if (due.length === 0) {
@@ -170,6 +202,18 @@ class SyncManager {
       const attempts = item.attempts + 1
       if (isApiError(e)) {
         const err = e as ApiError
+        if (err.status === 401) {
+          // Session gone: not the item's fault. Keep it pending, no penalty, and
+          // stop the drain (every other item would 401 too). The api layer has
+          // already raised the unauthenticated event that signs the user out.
+          await updatePending(item.client_id, {
+            status: 'pending',
+            last_error: SIGN_IN_TO_SYNC,
+            error_code: 'unauthenticated',
+          })
+          this.setState({ lastError: SIGN_IN_TO_SYNC })
+          return false
+        }
         if (err.isNetwork || err.status >= 500) {
           await updatePending(item.client_id, {
             status: 'pending',

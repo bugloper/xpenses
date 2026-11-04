@@ -6,6 +6,12 @@ export type PendingStatus = 'pending' | 'syncing' | 'failed'
 export type PendingTransaction = {
   /** Client-generated UUID, also sent as `client_id` so retries are idempotent. */
   client_id: string
+  /**
+   * Owner of the item (the signed-in user when it was queued). `null` only for
+   * items queued before accounts existed; they are claimed by the first user who
+   * drains the queue (see `claimOrphanedPending`).
+   */
+  user_id: string | null
   payload: CreateTransactionRequest
   status: PendingStatus
   attempts: number

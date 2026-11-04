@@ -1,5 +1,5 @@
 import { createRouter } from '@tanstack/react-router'
-import { rootRoute } from './routes/__root'
+import { appRoute, rootRoute } from './routes/__root'
 import { dashboardRoute } from './routes/index'
 import { transactionsRoute } from './routes/transactions'
 import { transactionDetailRoute } from './routes/transaction-detail'
@@ -11,21 +11,27 @@ import { settingsRoute } from './routes/settings'
 import { statementsRoute, statementDetailRoute } from './routes/statements'
 import { reconciliationRoute, reconciliationWorkspaceRoute } from './routes/reconciliation'
 import { reportsRoute } from './routes/reports'
+import { adminRoute } from './routes/admin'
+import { authLayoutRoute, loginRoute, registerRoute, setupRoute } from './routes/auth'
 
 const routeTree = rootRoute.addChildren([
-  dashboardRoute,
-  transactionsRoute,
-  transactionDetailRoute,
-  addRoute,
-  accountsRoute,
-  accountDetailRoute,
-  categoriesRoute,
-  settingsRoute,
-  statementsRoute,
-  statementDetailRoute,
-  reconciliationRoute,
-  reconciliationWorkspaceRoute,
-  reportsRoute,
+  appRoute.addChildren([
+    dashboardRoute,
+    transactionsRoute,
+    transactionDetailRoute,
+    addRoute,
+    accountsRoute,
+    accountDetailRoute,
+    categoriesRoute,
+    settingsRoute,
+    statementsRoute,
+    statementDetailRoute,
+    reconciliationRoute,
+    reconciliationWorkspaceRoute,
+    reportsRoute,
+    adminRoute,
+  ]),
+  authLayoutRoute.addChildren([loginRoute, setupRoute, registerRoute]),
 ])
 
 export const router = createRouter({

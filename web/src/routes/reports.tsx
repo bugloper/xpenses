@@ -16,7 +16,7 @@ import { currentMonth, rangeLabel, rangeMonth } from '@/lib/dates'
 import { useDefaultCurrency, useStatements } from '@/lib/queries'
 import { defaultGranularity, isMonth, periodSearch, resolveReportRange, type ExportParams } from '@/lib/reports'
 import type { ExportReport } from '@/types/api'
-import { rootRoute } from './__root'
+import { appRoute } from './__root'
 
 const TABS = ['overview', 'categories', 'spending', 'merchants', 'accounts', 'budgets', 'reconciliation'] as const
 type Tab = (typeof TABS)[number]
@@ -123,7 +123,7 @@ function ReportsPage() {
 }
 
 export const reportsRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => appRoute,
   path: '/reports',
   validateSearch: searchSchema,
   component: ReportsPage,

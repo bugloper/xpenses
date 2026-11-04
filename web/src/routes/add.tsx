@@ -5,7 +5,7 @@ import { PageHeader } from '@/components/common/PageHeader'
 import { useSaveTransaction } from '@/components/transactions/AddTransactionSheet'
 import { TransactionForm, defaultValues, toCreateRequest } from '@/components/transactions/TransactionForm'
 import { useDefaultCurrency } from '@/lib/queries'
-import { rootRoute } from './__root'
+import { appRoute } from './__root'
 
 const searchSchema = z.object({
   type: z.enum(['expense', 'income', 'transfer', 'refund', 'adjustment']).optional().catch(undefined),
@@ -44,7 +44,7 @@ function AddPage() {
 }
 
 export const addRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => appRoute,
   path: '/add',
   validateSearch: searchSchema,
   component: AddPage,

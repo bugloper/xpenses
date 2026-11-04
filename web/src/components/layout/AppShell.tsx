@@ -1,11 +1,13 @@
 import { Link, Outlet, useRouterState } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
+import { LogoutDialog } from '@/components/auth/LogoutDialog'
+import { MoreSheetUser, SidebarUser } from '@/components/auth/UserBadge'
 import { Button } from '@/components/ui/button'
-import { Toaster } from '@/components/ui/sonner'
+import { useAuth } from '@/lib/auth'
 import { cn } from '@/lib/utils'
 import { uiStore, useUIStore } from '@/lib/ui-store'
 import { AddTransactionSheet } from '@/components/transactions/AddTransactionSheet'
-import { ALL_NAV, MORE_NAV, PRIMARY_NAV, type NavItem } from './nav'
+import { ALL_NAV, MORE_NAV, PRIMARY_NAV, visibleNav, type NavItem } from './nav'
 import { PendingSheet } from './PendingSheet'
 import { PwaUpdatePrompt } from './PwaUpdatePrompt'
 import { SyncPill } from './SyncPill'
@@ -37,6 +39,7 @@ function SidebarLink({ item }: { item: NavItem }) {
 }
 
 function Sidebar() {
+  const { isAdmin } = useAuth()
   return (
     <aside className="bg-sidebar fixed inset-y-0 left-0 hidden w-60 flex-col border-r px-3 py-4 lg:flex">
       <div className="flex items-center gap-2 px-3 py-1">
@@ -54,13 +57,16 @@ function Sidebar() {
         <Plus data-icon="inline-start" /> Add transaction
       </Button>
       <nav className="mt-5 flex flex-1 flex-col gap-0.5">
-        {ALL_NAV.map((item) => (
+        {visibleNav(ALL_NAV, isAdmin).map((item) => (
           <SidebarLink key={item.to} item={item} />
         ))}
       </nav>
       <div className="flex items-center justify-between px-1">
         <SyncPill />
         <ThemeToggle />
+      </div>
+      <div className="mt-2 border-t pt-2">
+        <SidebarUser />
       </div>
     </aside>
   )
@@ -101,6 +107,7 @@ function BottomNavLink({ item }: { item: NavItem }) {
 
 function BottomNav() {
   const { moreOpen } = useUIStore()
+  const { isAdmin } = useAuth()
   const pathname = useRouterState({ select: (s) => s.location.pathname })
   const moreActive = MORE_NAV.some((i) => pathname === i.to || pathname.startsWith(i.to + '/'))
   const [dashboard, transactions, reports] = PRIMARY_NAV as [NavItem, NavItem, NavItem]
@@ -135,8 +142,9 @@ function BottomNav() {
         </div>
       </nav>
       <ResponsiveSheet open={moreOpen} onOpenChange={uiStore.setMore} title="More">
+        <MoreSheetUser />
         <div className="grid grid-cols-2 gap-2 pb-2">
-          {MORE_NAV.map((item) => {
+          {visibleNav(MORE_NAV, isAdmin).map((item) => {
             const Icon = item.icon
             return (
               <Link
@@ -196,8 +204,8 @@ export function AppShell() {
       <BottomNav />
       <AddTransactionSheet />
       <PendingSheet />
+      <LogoutDialog />
       <PwaUpdatePrompt />
-      <Toaster position="top-center" richColors closeButton />
     </div>
   )
 }
