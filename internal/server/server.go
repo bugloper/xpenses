@@ -5,6 +5,7 @@ package server
 import (
 	"database/sql"
 	"log/slog"
+	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -96,6 +97,8 @@ func New(cfg config.Config, log *slog.Logger, deps *Deps, extra ...Registrar) *e
 // serveSPA serves the built frontend with history-API fallback to index.html.
 // Hashed assets get long cache lifetimes; index.html and the service worker never cache.
 func serveSPA(e *echo.Echo, dir string) {
+	// Go's mime table lacks the manifest type; browsers need it for PWA install.
+	_ = mime.AddExtensionType(".webmanifest", "application/manifest+json")
 	fs := http.FileServer(http.Dir(dir))
 	e.GET("/*", func(c echo.Context) error {
 		p := c.Request().URL.Path
