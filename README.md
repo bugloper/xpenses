@@ -100,6 +100,21 @@ The app runs with `XPENSIV_TRUSTED_PROXY=true` (so login throttling sees real cl
 session cookies are marked Secure) and `XPENSIV_CORS_ORIGIN=` (same-origin only). The PWA, the
 offline queue and the install prompt all require HTTPS, which this setup provides.
 
+**No domain yet?** Use a [sslip.io](https://sslip.io) name for the server's public IP, e.g.
+`XPENSIV_DOMAIN=203.0.113.10.sslip.io`. It resolves to that IP without any DNS setup and Let's
+Encrypt issues a normal certificate for it. Put the variable in a `.env` file next to the compose
+files so `docker compose` picks it up on every run. When you later get a real domain, change
+`XPENSIV_DOMAIN` and run the same `up -d` command; Caddy fetches the new certificate itself.
+
+To redeploy after a change, copy the new source to the server and rebuild:
+
+```sh
+git archive HEAD | ssh myserver 'tar -x -C /opt/xpensiv'
+ssh myserver 'cd /opt/xpensiv && docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build'
+```
+
+Data lives in the `xpensiv-data` volume and survives rebuilds.
+
 ## Importing a BOB statement
 
 1. Download the account statement PDF from mBoB / BOB internet banking.
