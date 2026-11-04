@@ -201,7 +201,7 @@ export async function request<T>(path: string, opts: RequestOptions = {}): Promi
 }
 
 /**
- * Unwraps `{data}`; a 204 / empty body (e.g. POST /reconciliation/unmatch)
+ * Unwraps `{data}`; a 204 / empty body (e.g. POST /auth/logout)
  * resolves to undefined instead of throwing on `undefined.data`.
  */
 function unwrap<T>(r: Envelope<T> | undefined): T {

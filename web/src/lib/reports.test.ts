@@ -66,7 +66,6 @@ describe('exportPath', () => {
     granularity: 'week' as const,
     type: 'income' as const,
     month: '2026-11',
-    statement_id: 'st1',
   }
   it('only sends the params each report understands', () => {
     expect(exportPath('summary', 'csv', p)).toBe(
@@ -79,9 +78,6 @@ describe('exportPath', () => {
       '/reports/export?report=cash-flow&format=csv&from=2026-11-01&to=2026-11-30&granularity=week',
     )
     expect(exportPath('budgets', 'csv', p)).toBe('/reports/export?report=budgets&format=csv&month=2026-11')
-    expect(exportPath('reconciliation', 'pdf', p)).toBe(
-      '/reports/export?report=reconciliation&format=pdf&statement_id=st1',
-    )
     expect(exportPath('accounts', 'csv', p)).toBe(
       '/reports/export?report=accounts&format=csv&from=2026-11-01&to=2026-11-30',
     )
@@ -89,7 +85,6 @@ describe('exportPath', () => {
   it('names the file by report and params', () => {
     expect(exportFileName('merchants', 'csv', p)).toBe('merchants-2026-11-01_2026-11-30.csv')
     expect(exportFileName('budgets', 'pdf', p)).toBe('budgets-2026-11.pdf')
-    expect(exportFileName('reconciliation', 'csv', p)).toBe('reconciliation-st1.csv')
   })
 })
 

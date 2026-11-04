@@ -191,7 +191,7 @@ export function AccountFormSheet({
               <FieldLabel htmlFor="acc-number">Account number (optional)</FieldLabel>
               <Input
                 id="acc-number"
-                placeholder="Used to match bank statements"
+                placeholder="Optional"
                 {...field}
                 value={field.value ?? ''}
               />

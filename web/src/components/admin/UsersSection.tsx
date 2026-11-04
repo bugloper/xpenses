@@ -148,7 +148,7 @@ export function UsersSection() {
         open={doomed !== null}
         onOpenChange={(o) => !o && setDoomed(null)}
         title={`Delete ${doomed?.name ?? 'this user'}?`}
-        description={`${doomed?.email ?? ''} and all of their data - ${doomed?.account_count ?? 0} accounts, ${doomed?.transaction_count ?? 0} transactions, categories, budgets, statements and reconciliations - will be deleted permanently. This cannot be undone.`}
+        description={`${doomed?.email ?? ''} and all of their data - ${doomed?.account_count ?? 0} accounts, ${doomed?.transaction_count ?? 0} transactions, categories, budgets and settings - will be deleted permanently. This cannot be undone.`}
         confirmLabel="Delete user and data"
         destructive
         loading={del.isPending}

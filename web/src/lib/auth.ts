@@ -14,8 +14,6 @@ import type { User } from '@/types/api'
 export const API_RUNTIME_CACHE = 'xpensiv-api'
 /** Remembers which user the local caches belong to, so a user switch purges them. */
 export const LAST_USER_STORAGE_KEY = 'xpensiv-last-user'
-/** sessionStorage prefix used by the reconciliation workspace (holds transaction ids). */
-export const REJECTED_SUGGESTIONS_PREFIX = 'xpensiv:rejected-suggestions:'
 
 export const AUTH_PATHS = ['/login', '/setup', '/register'] as const
 
@@ -108,16 +106,6 @@ export async function purgeSessionData(): Promise<void> {
   clearLastUsed()
   clearRecentCategories()
   writeLastUser(null)
-  try {
-    const doomed: string[] = []
-    for (let i = 0; i < sessionStorage.length; i++) {
-      const k = sessionStorage.key(i)
-      if (k && k.startsWith(REJECTED_SUGGESTIONS_PREFIX)) doomed.push(k)
-    }
-    for (const k of doomed) sessionStorage.removeItem(k)
-  } catch {
-    // storage unavailable
-  }
   if (typeof caches !== 'undefined') {
     try {
       await caches.delete(API_RUNTIME_CACHE)

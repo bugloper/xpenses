@@ -21,7 +21,7 @@ const (
 // Report names accepted by the export endpoint.
 var exportReports = map[string]bool{
 	"summary": true, "categories": true, "cash-flow": true, "merchants": true,
-	"accounts": true, "budgets": true, "reconciliation": true,
+	"accounts": true, "budgets": true,
 }
 
 // ExportRequest carries the already-validated export parameters.
@@ -32,7 +32,6 @@ type ExportRequest struct {
 	Granularity string
 	Type        string
 	Month       Period
-	StatementID string
 }
 
 // Money marks a cell as a monetary amount so each renderer formats it.
@@ -59,7 +58,7 @@ func ParseExportReport(s string) (string, error) {
 	if exportReports[s] {
 		return s, nil
 	}
-	return "", apperr.Validation("invalid report", map[string]string{"report": "must be one of summary, categories, cash-flow, merchants, accounts, budgets, reconciliation"})
+	return "", apperr.Validation("invalid report", map[string]string{"report": "must be one of summary, categories, cash-flow, merchants, accounts, budgets"})
 }
 
 // ParseExportFormat validates the format; empty means csv.
@@ -98,8 +97,6 @@ func (s *Service) Export(ctx context.Context, req ExportRequest) (*Document, err
 			{"Previous expenses", Money(r.Previous.Expenses)},
 			{"Previous net", Money(r.Previous.Net)},
 			{"Expense change", change},
-			{"Unreconciled bank transactions", strconv.Itoa(r.UnreconciledBankCount)},
-			{"Unmatched manual transactions", strconv.Itoa(r.UnmatchedManualCount)},
 			{"Pending transactions", strconv.Itoa(r.PendingCount)},
 		}})
 		recent := Section{Heading: "Recent transactions", Columns: []string{"Date", "Type", "Account", "Category", "Payee", "Amount"}}
@@ -170,57 +167,10 @@ func (s *Service) Export(ctx context.Context, req ExportRequest) (*Document, err
 			sec.Rows = append(sec.Rows, []any{r.Name, Money(r.Amount), Money(r.Spent), Money(r.Remaining), strconv.Itoa(r.Pct), r.Level})
 		}
 		doc.Sections = append(doc.Sections, sec)
-	case "reconciliation":
-		r, err := s.Reconciliation(ctx, req.StatementID)
-		if err != nil {
-			return nil, err
-		}
-		doc.Title = "Reconciliation: " + r.Statement.FileName
-		doc.Subtitle = "Period: " + r.Statement.PeriodStart + " to " + r.Statement.PeriodEnd
-		doc.Filename = "xpensiv-reconciliation-" + r.Statement.PeriodStart + "_" + r.Statement.PeriodEnd
-		doc.Sections = append(doc.Sections, Section{Heading: "Totals", Columns: []string{"Metric", "Value"}, Rows: [][]any{
-			{"Bank debits", Money(r.TotalDebits)},
-			{"Bank credits", Money(r.TotalCredits)},
-			{"Manual expenses", Money(r.ManualExpenses)},
-			{"Manual income", Money(r.ManualIncome)},
-			{"Matched", strconv.Itoa(r.Matched)},
-			{"Unmatched manual", strconv.Itoa(len(r.UnmatchedManual))},
-			{"Unrecorded bank", strconv.Itoa(len(r.UnrecordedBank))},
-			{"Amount discrepancies", strconv.Itoa(len(r.AmountDiscrepancies))},
-			{"Opening balance", optMoney(r.Balance.Opening)},
-			{"Closing balance", optMoney(r.Balance.Closing)},
-			{"Computed closing", optMoney(r.Balance.ComputedClosing)},
-			{"Balance verified", strconv.FormatBool(r.Balance.Verified)},
-		}})
-		um := Section{Heading: "Unmatched manual transactions", Columns: []string{"Date", "Type", "Category", "Payee", "Description", "Amount"}}
-		for _, t := range r.UnmatchedManual {
-			um.Rows = append(um.Rows, []any{t.TransactionDate, t.Type, t.CategoryName, t.Payee, t.Description, Money(t.Amount)})
-		}
-		ub := Section{Heading: "Unrecorded bank transactions", Columns: []string{"Date", "Description", "Reference", "Debit", "Credit"}}
-		for _, b := range r.UnrecordedBank {
-			ub.Rows = append(ub.Rows, []any{b.TransactionDate, b.Description, b.Reference, Money(b.Debit), Money(b.Credit)})
-		}
-		ad := Section{Heading: "Amount discrepancies", Columns: []string{"Bank date", "Bank description", "Bank amount", "Manual date", "Manual payee", "Manual amount", "Difference"}}
-		for _, d := range r.AmountDiscrepancies {
-			bank := d.BankTransaction.Debit
-			if bank == 0 {
-				bank = d.BankTransaction.Credit
-			}
-			ad.Rows = append(ad.Rows, []any{d.BankTransaction.TransactionDate, d.BankTransaction.Description, Money(bank),
-				d.Transaction.TransactionDate, d.Transaction.Payee, Money(d.Transaction.Amount), Money(d.Difference)})
-		}
-		doc.Sections = append(doc.Sections, um, ub, ad)
 	default:
 		return nil, apperr.Validation("invalid report", map[string]string{"report": "unknown report"})
 	}
 	return doc, nil
-}
-
-func optMoney(v *int64) any {
-	if v == nil {
-		return "n/a"
-	}
-	return Money(*v)
 }
 
 func cellCSV(v any) string {

@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { CloudUpload, AlertTriangle, CheckCheck } from 'lucide-react'
+import { CloudUpload, AlertTriangle } from 'lucide-react'
 import { CategoryIcon } from '@/components/common/CategoryIcon'
 import { Money } from '@/components/common/Money'
 import { Badge } from '@/components/ui/badge'
@@ -62,11 +62,6 @@ export function TransactionRow({
               )}
               {row.item.status === 'failed' ? 'Sync failed' : 'Pending sync'}
             </Badge>
-          )}
-          {tx.reconciliation_status === 'matched' && (
-            <span className="text-primary" title="Reconciled with bank statement">
-              <CheckCheck className="size-3.5" />
-            </span>
           )}
           {tx.status === 'pending' && (
             <Badge variant="outline" className="h-5 px-1.5 text-[10px]">

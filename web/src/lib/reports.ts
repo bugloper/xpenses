@@ -71,7 +71,6 @@ export type ExportParams = {
   granularity?: CashFlowGranularity
   type?: FlowType
   month?: string
-  statement_id?: string
 }
 
 /** Path (relative to the API base) for GET /reports/export with only the params that report uses. */
@@ -97,20 +96,12 @@ export function exportPath(report: ExportReport, format: ExportFormat, params: E
     case 'budgets':
       q.month = params.month
       break
-    case 'reconciliation':
-      q.statement_id = params.statement_id
-      break
   }
   return `/reports/export${toQuery(q)}`
 }
 
 export function exportFileName(report: ExportReport, format: ExportFormat, params: ExportParams): string {
-  const stamp =
-    report === 'budgets'
-      ? params.month
-      : report === 'reconciliation'
-        ? params.statement_id
-        : `${params.from}_${params.to}`
+  const stamp = report === 'budgets' ? params.month : `${params.from}_${params.to}`
   return `${report}-${stamp ?? 'export'}.${format}`
 }
 
@@ -200,12 +191,25 @@ export function rollupCategories(rows: ReportCategory[]): CategoryRollup[] {
     const own = g.amount - g.children.reduce((n, c) => n + c.amount, 0)
     const children =
       g.children.length > 0 && own > 0
-        ? [{ ...g.row, name: 'General', amount: own, count: g.count - g.children.reduce((n, c) => n + c.count, 0) }, ...g.children]
+        ? [
+            {
+              ...g.row,
+              name: 'General',
+              amount: own,
+              count: g.count - g.children.reduce((n, c) => n + c.count, 0),
+            },
+            ...g.children,
+          ]
         : g.children
     return {
       ...g,
       children: [...children].sort((a, b) => b.amount - a.amount),
-      row: { ...g.row, amount: g.amount, count: g.count, pct: total > 0 ? Math.round((g.amount * 1000) / total) / 10 : 0 },
+      row: {
+        ...g.row,
+        amount: g.amount,
+        count: g.count,
+        pct: total > 0 ? Math.round((g.amount * 1000) / total) / 10 : 0,
+      },
     }
   })
   return out.sort((a, b) => b.amount - a.amount)

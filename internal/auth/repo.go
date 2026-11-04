@@ -105,25 +105,6 @@ func (Repo) UpdateUserRoleActive(ctx context.Context, db repositories.DBTX, id, 
 	return err
 }
 
-// ListStatementIDs returns the ids of the user's bank statements, whose audit
-// PDFs live outside the database and must be removed by hand on deletion.
-func (Repo) ListStatementIDs(ctx context.Context, db repositories.DBTX, userID string) ([]string, error) {
-	rows, err := db.QueryContext(ctx, `SELECT id FROM bank_statements WHERE user_id = ?`, userID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []string
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		out = append(out, id)
-	}
-	return out, rows.Err()
-}
-
 func (Repo) DeleteUser(ctx context.Context, db repositories.DBTX, id string) error {
 	_, err := db.ExecContext(ctx, `DELETE FROM users WHERE id = ?`, id)
 	return err

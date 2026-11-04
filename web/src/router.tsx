@@ -8,8 +8,6 @@ import { accountsRoute } from './routes/accounts'
 import { accountDetailRoute } from './routes/account-detail'
 import { categoriesRoute } from './routes/categories'
 import { settingsRoute } from './routes/settings'
-import { statementsRoute, statementDetailRoute } from './routes/statements'
-import { reconciliationRoute, reconciliationWorkspaceRoute } from './routes/reconciliation'
 import { reportsRoute } from './routes/reports'
 import { adminRoute } from './routes/admin'
 import { authLayoutRoute, loginRoute, registerRoute, setupRoute } from './routes/auth'
@@ -24,10 +22,6 @@ const routeTree = rootRoute.addChildren([
     accountDetailRoute,
     categoriesRoute,
     settingsRoute,
-    statementsRoute,
-    statementDetailRoute,
-    reconciliationRoute,
-    reconciliationWorkspaceRoute,
     reportsRoute,
     adminRoute,
   ]),

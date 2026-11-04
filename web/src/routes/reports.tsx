@@ -8,12 +8,11 @@ import { CategoriesTab } from '@/components/reports/CategoriesTab'
 import { ExportButtons } from '@/components/reports/ExportButtons'
 import { MerchantsTab } from '@/components/reports/MerchantsTab'
 import { OverviewTab } from '@/components/reports/OverviewTab'
-import { ReconciliationTab } from '@/components/reports/ReconciliationTab'
 import { ReportsPeriodSelector } from '@/components/reports/ReportsPeriodSelector'
 import { SpendingTab } from '@/components/reports/SpendingTab'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { currentMonth, rangeLabel, rangeMonth } from '@/lib/dates'
-import { useDefaultCurrency, useStatements } from '@/lib/queries'
+import { useDefaultCurrency } from '@/lib/queries'
 import {
   defaultGranularity,
   isMonth,
@@ -24,15 +23,7 @@ import {
 import type { ExportReport } from '@/types/api'
 import { appRoute } from './__root'
 
-const TABS = [
-  'overview',
-  'categories',
-  'spending',
-  'merchants',
-  'accounts',
-  'budgets',
-  'reconciliation',
-] as const
+const TABS = ['overview', 'categories', 'spending', 'merchants', 'accounts', 'budgets'] as const
 type Tab = (typeof TABS)[number]
 const TAB_LABELS: Record<Tab, string> = {
   overview: 'Overview',
@@ -41,7 +32,6 @@ const TAB_LABELS: Record<Tab, string> = {
   merchants: 'Merchants',
   accounts: 'Accounts',
   budgets: 'Budgets',
-  reconciliation: 'Reconciliation',
 }
 const TAB_REPORT: Record<Tab, ExportReport> = {
   overview: 'summary',
@@ -50,7 +40,6 @@ const TAB_REPORT: Record<Tab, ExportReport> = {
   merchants: 'merchants',
   accounts: 'accounts',
   budgets: 'budgets',
-  reconciliation: 'reconciliation',
 }
 
 const searchSchema = z.object({
@@ -62,7 +51,6 @@ const searchSchema = z.object({
   spend: z.enum(['day', 'week']).optional().catch(undefined),
   type: z.enum(['expense', 'income']).optional().catch(undefined),
   month: z.string().optional().catch(undefined),
-  statement: z.string().optional().catch(undefined),
 })
 export type ReportsSearchParams = z.infer<typeof searchSchema>
 
@@ -76,9 +64,6 @@ function ReportsPage() {
   const spend = search.spend ?? 'day'
   const type = search.type ?? 'expense'
   const month = isMonth(search.month) ? search.month : rangeMonth(range) || currentMonth()
-  // The reconciliation export needs a concrete statement id even before the user picks one.
-  const statements = useStatements()
-  const statementId = search.statement ?? statements.data?.[0]?.id
 
   const patch = (p: Partial<ReportsSearchParams>) =>
     void navigate({ search: (s) => ({ ...s, ...p }), replace: true })
@@ -89,28 +74,15 @@ function ReportsPage() {
     granularity: tab === 'spending' ? spend : granularity,
     type,
     month,
-    statement_id: statementId,
   }
-  const periodless = tab === 'budgets' || tab === 'reconciliation'
+  const periodless = tab === 'budgets'
 
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
         title="Reports"
-        description={
-          periodless
-            ? tab === 'budgets'
-              ? 'Monthly budgets'
-              : 'Statement reconciliation'
-            : rangeLabel(range)
-        }
-        actions={
-          <ExportButtons
-            report={TAB_REPORT[tab]}
-            params={exportParams}
-            disabled={tab === 'reconciliation' && !statementId}
-          />
-        }
+        description={periodless ? 'Monthly budgets' : rangeLabel(range)}
+        actions={<ExportButtons report={TAB_REPORT[tab]} params={exportParams} />}
       />
       {!periodless && (
         <ReportsPeriodSelector preset={preset} range={range} onChange={(p, r) => patch(periodSearch(p, r))} />
@@ -173,15 +145,6 @@ function ReportsPage() {
             <BudgetsTab
               month={month}
               onMonth={(m) => patch({ month: m === currentMonth() ? undefined : m })}
-              currency={currency}
-            />
-          )}
-        </TabsContent>
-        <TabsContent value="reconciliation" className="mt-2">
-          {tab === 'reconciliation' && (
-            <ReconciliationTab
-              statementId={statementId}
-              onStatement={(id) => patch({ statement: id })}
               currency={currency}
             />
           )}

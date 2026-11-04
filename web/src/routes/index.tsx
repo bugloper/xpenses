@@ -6,7 +6,7 @@ import { TransactionList } from '@/components/transactions/TransactionList'
 import { BudgetList } from '@/components/dashboard/BudgetList'
 import { Skeleton } from '@/components/ui/skeleton'
 import { PeriodSelector } from '@/components/dashboard/PeriodSelector'
-import { BalanceHero, ReconciliationCounts } from '@/components/dashboard/StatTiles'
+import { BalanceHero } from '@/components/dashboard/StatTiles'
 import { Button } from '@/components/ui/button'
 import {
   formatMonthLabel,
@@ -97,7 +97,6 @@ function DashboardPage() {
         currency={currency}
         range={range}
       />
-      <ReconciliationCounts summary={summary.data} />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Section title={granularity === 'day' ? 'Daily cash flow' : 'Monthly trend'}>

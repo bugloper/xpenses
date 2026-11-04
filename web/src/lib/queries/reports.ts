@@ -2,8 +2,6 @@ import { useQuery } from '@tanstack/react-query'
 import { api, toQuery } from '@/lib/api'
 import type {
   FlowType,
-  ReconciliationOverview,
-  ReconciliationReport,
   ReportAccount,
   ReportBudget,
   ReportCashFlow,
@@ -43,14 +41,6 @@ export function useReportBudgets(month: string) {
   })
 }
 
-export function useReconciliationOverview(enabled = true) {
-  return useQuery({
-    queryKey: keys.reconciliation.overview,
-    queryFn: ({ signal }) => api.get<ReconciliationOverview>('/reconciliation', signal),
-    enabled,
-  })
-}
-
 export function useReportMerchants(from: string, to: string, type: FlowType = 'expense') {
   return useQuery({
     queryKey: keys.reports.merchants(from, to, type),
@@ -66,14 +56,3 @@ export function useReportAccounts(from: string, to: string) {
   })
 }
 
-export function useReconciliationReport(statementId: string) {
-  return useQuery({
-    queryKey: keys.reports.reconciliation(statementId),
-    queryFn: ({ signal }) =>
-      api.get<ReconciliationReport>(
-        `/reports/reconciliation${toQuery({ statement_id: statementId })}`,
-        signal,
-      ),
-    enabled: !!statementId,
-  })
-}

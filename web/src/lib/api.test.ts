@@ -86,9 +86,9 @@ describe('request error mapping', () => {
   })
 
   it('resolves POST/PATCH with a 204 (no envelope) to undefined instead of throwing', async () => {
-    // POST /reconciliation/unmatch answers 204 No Content.
+    // POST /auth/logout answers 204 No Content.
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 204 }))
-    await expect(api.post('/reconciliation/unmatch', { bank_transaction_id: 'b1' })).resolves.toBeUndefined()
+    await expect(api.post('/auth/logout', {})).resolves.toBeUndefined()
     await expect(api.patch('/x', {})).resolves.toBeUndefined()
   })
 })

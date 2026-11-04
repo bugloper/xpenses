@@ -45,7 +45,7 @@ func TestSPAServing(t *testing.T) {
 		wantStatus                          int
 	}{
 		{"/", "app", "text/html", "no-cache", 200},
-		{"/reconciliation/some-id", "app", "text/html", "no-cache", 200},
+		{"/transactions/some-id", "app", "text/html", "no-cache", 200},
 		{"/manifest.webmanifest", "{}", "application/manifest+json", "no-cache", 200},
 		{"/assets/app-abc.js", "1", "javascript", "immutable", 200},
 		// Anonymous: the auth gate answers before routing resolves, never the SPA.

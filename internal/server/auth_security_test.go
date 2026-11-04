@@ -2,8 +2,6 @@ package server_test
 
 import (
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -84,37 +82,6 @@ func TestLoginReplacesExistingSession(t *testing.T) {
 	}
 	if st, b := owner.Do("GET", "/auth/me", nil); st != 200 || testutil.Data(b)["email"] != "bob@example.com" {
 		t.Fatalf("me after re-login: %d %v", st, b)
-	}
-}
-
-func TestDeleteUserRemovesStatementFiles(t *testing.T) {
-	e := testutil.New(t)
-	admin := e.Setup("Owner", "owner@example.com")
-	bob := e.Register(admin, "Bob", "bob@example.com")
-	acct := bob.CreateAccount("Bob bank", "bank", 0)
-	const stID = "stmt-bob-1"
-	if _, err := e.DB.Exec(`INSERT INTO bank_statements (id, user_id, provider, account_id, file_name, file_sha256, file_size, period_start, period_end, imported_at)
-		VALUES (?,?,?,?,?,?,?,?,?,?)`, stID, bob.UserID, "bob", acct, "s.pdf", "abc", 1, "2026-01-01", "2026-01-31", "2026-02-01T00:00:00Z"); err != nil {
-		t.Fatal(err)
-	}
-	dir := e.Cfg.StatementsDir()
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	pdf := filepath.Join(dir, stID+".pdf")
-	if err := os.WriteFile(pdf, []byte("%PDF-1.4"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if st, _ := admin.Do("DELETE", "/admin/users/"+bob.UserID, nil); st != 204 {
-		t.Fatalf("delete want 204 got %d", st)
-	}
-	if _, err := os.Stat(pdf); !os.IsNotExist(err) {
-		t.Fatalf("statement PDF must be removed with the user, stat err=%v", err)
-	}
-	var n int
-	_ = e.DB.QueryRow(`SELECT COUNT(*) FROM bank_statements WHERE user_id = ?`, bob.UserID).Scan(&n)
-	if n != 0 {
-		t.Fatalf("bank_statements rows left: %d", n)
 	}
 }
 

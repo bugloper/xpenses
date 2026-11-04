@@ -1,7 +1,7 @@
 # Xpensiv authentication & multi-user contract
 
 Xpensiv is multi-user with **fully isolated data per user**: every account, category,
-transaction, budget, recurring rule, statement, reconciliation and setting belongs to
+transaction, budget, recurring rule and setting belongs to
 exactly one user. There is one `admin` role (the instance owner) and the `user` role.
 
 ## Sessions
@@ -71,7 +71,7 @@ unless you accept that.
 | DELETE | /auth/sessions/:id | → 204 |
 
 Every existing data endpoint (`/accounts`, `/categories`, `/transactions`, `/budgets`, `/recurring`,
-`/settings`, `/statements`, `/reconciliation`, `/reports`) keeps its shape and is now scoped to the
+`/settings`, `/reports`) keeps its shape and is now scoped to the
 logged-in user. Resources of another user return `404 not_found`. A new user starts with the
 default categories (seeded at registration, fresh ids) and no accounts.
 
@@ -87,7 +87,7 @@ reverse proxy's access log may.
 |---|---|---|
 | GET | /admin/users | `[User & {account_count: number, transaction_count: number}]` |
 | PATCH | /admin/users/:id | `{is_active?, role?}` → User. 422 when targeting yourself (cannot disable/demote the last admin or self). Disabling revokes the user's sessions |
-| DELETE | /admin/users/:id | → 204. Deletes the user **and all their data**, including the audit PDFs of their statements on disk; 422 for self |
+| DELETE | /admin/users/:id | → 204. Deletes the user **and all their data**; 422 for self |
 | GET | /admin/settings | `{registration_open: boolean}` |
 | PATCH | /admin/settings | `{registration_open}` → same |
 | POST | /admin/invites | `{email?, expires_in_hours?}` (default 72, max 720) → 201 `{id, token, email, expires_at, register_path: "/register?invite=<token>"}` — the token is shown **once** |

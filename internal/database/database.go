@@ -116,6 +116,18 @@ func migrate(ctx context.Context, db *sql.DB) error {
 	}
 	_ = rows.Close()
 
+	// A pre-release database ran 0001 before the users table existed; later
+	// migrations would fail confusingly on it, so stop here.
+	if applied["0001_init.sql"] {
+		var n int
+		if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'users'`).Scan(&n); err != nil {
+			return err
+		}
+		if n == 0 {
+			return ErrStaleSchema
+		}
+	}
+
 	entries, err := fs.ReadDir(migrationFS, "migrations")
 	if err != nil {
 		return err

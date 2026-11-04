@@ -1,4 +1,3 @@
-import { Link } from '@tanstack/react-router'
 import { ArrowDownLeft, ArrowUpRight, Scale, TrendingDown, TrendingUp } from 'lucide-react'
 import { Money } from '@/components/common/Money'
 import { ErrorState } from '@/components/common/States'
@@ -131,30 +130,5 @@ function Tile({
       </div>
       {loading ? <Skeleton className="mt-2 h-6 w-24" /> : <div className="mt-1">{value}</div>}
     </div>
-  )
-}
-
-export function ReconciliationCounts({ summary }: { summary?: ReportSummary }) {
-  if (!summary) return null
-  const bank = summary.unreconciled_bank_count
-  const manual = summary.unmatched_manual_count
-  if (!bank && !manual) return null
-  return (
-    <Link
-      to="/reconciliation"
-      className="border-warning/30 bg-warning/5 hover:bg-warning/10 flex items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-sm transition-colors"
-    >
-      <span className="flex items-center gap-2">
-        <Scale className="text-warning size-4" />
-        <span>
-          {bank > 0 && <strong>{bank}</strong>}
-          {bank > 0 && ` bank line${bank === 1 ? '' : 's'} unreconciled`}
-          {bank > 0 && manual > 0 && ' · '}
-          {manual > 0 && <strong>{manual}</strong>}
-          {manual > 0 && ` manual unmatched`}
-        </span>
-      </span>
-      <span className="text-warning text-xs font-medium">Reconcile →</span>
-    </Link>
   )
 }

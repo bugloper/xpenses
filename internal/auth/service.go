@@ -7,8 +7,6 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"net/mail"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -43,9 +41,6 @@ type Service struct {
 	Repo Repo
 	// DefaultCurrency is used for the seeded Cash account.
 	DefaultCurrency string
-	// StatementsDir holds the audit PDFs (<id>.pdf) that DeleteUser removes
-	// alongside the user's rows. Empty leaves files alone.
-	StatementsDir string
 
 	// signup serialises Setup and Register. SQLite resolves two concurrent
 	// read-then-write transactions by failing one with SQLITE_BUSY, which would
@@ -501,9 +496,7 @@ func (s *Service) UpdateUserAdmin(ctx context.Context, actor *models.User, id st
 	return u, nil
 }
 
-// DeleteUser removes a user and, through ON DELETE CASCADE, every row they
-// own, then the audit PDFs of their statements (which live on disk, outside the
-// cascade).
+// DeleteUser removes a user and, through ON DELETE CASCADE, every row they own.
 func (s *Service) DeleteUser(ctx context.Context, actor *models.User, id string) error {
 	if id == actor.ID {
 		return apperr.Validation("validation failed", map[string]string{"id": "you cannot delete your own account"})
@@ -515,21 +508,11 @@ func (s *Service) DeleteUser(ctx context.Context, actor *models.User, id string)
 	if u == nil {
 		return apperr.NotFound("user")
 	}
-	var statementIDs []string
 	err = repositories.WithTx(ctx, s.DB, func(tx *sql.Tx) error {
-		var err error
-		if statementIDs, err = s.Repo.ListStatementIDs(ctx, tx, id); err != nil {
-			return err
-		}
 		return s.Repo.DeleteUser(ctx, tx, id)
 	})
 	if err != nil {
 		return apperr.Internal(err)
-	}
-	if s.StatementsDir != "" {
-		for _, sid := range statementIDs {
-			_ = os.Remove(filepath.Join(s.StatementsDir, sid+".pdf"))
-		}
 	}
 	return nil
 }

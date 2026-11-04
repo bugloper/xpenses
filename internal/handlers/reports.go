@@ -21,7 +21,6 @@ func (h *ReportHandler) Register(g *echo.Group) {
 	g.GET("/reports/merchants", h.Merchants)
 	g.GET("/reports/accounts", h.Accounts)
 	g.GET("/reports/budgets", h.Budgets)
-	g.GET("/reports/reconciliation", h.Reconciliation)
 	g.GET("/reports/export", h.Export)
 }
 
@@ -113,14 +112,6 @@ func (h *ReportHandler) Budgets(c echo.Context) error {
 	return JSON(c, http.StatusOK, out)
 }
 
-func (h *ReportHandler) Reconciliation(c echo.Context) error {
-	out, err := h.Svc.Reconciliation(c.Request().Context(), c.QueryParam("statement_id"))
-	if err != nil {
-		return err
-	}
-	return JSON(c, http.StatusOK, out)
-}
-
 // Export streams the chosen report as a CSV or PDF attachment.
 func (h *ReportHandler) Export(c echo.Context) error {
 	report, err := reports.ParseExportReport(c.QueryParam("report"))
@@ -131,7 +122,7 @@ func (h *ReportHandler) Export(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	req := reports.ExportRequest{Report: report, Format: format, StatementID: c.QueryParam("statement_id")}
+	req := reports.ExportRequest{Report: report, Format: format}
 	if req.Period, err = period(c); err != nil {
 		return err
 	}

@@ -132,13 +132,6 @@ func TestReportsValidation(t *testing.T) {
 			t.Fatalf("%s: %s", c2.path, body)
 		}
 	}
-	st, _, body := get(t, c, "/reports/reconciliation?statement_id=missing")
-	if st != 404 || decode(t, body)["error"].(map[string]any)["code"] != "not_found" {
-		t.Fatalf("reconciliation: %d %s", st, body)
-	}
-	if st, _, _ := get(t, c, "/reports/export?report=reconciliation&statement_id=missing"); st != 404 {
-		t.Fatalf("export reconciliation: %d", st)
-	}
 }
 
 func TestReportsExport(t *testing.T) {
@@ -175,7 +168,7 @@ func TestReportsRequireSession(t *testing.T) {
 	env, _ := newReportEnv(t)
 	anon := env.Anon()
 	for _, p := range []string{"/reports/summary", "/reports/categories", "/reports/cash-flow", "/reports/merchants",
-		"/reports/accounts", "/reports/budgets", "/reports/reconciliation?statement_id=x", "/reports/export?report=summary"} {
+		"/reports/accounts", "/reports/budgets", "/reports/export?report=summary"} {
 		st, _, body := get(t, anon, p)
 		if st != 401 || decode(t, body)["error"].(map[string]any)["code"] != "unauthenticated" {
 			t.Fatalf("%s anonymous: %d %s", p, st, body)
@@ -194,16 +187,6 @@ func TestReportsIsolation(t *testing.T) {
 			t.Fatalf("%s: %v", q, err)
 		}
 	}
-	// Admin's statement with one unreconciled bank line.
-	var adminAcc string
-	if err := env.DB.QueryRow(`SELECT id FROM accounts WHERE user_id = ?`, admin.UserID).Scan(&adminAcc); err != nil {
-		t.Fatal(err)
-	}
-	exec(`INSERT INTO bank_statements (id,user_id,provider,account_id,file_name,file_sha256,file_size,period_start,period_end,opening_balance,closing_balance,imported_at)
-		VALUES ('st-a',?,'bob',?,'nov.pdf','abc',10,'2026-11-01','2026-11-30',10000,57500,?)`, admin.UserID, adminAcc, reportTS)
-	exec(`INSERT INTO bank_transactions (id,user_id,statement_id,account_id,line_no,transaction_date,description,debit,credit,fingerprint,created_at)
-		VALUES ('bt-a',?,'st-a',?,1,'2026-11-02','CAFE',2500,0,'fp-a',?)`, admin.UserID, adminAcc, reportTS)
-
 	bob := env.Register(admin, "Bob", "bob@example.com")
 	bobAcc := bob.CreateAccount("Cash", "cash", 500)
 	exec(`INSERT INTO transactions (id,user_id,type,amount,account_id,category_id,payee,transaction_date,created_at,updated_at)
@@ -215,27 +198,26 @@ func TestReportsIsolation(t *testing.T) {
 	}
 
 	const nov = "from=2026-11-01&to=2026-11-30"
-	// Bob's summary: only his cash account and expense; the admin's bank
-	// statement and unmatched bank transactions never reach his counts.
+	// Bob's summary: only his cash account and expense.
 	st, _, body := get(t, bob, "/reports/summary?"+nov)
 	d := decode(t, body)["data"].(map[string]any)
 	if st != 200 || d["income"].(float64) != 0 || d["expenses"].(float64) != 200 || d["net"].(float64) != -200 || d["total_balance"].(float64) != 300 {
 		t.Fatalf("bob summary: %d %v", st, d)
 	}
-	if d["unreconciled_bank_count"].(float64) != 0 || d["unmatched_manual_count"].(float64) != 0 || d["pending_count"].(float64) != 0 {
+	if d["pending_count"].(float64) != 0 {
 		t.Fatalf("bob summary counts: %v", d)
 	}
 	recent := d["recent_transactions"].([]any)
 	if len(recent) != 1 || recent[0].(map[string]any)["id"] != "tb1" {
 		t.Fatalf("bob recent: %v", recent)
 	}
-	// Admin's summary is unchanged by Bob's rows, and counts only the admin's bank data.
+	// Admin's summary is unchanged by Bob's rows.
 	st, _, body = get(t, admin, "/reports/summary?"+nov)
 	d = decode(t, body)["data"].(map[string]any)
 	if st != 200 || d["income"].(float64) != 50000 || d["expenses"].(float64) != 2500 || d["total_balance"].(float64) != 57500 {
 		t.Fatalf("admin summary: %d %v", st, d)
 	}
-	if d["unreconciled_bank_count"].(float64) != 1 || d["unmatched_manual_count"].(float64) != 2 || len(d["recent_transactions"].([]any)) != 2 {
+	if len(d["recent_transactions"].([]any)) != 2 {
 		t.Fatalf("admin summary counts: %v", d)
 	}
 
@@ -280,29 +262,12 @@ func TestReportsIsolation(t *testing.T) {
 		t.Fatalf("bob budgets: %d %s", st, body)
 	}
 
-	// The admin's statement is a 404 for Bob, in both the JSON and export forms.
-	st, _, body = get(t, admin, "/reports/reconciliation?statement_id=st-a")
-	d = decode(t, body)["data"].(map[string]any)
-	if st != 200 || d["statement"].(map[string]any)["file_name"] != "nov.pdf" || len(d["unrecorded_bank"].([]any)) != 1 {
-		t.Fatalf("admin reconciliation: %d %s", st, body)
-	}
-	st, _, body = get(t, bob, "/reports/reconciliation?statement_id=st-a")
-	if st != 404 || decode(t, body)["error"].(map[string]any)["code"] != "not_found" {
-		t.Fatalf("bob reconciliation of admin statement: %d %s", st, body)
-	}
-	if st, _, _ := get(t, bob, "/reports/export?report=reconciliation&statement_id=st-a"); st != 404 {
-		t.Fatalf("bob export of admin statement: %d", st)
-	}
-	if st, _, _ := get(t, admin, "/reports/export?report=reconciliation&statement_id=st-a"); st != 200 {
-		t.Fatalf("admin export of own statement: %d", st)
-	}
-
 	st, _, body = get(t, bob, "/reports/export?report=categories&format=csv&"+nov)
 	if st != 200 || !strings.Contains(string(body), "Eating out,1,2.00,100.0") || strings.Contains(string(body), "25.00") {
 		t.Fatalf("bob export csv: %d %s", st, body)
 	}
 	st, _, body = get(t, bob, "/reports/export?report=summary&format=csv&"+nov)
-	if st != 200 || !strings.Contains(string(body), "Total balance,3.00") || !strings.Contains(string(body), "Unreconciled bank transactions,0") {
+	if st != 200 || !strings.Contains(string(body), "Total balance,3.00") || !strings.Contains(string(body), "Pending transactions,0") {
 		t.Fatalf("bob summary csv: %d %s", st, body)
 	}
 }

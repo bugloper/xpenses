@@ -3,7 +3,6 @@ import { ApiError } from './api'
 import {
   API_RUNTIME_CACHE,
   LAST_USER_STORAGE_KEY,
-  REJECTED_SUGGESTIONS_PREFIX,
   adoptUser,
   authErrorInfo,
   authStore,
@@ -195,7 +194,6 @@ describe('purgeSessionData', () => {
     localStorage.setItem('xpensiv-theme', 'light')
     localStorage.setItem(LAST_USER_STORAGE_KEY, 'u1')
     setLastUsed('expense', { account_id: 'a1', category_id: 'c1' })
-    sessionStorage.setItem(REJECTED_SUGGESTIONS_PREFIX + 'st1', '["b:t"]')
     sessionStorage.setItem('unrelated', 'keep')
     authStore.setUser(user())
 
@@ -208,7 +206,6 @@ describe('purgeSessionData', () => {
     expect(getLastUsed('expense')).toEqual({})
     expect(localStorage.getItem(LAST_USER_STORAGE_KEY)).toBeNull()
     expect(localStorage.getItem('xpensiv-theme')).toBe('light')
-    expect(sessionStorage.getItem(REJECTED_SUGGESTIONS_PREFIX + 'st1')).toBeNull()
     expect(sessionStorage.getItem('unrelated')).toBe('keep')
     expect(deleted).toEqual([API_RUNTIME_CACHE])
     expect(authStore.get().user).toBeNull()

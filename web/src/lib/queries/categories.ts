@@ -27,9 +27,8 @@ export function useUpdateCategory() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: keys.categories.all })
       void qc.invalidateQueries({ queryKey: keys.reports.all })
-      // Name/icon/colour are denormalised onto transaction rows and workspace manual lines.
+      // Name/icon/colour are denormalised onto transaction rows.
       void qc.invalidateQueries({ queryKey: keys.transactions.all })
-      void qc.invalidateQueries({ queryKey: keys.reconciliation.all })
     },
   })
 }

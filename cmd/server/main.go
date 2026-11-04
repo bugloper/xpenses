@@ -41,7 +41,7 @@ func run() error {
 	}
 	log := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: level}))
 
-	for _, d := range []string{cfg.DataDir, cfg.StatementsDir(), cfg.BackupsDir()} {
+	for _, d := range []string{cfg.DataDir, cfg.BackupsDir()} {
 		if err := os.MkdirAll(d, 0o700); err != nil {
 			return err
 		}

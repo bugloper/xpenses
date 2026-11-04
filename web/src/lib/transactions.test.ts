@@ -19,7 +19,6 @@ function tx(partial: Partial<Transaction>): Transaction {
     origin: 'manual',
     status: 'cleared',
     recurring_id: null,
-    source_bank_transaction_id: null,
     tags: [],
     created_at: '2026-11-04T10:00:00Z',
     updated_at: '2026-11-04T10:00:00Z',

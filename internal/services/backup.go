@@ -131,7 +131,7 @@ func IsEncrypted(data []byte) bool {
 var restoreTables = []string{
 	"users", "sessions", "login_attempts", "invites", "app_settings",
 	"accounts", "categories", "recurring_transactions", "transactions", "tags", "transaction_tags",
-	"bank_statements", "bank_transactions", "reconciliations", "budgets", "settings",
+	"budgets", "settings",
 }
 
 // Restore replaces the contents of the live database with the uploaded

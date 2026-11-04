@@ -15,30 +15,26 @@ type TransactionRepo struct{}
 const txCols = `t.user_id, t.id, t.type, t.amount, t.currency, t.account_id, a.name, t.transfer_account_id, COALESCE(ta.name,''),
 	t.category_id, COALESCE(c.name,''), COALESCE(c.icon,''), COALESCE(c.color,''),
 	t.description, t.payee, t.transaction_date, t.notes, t.origin, t.status, t.recurring_id,
-	t.source_bank_transaction_id, t.client_id, t.created_at, t.updated_at,
-	r.bank_transaction_id, COALESCE(r.status,'')`
+	t.client_id, t.created_at, t.updated_at`
 
 const txFrom = ` FROM transactions t
 	JOIN accounts a ON a.id = t.account_id
 	LEFT JOIN accounts ta ON ta.id = t.transfer_account_id
-	LEFT JOIN categories c ON c.id = t.category_id
-	LEFT JOIN reconciliations r ON r.transaction_id = t.id`
+	LEFT JOIN categories c ON c.id = t.category_id`
 
 func scanTx(s interface{ Scan(...any) error }) (*models.Transaction, error) {
 	var t models.Transaction
-	var transferID, catID, recID, srcID, clientID, bankTxID sql.NullString
+	var transferID, catID, recID, clientID sql.NullString
 	if err := s.Scan(&t.UserID, &t.ID, &t.Type, &t.Amount, &t.Currency, &t.AccountID, &t.AccountName, &transferID, &t.TransferAccountName,
 		&catID, &t.CategoryName, &t.CategoryIcon, &t.CategoryColor,
 		&t.Description, &t.Payee, &t.TransactionDate, &t.Notes, &t.Origin, &t.Status, &recID,
-		&srcID, &clientID, &t.CreatedAt, &t.UpdatedAt, &bankTxID, &t.ReconciliationStatus); err != nil {
+		&clientID, &t.CreatedAt, &t.UpdatedAt); err != nil {
 		return nil, err
 	}
 	t.TransferAccountID = strPtr(transferID)
 	t.CategoryID = strPtr(catID)
 	t.RecurringID = strPtr(recID)
-	t.SourceBankTransactionID = strPtr(srcID)
 	t.ClientID = strPtr(clientID)
-	t.BankTransactionID = strPtr(bankTxID)
 	t.Tags = []string{}
 	return &t, nil
 }
@@ -188,11 +184,11 @@ func (TransactionRepo) GetByClientID(ctx context.Context, db DBTX, userID, clien
 func (TransactionRepo) Insert(ctx context.Context, db DBTX, t *models.Transaction) error {
 	_, err := db.ExecContext(ctx, `INSERT INTO transactions
 		(user_id, id, type, amount, currency, account_id, transfer_account_id, category_id, description, payee,
-		 transaction_date, notes, origin, status, recurring_id, source_bank_transaction_id, client_id, created_at, updated_at)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		 transaction_date, notes, origin, status, recurring_id, client_id, created_at, updated_at)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		t.UserID, t.ID, t.Type, t.Amount, t.Currency, t.AccountID, nullStr(t.TransferAccountID), nullStr(t.CategoryID),
 		t.Description, t.Payee, t.TransactionDate, t.Notes, t.Origin, t.Status, nullStr(t.RecurringID),
-		nullStr(t.SourceBankTransactionID), nullStr(t.ClientID), t.CreatedAt, t.UpdatedAt)
+		nullStr(t.ClientID), t.CreatedAt, t.UpdatedAt)
 	return err
 }
 
@@ -236,21 +232,4 @@ func (TransactionRepo) SetTags(ctx context.Context, db DBTX, userID, txID string
 		}
 	}
 	return nil
-}
-
-// CountUnmatchedManual counts cleared manual transactions on bank-type accounts
-// that are not linked to any bank transaction. It feeds the dashboard
-// (/reports/summary) and the reconciliation overview, and is deliberately
-// narrower than a workspace's summary.unmatched_manual, which is scoped to one
-// statement's account and period (± tolerance) and also counts pending drafts
-// and imported-origin rows that lost their link. The two numbers are not
-// expected to agree.
-func (TransactionRepo) CountUnmatchedManual(ctx context.Context, db DBTX, userID string) (int, error) {
-	var n int
-	err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM transactions t
-		JOIN accounts a ON a.id = t.account_id
-		LEFT JOIN reconciliations r ON r.transaction_id = t.id
-		WHERE t.user_id = ? AND t.status = 'cleared' AND t.origin = 'manual' AND r.id IS NULL
-		AND a.type IN ('bank','savings','credit_card')`, userID).Scan(&n)
-	return n, err
 }

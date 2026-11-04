@@ -3,7 +3,6 @@ package reports
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"math"
 
 	"github.com/bugloper/xpensiv/internal/auth"
@@ -40,16 +39,14 @@ type PeriodTotals struct {
 }
 
 type Summary struct {
-	TotalBalance          int64                `json:"total_balance"`
-	Income                int64                `json:"income"`
-	Expenses              int64                `json:"expenses"`
-	Net                   int64                `json:"net"`
-	Previous              PeriodTotals         `json:"previous"`
-	ExpenseChangePct      *float64             `json:"expense_change_pct"`
-	UnreconciledBankCount int                  `json:"unreconciled_bank_count"`
-	UnmatchedManualCount  int                  `json:"unmatched_manual_count"`
-	PendingCount          int                  `json:"pending_count"`
-	RecentTransactions    []models.Transaction `json:"recent_transactions"`
+	TotalBalance       int64                `json:"total_balance"`
+	Income             int64                `json:"income"`
+	Expenses           int64                `json:"expenses"`
+	Net                int64                `json:"net"`
+	Previous           PeriodTotals         `json:"previous"`
+	ExpenseChangePct   *float64             `json:"expense_change_pct"`
+	PendingCount       int                  `json:"pending_count"`
+	RecentTransactions []models.Transaction `json:"recent_transactions"`
 }
 
 type CategoryRow struct {
@@ -112,32 +109,6 @@ const (
 	LevelOver   = "over"
 )
 
-type Discrepancy struct {
-	BankTransaction models.BankTransaction `json:"bank_transaction"`
-	Transaction     models.Transaction     `json:"transaction"`
-	Difference      int64                  `json:"difference"`
-}
-
-type BalanceCheck struct {
-	Opening         *int64 `json:"opening"`
-	Closing         *int64 `json:"closing"`
-	ComputedClosing *int64 `json:"computed_closing"`
-	Verified        bool   `json:"verified"`
-}
-
-type ReconciliationReport struct {
-	Statement           models.BankStatement     `json:"statement"`
-	TotalDebits         int64                    `json:"total_debits"`
-	TotalCredits        int64                    `json:"total_credits"`
-	ManualExpenses      int64                    `json:"manual_expenses"`
-	ManualIncome        int64                    `json:"manual_income"`
-	Matched             int                      `json:"matched"`
-	UnmatchedManual     []models.Transaction     `json:"unmatched_manual"`
-	UnrecordedBank      []models.BankTransaction `json:"unrecorded_bank"`
-	AmountDiscrepancies []Discrepancy            `json:"amount_discrepancies"`
-	Balance             BalanceCheck             `json:"balance"`
-}
-
 // BudgetLevel classifies spend against a budget.
 func BudgetLevel(pct int) string {
 	switch {
@@ -194,14 +165,6 @@ func (s *Service) Summary(ctx context.Context, p Period) (*Summary, error) {
 		return nil, apperr.Internal(err)
 	}
 	uid := auth.UserID(ctx)
-	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM bank_transactions bt
-		LEFT JOIN reconciliations r ON r.bank_transaction_id = bt.id AND r.user_id = bt.user_id
-		WHERE bt.user_id = ? AND r.id IS NULL`, uid).Scan(&out.UnreconciledBankCount); err != nil {
-		return nil, apperr.Internal(err)
-	}
-	if out.UnmatchedManualCount, err = s.txs.CountUnmatchedManual(ctx, s.db, uid); err != nil {
-		return nil, apperr.Internal(err)
-	}
 	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM transactions WHERE user_id = ? AND status = 'pending'`, uid).Scan(&out.PendingCount); err != nil {
 		return nil, apperr.Internal(err)
 	}
@@ -410,133 +373,6 @@ func (s *Service) Budgets(ctx context.Context, month Period) ([]BudgetRow, error
 	}
 	if err := rows.Err(); err != nil {
 		return nil, apperr.Internal(err)
-	}
-	return out, nil
-}
-
-func (s *Service) Reconciliation(ctx context.Context, statementID string) (*ReconciliationReport, error) {
-	uid := auth.UserID(ctx)
-	var st models.BankStatement
-	var opening, closing sql.NullInt64
-	var verified int
-	// Another user's statement is indistinguishable from a missing one: 404.
-	err := s.db.QueryRowContext(ctx, `SELECT id, provider, account_id, file_name, file_sha256, file_size, account_number,
-		account_holder, period_start, period_end, opening_balance, closing_balance, total_debits, total_credits,
-		transaction_count, balance_verified, notes, imported_at FROM bank_statements WHERE id = ? AND user_id = ?`, statementID, uid).
-		Scan(&st.ID, &st.Provider, &st.AccountID, &st.FileName, &st.FileSHA256, &st.FileSize, &st.AccountNumber,
-			&st.AccountHolder, &st.PeriodStart, &st.PeriodEnd, &opening, &closing, &st.TotalDebits, &st.TotalCredits,
-			&st.TransactionCount, &verified, &st.Notes, &st.ImportedAt)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, apperr.NotFound("statement")
-	}
-	if err != nil {
-		return nil, apperr.Internal(err)
-	}
-	st.BalanceVerified = verified == 1
-	if opening.Valid {
-		v := opening.Int64
-		st.OpeningBalance = &v
-	}
-	if closing.Valid {
-		v := closing.Int64
-		st.ClosingBalance = &v
-	}
-	out := &ReconciliationReport{Statement: st, UnmatchedManual: []models.Transaction{},
-		UnrecordedBank: []models.BankTransaction{}, AmountDiscrepancies: []Discrepancy{}}
-
-	// Bank side: every line with its reconciliation (if any).
-	rows, err := s.db.QueryContext(ctx, `SELECT bt.id, bt.statement_id, bt.account_id, bt.line_no, bt.transaction_date, bt.value_date,
-		bt.description, bt.reference, bt.debit, bt.credit, bt.balance, bt.fingerprint, bt.created_at,
-		COALESCE(r.status, ''), r.transaction_id, COALESCE(r.amount_diff, 0)
-		FROM bank_transactions bt LEFT JOIN reconciliations r ON r.bank_transaction_id = bt.id AND r.user_id = bt.user_id
-		WHERE bt.statement_id = ? AND bt.user_id = ? ORDER BY bt.line_no`, statementID, uid)
-	if err != nil {
-		return nil, apperr.Internal(err)
-	}
-	defer rows.Close()
-	type pending struct {
-		bank models.BankTransaction
-		txID string
-		diff int64
-	}
-	var discrepancies []pending
-	for rows.Next() {
-		var bt models.BankTransaction
-		var valueDate, txID sql.NullString
-		var balance sql.NullInt64
-		var status string
-		var diff int64
-		if err := rows.Scan(&bt.ID, &bt.StatementID, &bt.AccountID, &bt.LineNo, &bt.TransactionDate, &valueDate,
-			&bt.Description, &bt.Reference, &bt.Debit, &bt.Credit, &balance, &bt.Fingerprint, &bt.CreatedAt,
-			&status, &txID, &diff); err != nil {
-			return nil, apperr.Internal(err)
-		}
-		if valueDate.Valid {
-			v := valueDate.String
-			bt.ValueDate = &v
-		}
-		if balance.Valid {
-			v := balance.Int64
-			bt.Balance = &v
-		}
-		out.TotalDebits += bt.Debit
-		out.TotalCredits += bt.Credit
-		switch status {
-		case "":
-			out.UnrecordedBank = append(out.UnrecordedBank, bt)
-		case models.ReconMatched:
-			out.Matched++
-			if diff != 0 && txID.Valid {
-				discrepancies = append(discrepancies, pending{bank: bt, txID: txID.String, diff: diff})
-			}
-		}
-	}
-	if err := rows.Err(); err != nil {
-		return nil, apperr.Internal(err)
-	}
-	for _, d := range discrepancies {
-		t, err := s.txs.Get(ctx, s.db, uid, d.txID)
-		if err != nil {
-			return nil, apperr.Internal(err)
-		}
-		if t == nil {
-			continue
-		}
-		out.AmountDiscrepancies = append(out.AmountDiscrepancies, Discrepancy{BankTransaction: d.bank, Transaction: *t, Difference: d.diff})
-	}
-
-	// Manual side: non-void transactions touching the account within the period.
-	filter := dto.TransactionFilter{UserID: uid, AccountID: st.AccountID, DateFrom: st.PeriodStart, DateTo: st.PeriodEnd,
-		Sort: "date", Order: "asc", Page: 1, PerPage: 200}
-	var manual []models.Transaction
-	for {
-		page, total, err := s.txs.List(ctx, s.db, filter)
-		if err != nil {
-			return nil, apperr.Internal(err)
-		}
-		manual = append(manual, page...)
-		if len(page) == 0 || len(manual) >= total {
-			break
-		}
-		filter.Page++
-	}
-	for _, t := range manual {
-		switch t.Type {
-		case models.TxExpense:
-			out.ManualExpenses += t.Amount
-		case models.TxIncome, models.TxRefund:
-			out.ManualIncome += t.Amount
-		}
-		if t.ReconciliationStatus == "" {
-			out.UnmatchedManual = append(out.UnmatchedManual, t)
-		}
-	}
-
-	out.Balance = BalanceCheck{Opening: st.OpeningBalance, Closing: st.ClosingBalance}
-	if st.OpeningBalance != nil {
-		v := *st.OpeningBalance + out.TotalCredits - out.TotalDebits
-		out.Balance.ComputedClosing = &v
-		out.Balance.Verified = st.ClosingBalance != nil && v == *st.ClosingBalance
 	}
 	return out, nil
 }

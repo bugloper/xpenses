@@ -78,10 +78,6 @@ function TransactionDetailPage() {
               {tx.origin}
             </Badge>
           )}
-          {tx.reconciliation_status === 'matched' && <Badge>Reconciled</Badge>}
-          {tx.reconciliation_status === 'ignored' && (
-            <Badge variant="outline">Ignored in reconciliation</Badge>
-          )}
         </div>
       </div>
       <div className="bg-card ring-foreground/10 divide-y rounded-2xl px-4 ring-1">

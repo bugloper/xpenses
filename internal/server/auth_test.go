@@ -171,8 +171,8 @@ func TestDataIsolationBetweenUsers(t *testing.T) {
 		t.Fatalf("alice same client_id want 201 got %d", st)
 	}
 	// Settings and budgets are per user.
-	a.Do("PATCH", "/settings", map[string]any{"reconciliation.date_tolerance_days": "7"})
-	if st, body := b.Do("GET", "/settings", nil); st != 200 || testutil.Data(body)["reconciliation.date_tolerance_days"] != "3" {
+	a.Do("PATCH", "/settings", map[string]any{"ui.theme": "dark"})
+	if st, body := b.Do("GET", "/settings", nil); st != 200 || testutil.Data(body)["ui.theme"] != nil {
 		t.Fatalf("bob settings: %d %v", st, body)
 	}
 	a.Do("POST", "/budgets", map[string]any{"category_id": a.Category("Eating out"), "amount": 100})

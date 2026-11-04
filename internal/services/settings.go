@@ -3,7 +3,6 @@ package services
 import (
 	"context"
 	"database/sql"
-	"strconv"
 
 	"github.com/bugloper/xpensiv/internal/auth"
 	apperr "github.com/bugloper/xpensiv/internal/errors"
@@ -12,7 +11,6 @@ import (
 
 // Setting keys.
 const (
-	SettingDateTolerance   = "reconciliation.date_tolerance_days"
 	SettingDefaultCurrency = "default_currency"
 	SettingLastAccount     = "ui.last_account_id"
 	SettingLastCategory    = "ui.last_category_id"
@@ -20,7 +18,7 @@ const (
 )
 
 var allowedSettings = map[string]bool{
-	SettingDateTolerance: true, SettingDefaultCurrency: true, SettingLastAccount: true, SettingLastCategory: true, SettingTheme: true,
+	SettingDefaultCurrency: true, SettingLastAccount: true, SettingLastCategory: true, SettingTheme: true,
 }
 
 type SettingsService struct {
@@ -29,7 +27,7 @@ type SettingsService struct {
 }
 
 // Defaults applied when a user has not set a key.
-var settingDefaults = map[string]string{SettingDateTolerance: "3", SettingDefaultCurrency: "BTN"}
+var settingDefaults = map[string]string{SettingDefaultCurrency: "BTN"}
 
 func (s *SettingsService) All(ctx context.Context) (map[string]string, error) {
 	vals, err := s.Repo.All(ctx, s.DB, auth.UserID(ctx))
@@ -49,12 +47,6 @@ func (s *SettingsService) Update(ctx context.Context, values map[string]string) 
 		if !allowedSettings[k] {
 			return nil, apperr.Validation("unknown setting", map[string]string{k: "is not a recognised setting"})
 		}
-		if k == SettingDateTolerance {
-			n, err := strconv.Atoi(v)
-			if err != nil || n < 0 || n > 31 {
-				return nil, apperr.Validation("validation failed", map[string]string{k: "must be an integer between 0 and 31"})
-			}
-		}
 		if len(v) > 200 {
 			return nil, apperr.Validation("validation failed", map[string]string{k: "is too long"})
 		}
@@ -63,17 +55,4 @@ func (s *SettingsService) Update(ctx context.Context, values map[string]string) 
 		}
 	}
 	return s.All(ctx)
-}
-
-// DateTolerance returns the reconciliation date tolerance in days.
-func (s *SettingsService) DateTolerance(ctx context.Context) int {
-	v, err := s.Repo.Get(ctx, s.DB, auth.UserID(ctx), SettingDateTolerance, "3")
-	if err != nil {
-		return 3
-	}
-	n, err := strconv.Atoi(v)
-	if err != nil {
-		return 3
-	}
-	return n
 }

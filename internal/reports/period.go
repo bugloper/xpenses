@@ -1,5 +1,5 @@
 // Package reports computes the aggregate views (summary, categories, cash
-// flow, merchants, accounts, budgets, reconciliation) and renders them as
+// flow, merchants, accounts, budgets) and renders them as
 // JSON, CSV or PDF. All amounts are int64 minor units; only percentages are
 // floating point.
 package reports

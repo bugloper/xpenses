@@ -49,20 +49,12 @@ function GeneralSettings() {
   if (isPending) return <Skeleton className="h-32 w-full rounded-2xl" />
   if (error) return <ErrorState error={error} onRetry={() => void refetch()} compact />
   // Keyed on the server values so the local drafts reset whenever they change.
-  const tol = data['reconciliation.date_tolerance_days'] ?? '3'
   const cur = data.default_currency ?? 'BTN'
-  return <GeneralSettingsForm key={`${tol}|${cur}`} tolerance={tol} currency={cur} />
+  return <GeneralSettingsForm key={cur} currency={cur} />
 }
 
-function GeneralSettingsForm({
-  tolerance: initialTolerance,
-  currency: initialCurrency,
-}: {
-  tolerance: string
-  currency: string
-}) {
+function GeneralSettingsForm({ currency: initialCurrency }: { currency: string }) {
   const update = useUpdateSettings()
-  const [tolerance, setTolerance] = useState(initialTolerance)
   const [currency, setCurrency] = useState(initialCurrency)
   const save = (patch: Record<string, string>) =>
     update.mutate(patch, {
@@ -71,34 +63,6 @@ function GeneralSettingsForm({
     })
   return (
     <div className="bg-card ring-foreground/10 divide-y rounded-2xl px-4 ring-1">
-      <SettingRow
-        label="Reconciliation date tolerance"
-        description="Days a bank line may differ from a manual transaction (0–31)."
-      >
-        <form
-          className="flex gap-2"
-          onSubmit={(e) => {
-            e.preventDefault()
-            save({ 'reconciliation.date_tolerance_days': tolerance })
-          }}
-        >
-          <Input
-            type="number"
-            min={0}
-            max={31}
-            value={tolerance}
-            onChange={(e) => setTolerance(e.target.value)}
-            aria-label="Date tolerance in days"
-          />
-          <Button
-            type="submit"
-            variant="outline"
-            disabled={update.isPending || tolerance === initialTolerance}
-          >
-            Save
-          </Button>
-        </form>
-      </SettingRow>
       <SettingRow
         label="Default currency"
         description="3-letter code used for new accounts and the amount entry."

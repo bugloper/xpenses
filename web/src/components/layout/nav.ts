@@ -1,13 +1,11 @@
 import {
   ArrowLeftRight,
-  FileText,
   LayoutDashboard,
   PieChart,
   Settings,
   Shapes,
   ShieldCheck,
   Wallet,
-  Scale,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -22,8 +20,6 @@ export const PRIMARY_NAV: NavItem[] = [
 export const MORE_NAV: NavItem[] = [
   { to: '/accounts', label: 'Accounts', icon: Wallet },
   { to: '/categories', label: 'Categories', icon: Shapes },
-  { to: '/statements', label: 'Bank Statements', icon: FileText },
-  { to: '/reconciliation', label: 'Reconciliation', icon: Scale },
   { to: '/admin', label: 'Admin', icon: ShieldCheck, adminOnly: true },
   { to: '/settings', label: 'Settings', icon: Settings },
 ]

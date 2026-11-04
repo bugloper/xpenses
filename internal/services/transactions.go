@@ -182,15 +182,6 @@ func (s *TransactionService) Update(ctx context.Context, id string, req dto.Upda
 	if err != nil {
 		return nil, err
 	}
-	// A reconciled transaction's financial fields are frozen: changing them
-	// would silently invalidate the match. Descriptive fields stay editable.
-	if t.ReconciliationStatus != "" {
-		touchesMoney := req.Type != nil || req.Amount != nil || req.Currency != nil || req.AccountID != nil ||
-			req.TransferAccountID != nil || req.ClearTransferAccount || req.TransactionDate != nil || req.Status != nil
-		if touchesMoney {
-			return nil, apperr.Conflict("this transaction is reconciled with a bank transaction; unmatch it before changing its amount, account, type, date or status")
-		}
-	}
 	if req.Type != nil {
 		t.Type = *req.Type
 	}
@@ -251,8 +242,6 @@ func (s *TransactionService) Delete(ctx context.Context, id string) error {
 	if _, err := s.Get(ctx, id); err != nil {
 		return err
 	}
-	// Reconciliation rows referencing the transaction are removed by ON DELETE CASCADE,
-	// which keeps the bank transaction itself intact (it simply becomes unmatched again).
 	if err := s.Repo.Delete(ctx, s.DB, auth.UserID(ctx), id); err != nil {
 		return apperr.Internal(err)
 	}

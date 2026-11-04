@@ -210,12 +210,9 @@ func TestRecurringGeneration(t *testing.T) {
 
 func TestSettings(t *testing.T) {
 	e := newEnv(t)
-	st, body := e.do("PATCH", "/settings", map[string]any{"reconciliation.date_tolerance_days": "5"})
-	if st != 200 || data(body)["reconciliation.date_tolerance_days"] != "5" {
+	st, body := e.do("PATCH", "/settings", map[string]any{"ui.theme": "dark"})
+	if st != 200 || data(body)["ui.theme"] != "dark" {
 		t.Fatalf("settings: %d %v", st, body)
-	}
-	if st, _ := e.do("PATCH", "/settings", map[string]any{"reconciliation.date_tolerance_days": "99"}); st != 422 {
-		t.Fatalf("want 422 got %d", st)
 	}
 	if st, _ := e.do("PATCH", "/settings", map[string]any{"evil": "1"}); st != 422 {
 		t.Fatalf("unknown key want 422 got %d", st)

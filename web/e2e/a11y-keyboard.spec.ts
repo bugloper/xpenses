@@ -7,8 +7,6 @@ const PAGES = [
   '/transactions',
   '/accounts',
   '/categories',
-  '/statements',
-  '/reconciliation',
   '/reports',
   '/settings',
 ]

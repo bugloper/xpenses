@@ -48,7 +48,6 @@ func NewDeps(cfg config.Config, db *sql.DB) *Deps {
 	}
 	d.Auth = auth.NewService(db)
 	d.Auth.DefaultCurrency = cfg.DefaultCurrency
-	d.Auth.StatementsDir = cfg.StatementsDir()
 	d.AuthMW = &auth.Middleware{Svc: d.Auth, SecureCookies: cfg.SecureCookies, TrustedProxy: cfg.TrustedProxy, AllowedOrigin: cfg.CORSOrigin}
 	return d
 }
@@ -56,7 +55,7 @@ func NewDeps(cfg config.Config, db *sql.DB) *Deps {
 // Registrar is implemented by every domain handler.
 type Registrar interface{ Register(g *echo.Group) }
 
-// New builds the Echo instance. Extra registrars (statements, reconciliation,
+// New builds the Echo instance. Extra registrars (reports,
 // reports) are appended by main so this package stays free of those imports.
 func New(cfg config.Config, log *slog.Logger, deps *Deps, extra ...Registrar) *echo.Echo {
 	e := echo.New()

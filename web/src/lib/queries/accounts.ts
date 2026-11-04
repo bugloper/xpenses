@@ -39,9 +39,8 @@ export function useUpdateAccount() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: keys.accounts.all })
       void qc.invalidateQueries({ queryKey: keys.reports.all })
-      // Name/currency are denormalised onto transaction rows and the reconciliation workspace.
+      // Name/currency are denormalised onto transaction rows.
       void qc.invalidateQueries({ queryKey: keys.transactions.all })
-      void qc.invalidateQueries({ queryKey: keys.reconciliation.all })
     },
   })
 }
