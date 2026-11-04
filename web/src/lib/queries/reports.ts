@@ -1,10 +1,14 @@
 import { useQuery } from '@tanstack/react-query'
 import { api, toQuery } from '@/lib/api'
 import type {
+  FlowType,
   ReconciliationOverview,
+  ReconciliationReport,
+  ReportAccount,
   ReportBudget,
   ReportCashFlow,
   ReportCategory,
+  ReportMerchant,
   ReportSummary,
 } from '@/types/api'
 import { keys } from './keys'
@@ -16,7 +20,7 @@ export function useReportSummary(from: string, to: string) {
   })
 }
 
-export function useReportCategories(from: string, to: string, type: 'expense' | 'income' = 'expense') {
+export function useReportCategories(from: string, to: string, type: FlowType = 'expense') {
   return useQuery({
     queryKey: keys.reports.categories(from, to, type),
     queryFn: ({ signal }) =>
@@ -44,5 +48,32 @@ export function useReconciliationOverview(enabled = true) {
     queryKey: keys.reconciliation.overview,
     queryFn: ({ signal }) => api.get<ReconciliationOverview>('/reconciliation', signal),
     enabled,
+  })
+}
+
+export function useReportMerchants(from: string, to: string, type: FlowType = 'expense') {
+  return useQuery({
+    queryKey: keys.reports.merchants(from, to, type),
+    queryFn: ({ signal }) =>
+      api.get<ReportMerchant[]>(`/reports/merchants${toQuery({ from, to, type })}`, signal),
+  })
+}
+
+export function useReportAccounts(from: string, to: string) {
+  return useQuery({
+    queryKey: keys.reports.accounts(from, to),
+    queryFn: ({ signal }) => api.get<ReportAccount[]>(`/reports/accounts${toQuery({ from, to })}`, signal),
+  })
+}
+
+export function useReconciliationReport(statementId: string) {
+  return useQuery({
+    queryKey: keys.reports.reconciliation(statementId),
+    queryFn: ({ signal }) =>
+      api.get<ReconciliationReport>(
+        `/reports/reconciliation${toQuery({ statement_id: statementId })}`,
+        signal,
+      ),
+    enabled: !!statementId,
   })
 }

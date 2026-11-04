@@ -103,7 +103,12 @@ export function displayAmount(tx: Transaction, perspectiveAccountId?: string): n
   return signedAmount(tx.type, tx.amount)
 }
 
-export function transactionTitle(tx: Transaction): string {
+export type TitleFields = Pick<
+  Transaction,
+  'type' | 'account_name' | 'transfer_account_name' | 'payee' | 'description' | 'category_name'
+>
+
+export function transactionTitle(tx: TitleFields): string {
   if (tx.type === 'transfer')
     return `${tx.account_name ?? 'Account'} → ${tx.transfer_account_name ?? 'Account'}`
   return (
@@ -114,7 +119,7 @@ export function transactionTitle(tx: Transaction): string {
   )
 }
 
-export function transactionSubtitle(tx: Transaction): string {
+export function transactionSubtitle(tx: TitleFields): string {
   if (tx.type === 'transfer') return tx.description || 'Transfer'
   const parts: string[] = []
   if (tx.payee && tx.description) parts.push(tx.description)

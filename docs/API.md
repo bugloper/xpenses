@@ -10,7 +10,7 @@ Base path: `/api/v1`. All bodies are JSON unless stated. All monetary values are
 - Paginated list: `{"data": [...], "meta": {"page": 1, "per_page": 50, "total": 123}}`
 - Error: `{"error": {"code": "validation_error", "message": "...", "details": {"field": "msg"}, "request_id": "..."}}`
 
-Status codes: 200 OK, 201 Created, 204 No Content, 400 bad_request, 404 not_found,
+Status codes: 200 OK, 201 Created, 204 No Content, 400 bad_request, 404 not_found, 405 method_not_allowed,
 409 conflict, 413 payload_too_large, 422 validation_error, 500 internal_error.
 
 ## Implemented (core)
@@ -27,7 +27,7 @@ Status codes: 200 OK, 201 Created, 204 No Content, 400 bad_request, 404 not_foun
 | GET | /transactions | query: search,date_from,date_to,category_id,account_id,type,status,origin,unmatched=1,sort(date|amount|created_at|payee),order(asc|desc),page,per_page(≤200) |
 | GET | /transactions/export.csv | same filters, streams CSV |
 | POST | /transactions | see below. Returns 201, or 200 if `client_id` was already seen (idempotent replay) |
-| GET/PATCH/DELETE | /transactions/:id | PATCH is partial; `clear_category:true` / `clear_transfer_account:true` to null those |
+| GET/PATCH/DELETE | /transactions/:id | PATCH is partial; `clear_category:true` / `clear_transfer_account:true` to null those. 409 when changing amount/account/type/date/status of a transaction that is reconciled (unmatch first). DELETE of a matched transaction removes the reconciliation row (bank line becomes unrecorded again). |
 | POST | /transactions/:id/duplicate | body `{transaction_date?}` default today → 201 |
 | GET | /budgets | `[{id,category_id,amount}]` monthly amount per expense category |
 | POST | /budgets | `{category_id, amount}` (409 if exists) |
@@ -61,14 +61,14 @@ Rules enforced by the server:
 - Only `status = cleared` counts toward balances/reports. `pending` = draft (recurring drafts). `void` is hidden by default.
 - `client_id` (optional UUID from the offline queue) makes POST idempotent.
 
-## To be implemented by domain agents (contract)
+## Statements, reconciliation and reports
 
 ### Statements (`internal/pdf`, `internal/handlers/statements.go`, `internal/services/statements.go`)
 
 | Method | Path | Body / Notes |
 |---|---|---|
 | POST | /statements/parse | multipart: `file` (PDF, ≤ XPENSIV_MAX_UPLOAD_BYTES), `account_id`, `password?` (BOB statements are password-protected; hint shown in UI: "DDMM of your DOB"), `provider?` default `bob`. Returns **ImportPreview** (nothing persisted). Error codes: `pdf_password_required` (400), `pdf_password_incorrect` (400), `pdf_no_text` (422, scanned/needs OCR), `pdf_unrecognised` (422, could not detect statement table), `invalid_file` (400). |
-| POST | /statements/import | JSON **ImportRequest** → 201 `{"data": Statement}`. Uses `upload_token` from the preview to retrieve the cached original PDF (kept 30 min, in `DATA_DIR/statements/pending`). 409 `duplicate_statement` if same sha256 already imported unless `force:true`. |
+| POST | /statements/import | JSON **ImportRequest** → 201 `{"data": Statement & {skipped_duplicates: number}}`. Uses `upload_token` from the preview to retrieve the cached original PDF (kept 30 min, in `DATA_DIR/statements/pending`). 409 `duplicate_statement` if same sha256 already imported unless `force:true`; 409 `duplicate_bank_transaction` if `skip_duplicates:false` and a row's fingerprint already exists. Stored `total_debits/total_credits/transaction_count` cover inserted rows only; `notes` records how many duplicates were skipped. |
 | GET | /statements | `[Statement]` newest first |
 | GET | /statements/:id | Statement |
 | GET | /statements/:id/transactions | `[BankTransactionWithStatus]` ordered by line_no |
@@ -99,7 +99,7 @@ type ImportRequest = {
 type Statement = { id, provider, account_id, file_name, file_sha256, file_size, account_number, account_holder,
   period_start, period_end, opening_balance, closing_balance, total_debits, total_credits, transaction_count,
   balance_verified: boolean, notes, imported_at,
-  // computed:
+  // computed: matched_count = matched + transfer; the three counts sum to transaction_count
   matched_count: number, unmatched_count: number, ignored_count: number }
 type BankTransactionWithStatus = BankTransaction & { status: "matched"|"unrecorded"|"ignored"|"transfer";
   reconciliation: Reconciliation | null; transaction: Transaction | null }
@@ -114,7 +114,7 @@ Fingerprint = sha256(`account_id|transaction_date|normalised description|debit|c
 | GET | /reconciliation | `{ statements: [ {statement_id, file_name, period_start, period_end, account_id, account_name, total: n, matched: n, unrecorded: n, ignored: n, transfer: n} ], unmatched_manual_count, unreconciled_bank_count }` |
 | GET | /reconciliation/:statement_id | **Workspace** |
 | POST | /reconciliation/auto-match | `{statement_id}` → `{matched: n}`; applies only rule 1 and rule 2 **when the candidate is unique**. Rules 3–4 are suggestions only. |
-| POST | /reconciliation/match | `{bank_transaction_id, transaction_id, note?}` → Reconciliation (manual). 409 if either side already matched. |
+| POST | /reconciliation/match | `{bank_transaction_id, transaction_id, note?}` → Reconciliation (manual). Amounts may differ; the difference is stored as `amount_diff` and reported as a discrepancy (use `/adjustment` to also fix the ledger). Matching a `transfer` transaction stores status `transfer`. 409 if either side already matched. |
 | POST | /reconciliation/unmatch | `{bank_transaction_id}` → 204. Also used to un-ignore / un-transfer. |
 | POST | /reconciliation/ignore | `{bank_transaction_id, note?}` → Reconciliation(status ignored) |
 | POST | /reconciliation/transfer | `{bank_transaction_id, transaction_id?, transfer_account_id?}`: link to an existing transfer transaction, or create one (between the statement account and `transfer_account_id`, direction from debit/credit) → `{reconciliation, transaction}` |
@@ -122,12 +122,14 @@ Fingerprint = sha256(`account_id|transaction_date|normalised description|debit|c
 | POST | /reconciliation/adjustment | `{bank_transaction_id, transaction_id, note?}` → matches the pair and creates an `adjustment` transaction for the difference (bank − manual, signed, on the statement account) → `{reconciliation, transaction, adjustment}` |
 
 ```ts
-type Suggestion = { transaction_id: string; transaction: Transaction; rule: "exact_date"|"date_tolerance"|"merchant_similarity"|"description_similarity";
+type Suggestion = { transaction_id: string; transaction: Transaction;
+  rule: "exact_date"|"date_tolerance"|"merchant_similarity"|"description_similarity"|"amount_mismatch" /* near-amount hint, confidence ≤ 30, never auto-matched */;
   confidence: number /*0-100*/; amount_diff: number; date_diff_days: number; reason: string }
 type Workspace = {
   statement: Statement; account: Account; date_tolerance_days: number;
   bank_transactions: Array<BankTransactionWithStatus & { suggestions: Suggestion[] }>;
-  manual_transactions: Array<Transaction & { status: "matched"|"unmatched"|"possible_duplicate"|"ignored"|"transfer"; duplicate_of?: string }>;
+  // `status` here is the reconciliation state and shadows the ledger status (cleared/pending/void).
+  manual_transactions: Array<Omit<Transaction,"status"> & { status: "matched"|"unmatched"|"possible_duplicate"|"ignored"|"transfer"; duplicate_of?: string }>;
   summary: { total_debits, total_credits, manual_expenses, manual_income, matched, unmatched_manual, unrecorded_bank, ignored, transfers,
              amount_discrepancies: number, balance_verified: boolean }
 }
@@ -137,15 +139,15 @@ Manual transactions in the workspace = non-void transactions whose `account_id` 
 
 ### Reports (`internal/reports`, `internal/handlers/reports.go`)
 
-All take `from`, `to` (YYYY-MM-DD, inclusive). Transfers are excluded everywhere. Only `cleared` transactions. Expense totals include `expense` minus `refund`? **No**: refunds are reported as income-type inflows under their category; expenses are `expense` only. (Keeps every number traceable.)
+All take `from`, `to` (YYYY-MM-DD, inclusive; give both or neither — neither means the current month). Transfers are excluded everywhere. Only `cleared` transactions. Expense totals include `expense` minus `refund`? **No**: refunds are reported as income-type inflows under their category; expenses are `expense` only. (Keeps every number traceable.)
 
 | Method | Path | Returns |
 |---|---|---|
 | GET | /reports/summary?from&to | `{ total_balance, income, expenses, net, previous: {from,to,income,expenses,net}, expense_change_pct: number|null, unreconciled_bank_count, unmatched_manual_count, pending_count, recent_transactions: Transaction[10] }` previous = same-length period immediately before |
 | GET | /reports/categories?from&to&type=expense|income | `[{category_id, name, icon, color, amount, count, pct}]` uncategorised appears as `{category_id: null, name: "Uncategorised"}` |
 | GET | /reports/cash-flow?from&to&granularity=day|week|month | `[{period: "2026-11-04"|"2026-W45"|"2026-11", income, expenses, net}]` zero-filled |
-| GET | /reports/merchants?from&to&type=expense | `[{payee, amount, count}]` top 50, blank payee grouped as "(no payee)" |
+| GET | /reports/merchants?from&to&type=expense\|income | `[{payee, amount, count}]` top 50, blank payee grouped as "(no payee)" |
 | GET | /reports/accounts | `[{account_id, name, type, currency, opening_balance, balance, income, expenses, transfers_in, transfers_out}]` for the period (balance is as-of now) |
 | GET | /reports/budgets?month=YYYY-MM | `[{budget_id, category_id, name, icon, color, amount, spent, remaining, pct, level: "ok"|"warn75"|"warn90"|"over"}]` |
-| GET | /reports/reconciliation?statement_id= | `{ statement, total_debits, total_credits, manual_expenses, manual_income, matched, unmatched_manual: Transaction[], unrecorded_bank: BankTransaction[], amount_discrepancies: [{bank_transaction, transaction, difference}], balance: {opening, closing, computed_closing, verified} }` |
+| GET | /reports/reconciliation?statement_id= | manual side scoped to [period_start, period_end] (no tolerance, unlike the workspace). `{ statement, total_debits, total_credits, manual_expenses, manual_income, matched, unmatched_manual: Transaction[], unrecorded_bank: BankTransaction[], amount_discrepancies: [{bank_transaction, transaction, difference}], balance: {opening, closing, computed_closing, verified} }` |
 | GET | /reports/export?report=summary|categories|cash-flow|merchants|accounts|budgets|reconciliation&format=csv|pdf&… | file download |

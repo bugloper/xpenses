@@ -29,8 +29,19 @@ export const keys = {
     merchants: (from: string, to: string, type: string) =>
       ['reports', 'merchants', { from, to, type }] as const,
     accounts: (from: string, to: string) => ['reports', 'accounts', { from, to }] as const,
+    reconciliation: (statementId: string) => ['reports', 'reconciliation', { statementId }] as const,
   },
-  reconciliation: { overview: ['reconciliation', 'overview'] as const },
+  reconciliation: {
+    all: ['reconciliation'] as const,
+    overview: ['reconciliation', 'overview'] as const,
+    workspace: (statementId: string) => ['reconciliation', 'workspace', statementId] as const,
+  },
+  statements: {
+    all: ['statements'] as const,
+    list: ['statements', 'list'] as const,
+    detail: (id: string) => ['statements', 'detail', id] as const,
+    transactions: (id: string) => ['statements', 'transactions', id] as const,
+  },
 }
 
 /** Everything that changes when a transaction is written. */
@@ -38,5 +49,14 @@ export const transactionDependentKeys = [
   keys.transactions.all,
   keys.accounts.all,
   keys.reports.all,
-  keys.reconciliation.overview,
+  keys.reconciliation.all,
+] as const
+
+/** Everything that changes when a reconciliation or statement is written. */
+export const reconciliationDependentKeys = [
+  keys.reconciliation.all,
+  keys.statements.all,
+  keys.transactions.all,
+  keys.accounts.all,
+  keys.reports.all,
 ] as const
