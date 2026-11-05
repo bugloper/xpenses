@@ -1,5 +1,6 @@
-# Go
-/bin/
+# Go (the built binary; the deploy script is tracked)
+/bin/*
+!/bin/deploy.sh
 /dist/
 *.test
 *.out

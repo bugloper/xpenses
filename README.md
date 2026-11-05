@@ -135,14 +135,18 @@ IP without any DNS setup and Let's Encrypt issues a normal certificate for it. W
 a real domain, change it in `/opt/proxy/.env` and restart the proxy (`docker compose up -d
 --force-recreate`); Caddy fetches the new certificate itself.
 
-**To deploy or redeploy**, replace the source on the server and rebuild, then hand the proxy the
-site file. Clear the old tree first (keeping `.env`): extracting over it would leave behind files
-that were deleted from the repo, and a stale file can break the build.
+**To deploy or redeploy**, commit and run
 
 ```sh
-ssh myserver 'mkdir -p /opt/xpenses && find /opt/xpenses -mindepth 1 -maxdepth 1 ! -name .env -exec rm -rf {} +'
-git archive HEAD | ssh myserver 'tar -x -C /opt/xpenses'
-ssh myserver 'cd /opt/xpenses && docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build'
+bin/deploy.sh myserver /opt/xpenses   # defaults: lockedsh /opt/xpenses
+```
+
+It stages a clean copy of `HEAD` next to the live tree (never on top of it: extracting over an old
+tree keeps files deleted from the repo, and a stale file can break the build), keeps the server's
+`.env`, swaps the trees, rebuilds the container, waits for `/healthz` and removes the previous tree.
+If the build fails the previous tree is put back. The first time, also hand the proxy the site file:
+
+```sh
 ssh myserver 'cp /opt/xpenses/deploy/xpenses.caddy /opt/proxy/sites/ && docker exec caddy caddy reload --config /etc/caddy/Caddyfile'
 ```
 
