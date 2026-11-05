@@ -50,6 +50,7 @@ beforeEach(() => {
     is_active: true,
     created_at: '',
     last_login_at: null,
+    avatar_updated_at: null,
   })
 })
 afterEach(() => {
@@ -260,6 +261,7 @@ describe('per-user queue isolation', () => {
     is_active: true,
     created_at: '',
     last_login_at: null,
+    avatar_updated_at: null,
   }
 
   it('stamps the signed-in user id on queued items', async () => {

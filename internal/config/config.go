@@ -60,6 +60,9 @@ func (c Config) DBPath() string { return c.DataDir + "/xpenses.db" }
 // AttachmentsDir returns where transaction images are kept.
 func (c Config) AttachmentsDir() string { return c.DataDir + "/attachments" }
 
+// AvatarsDir returns where profile pictures are kept.
+func (c Config) AvatarsDir() string { return c.DataDir + "/avatars" }
+
 // BackupsDir returns where backups are written.
 func (c Config) BackupsDir() string { return c.DataDir + "/backups" }
 

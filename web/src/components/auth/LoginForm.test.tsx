@@ -64,6 +64,7 @@ describe('LoginForm', () => {
       is_active: true,
       created_at: '',
       last_login_at: null,
+      avatar_updated_at: null,
     }
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')

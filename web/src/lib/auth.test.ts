@@ -29,6 +29,7 @@ const user = (over: Partial<User> = {}): User => ({
   is_active: true,
   created_at: '',
   last_login_at: null,
+  avatar_updated_at: null,
   ...over,
 })
 

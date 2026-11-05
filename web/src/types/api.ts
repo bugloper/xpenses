@@ -300,6 +300,8 @@ export type User = {
   is_active: boolean
   created_at: string
   last_login_at: string | null
+  /** Set while the user has a profile picture; changes whenever it does. */
+  avatar_updated_at: string | null
 }
 export type AuthStatus = { setup_required: boolean; registration_open: boolean; authenticated: boolean }
 export type LoginRequest = { email: string; password: string }

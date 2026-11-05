@@ -1,6 +1,10 @@
 package server_test
 
 import (
+	"bytes"
+	"image"
+	"image/color"
+	pngenc "image/png"
 	"net/http"
 	"strings"
 	"testing"
@@ -367,5 +371,48 @@ func TestPasswordReset(t *testing.T) {
 	}
 	if st, _ := e.Anon().Do("POST", "/auth/reset-password", map[string]any{"token": token, "new_password": "another-password-123"}); st != 400 {
 		t.Fatalf("reuse want 400 got %d", st)
+	}
+}
+
+func TestProfilePicture(t *testing.T) {
+	e := testutil.New(t)
+	me := e.Setup("Owner", "owner@example.com")
+	// A 40×20 PNG: the stored picture is the centred square, scaled to 256.
+	img := image.NewRGBA(image.Rect(0, 0, 40, 20))
+	for x := 0; x < 40; x++ {
+		for y := 0; y < 20; y++ {
+			img.Set(x, y, color.RGBA{R: 200, G: 30, B: 30, A: 255})
+		}
+	}
+	var png bytes.Buffer
+	if err := pngenc.Encode(&png, img); err != nil {
+		t.Fatal(err)
+	}
+	if st, _ := me.Do("GET", "/auth/me/avatar", nil); st != 404 {
+		t.Fatalf("no picture yet want 404 got %d", st)
+	}
+	if st, b := me.MultipartMethod("PUT", "/auth/me/avatar", nil, "file", "me.png", []byte("not an image")); st != 422 {
+		t.Fatalf("text upload want 422 got %d %v", st, b)
+	}
+	st, b := me.MultipartMethod("PUT", "/auth/me/avatar", nil, "file", "me.png", png.Bytes())
+	if st != 200 || testutil.Data(b)["avatar_updated_at"] == nil {
+		t.Fatalf("upload: %d %v", st, b)
+	}
+	if st, b := me.Do("GET", "/auth/me", nil); st != 200 || testutil.Data(b)["avatar_updated_at"] == nil {
+		t.Fatalf("me after upload: %d %v", st, b)
+	}
+	code, raw, hdr := me.Get("/auth/me/avatar")
+	if code != 200 || hdr.Get("Content-Type") != "image/jpeg" {
+		t.Fatalf("serve: %d %s", code, hdr.Get("Content-Type"))
+	}
+	got, _, err := image.Decode(bytes.NewReader(raw))
+	if err != nil || got.Bounds().Dx() != 256 || got.Bounds().Dy() != 256 {
+		t.Fatalf("stored picture: %v %v", err, got.Bounds())
+	}
+	if st, b := me.Do("DELETE", "/auth/me/avatar", nil); st != 200 || testutil.Data(b)["avatar_updated_at"] != nil {
+		t.Fatalf("remove: %d %v", st, b)
+	}
+	if st, _ := me.Do("GET", "/auth/me/avatar", nil); st != 404 {
+		t.Fatalf("after remove want 404 got %d", st)
 	}
 }

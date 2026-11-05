@@ -11,20 +11,23 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { initials, useAuth } from '@/lib/auth'
+import { avatarUrl } from '@/lib/queries/auth'
 import { uiStore } from '@/lib/ui-store'
 import { cn } from '@/lib/utils'
 import type { User } from '@/types/api'
 
+/** The user's picture when they have set one, else their initials. */
 export function Avatar({ user, className }: { user: User; className?: string }) {
+  const src = avatarUrl(user)
   return (
     <span
       aria-hidden
       className={cn(
-        'bg-accent text-accent-foreground flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold select-none',
+        'bg-accent text-accent-foreground flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full text-xs font-semibold select-none',
         className,
       )}
     >
-      {initials(user.name)}
+      {src ? <img src={src} alt="" className="size-full object-cover" /> : initials(user.name)}
     </span>
   )
 }

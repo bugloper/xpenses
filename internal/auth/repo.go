@@ -12,19 +12,23 @@ import (
 
 type Repo struct{}
 
-const userCols = `id, email, name, password_hash, role, is_active, last_login_at, created_at, updated_at`
+const userCols = `id, email, name, password_hash, role, is_active, last_login_at, created_at, updated_at, avatar_updated_at`
 
 func scanUser(s interface{ Scan(...any) error }) (*models.User, error) {
 	var u models.User
 	var active int
-	var last sql.NullString
-	if err := s.Scan(&u.ID, &u.Email, &u.Name, &u.PasswordHash, &u.Role, &active, &last, &u.CreatedAt, &u.UpdatedAt); err != nil {
+	var last, avatar sql.NullString
+	if err := s.Scan(&u.ID, &u.Email, &u.Name, &u.PasswordHash, &u.Role, &active, &last, &u.CreatedAt, &u.UpdatedAt, &avatar); err != nil {
 		return nil, err
 	}
 	u.IsActive = active == 1
 	if last.Valid {
 		v := last.String
 		u.LastLoginAt = &v
+	}
+	if avatar.Valid {
+		v := avatar.String
+		u.AvatarUpdatedAt = &v
 	}
 	return &u, nil
 }
@@ -95,6 +99,11 @@ func (Repo) UpdateUserPassword(ctx context.Context, db repositories.DBTX, id, ha
 	return err
 }
 
+func (Repo) SetUserAvatar(ctx context.Context, db repositories.DBTX, id string, at *string) error {
+	_, err := db.ExecContext(ctx, `UPDATE users SET avatar_updated_at = ? WHERE id = ?`, at, id)
+	return err
+}
+
 func (Repo) UpdateUserLastLogin(ctx context.Context, db repositories.DBTX, id, at string) error {
 	_, err := db.ExecContext(ctx, `UPDATE users SET last_login_at=?, updated_at=? WHERE id=?`, at, at, id)
 	return err
@@ -123,12 +132,12 @@ func (Repo) GetSession(ctx context.Context, db repositories.DBTX, id string) (*m
 	var s models.Session
 	var u models.User
 	var active int
-	var last sql.NullString
+	var last, avatar sql.NullString
 	err := db.QueryRowContext(ctx, `SELECT s.id, s.user_id, s.created_at, s.last_seen_at, s.expires_at, s.user_agent, s.ip,
-		u.id, u.email, u.name, u.password_hash, u.role, u.is_active, u.last_login_at, u.created_at, u.updated_at
+		u.id, u.email, u.name, u.password_hash, u.role, u.is_active, u.last_login_at, u.created_at, u.updated_at, u.avatar_updated_at
 		FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.id = ?`, id).
 		Scan(&s.ID, &s.UserID, &s.CreatedAt, &s.LastSeenAt, &s.ExpiresAt, &s.UserAgent, &s.IP,
-			&u.ID, &u.Email, &u.Name, &u.PasswordHash, &u.Role, &active, &last, &u.CreatedAt, &u.UpdatedAt)
+			&u.ID, &u.Email, &u.Name, &u.PasswordHash, &u.Role, &active, &last, &u.CreatedAt, &u.UpdatedAt, &avatar)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil, nil
 	}
@@ -139,6 +148,10 @@ func (Repo) GetSession(ctx context.Context, db repositories.DBTX, id string) (*m
 	if last.Valid {
 		v := last.String
 		u.LastLoginAt = &v
+	}
+	if avatar.Valid {
+		v := avatar.String
+		u.AvatarUpdatedAt = &v
 	}
 	return &s, &u, nil
 }

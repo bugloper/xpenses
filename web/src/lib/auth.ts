@@ -49,7 +49,8 @@ function shallowEqualUser(a: User, b: User): boolean {
     a.email === b.email &&
     a.role === b.role &&
     a.is_active === b.is_active &&
-    a.last_login_at === b.last_login_at
+    a.last_login_at === b.last_login_at &&
+    a.avatar_updated_at === b.avatar_updated_at
   )
 }
 

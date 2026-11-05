@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"os"
 
 	"github.com/labstack/echo/v4"
 
@@ -36,6 +37,9 @@ func (h *AuthHandler) RegisterPublic(g *echo.Group) {
 func (h *AuthHandler) Register(g *echo.Group) {
 	g.GET("/auth/me", h.Me)
 	g.PATCH("/auth/me", h.UpdateMe)
+	g.PUT("/auth/me/avatar", h.SetAvatar)
+	g.GET("/auth/me/avatar", h.Avatar)
+	g.DELETE("/auth/me/avatar", h.RemoveAvatar)
 	g.PATCH("/auth/password", h.ChangePassword)
 	g.POST("/auth/logout", h.Logout)
 	g.POST("/auth/logout-all", h.LogoutAll)
@@ -163,6 +167,48 @@ func (h *AuthHandler) UpdateMe(c echo.Context) error {
 		if err != nil {
 			return err
 		}
+	}
+	return JSON(c, http.StatusOK, u)
+}
+
+// SetAvatar stores the uploaded picture (multipart field "file") and returns the user.
+func (h *AuthHandler) SetAvatar(c echo.Context) error {
+	fh, err := c.FormFile("file")
+	if err != nil {
+		return apperr.BadRequest("an image is required (multipart field 'file')")
+	}
+	f, err := fh.Open()
+	if err != nil {
+		return apperr.BadRequest("could not read the uploaded file")
+	}
+	defer f.Close()
+	u, err := h.Svc.SetAvatar(c.Request().Context(), auth.CurrentUser(c), f)
+	if err != nil {
+		return err
+	}
+	return JSON(c, http.StatusOK, u)
+}
+
+// Avatar serves the signed-in user's picture.
+func (h *AuthHandler) Avatar(c echo.Context) error {
+	path, err := h.Svc.Avatar(auth.CurrentUser(c))
+	if err != nil {
+		return err
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return apperr.NotFound("profile picture")
+	}
+	defer f.Close()
+	c.Response().Header().Set("Cache-Control", "private, max-age=86400")
+	c.Response().Header().Set("X-Content-Type-Options", "nosniff")
+	return c.Stream(http.StatusOK, "image/jpeg", f)
+}
+
+func (h *AuthHandler) RemoveAvatar(c echo.Context) error {
+	u, err := h.Svc.RemoveAvatar(c.Request().Context(), auth.CurrentUser(c))
+	if err != nil {
+		return err
 	}
 	return JSON(c, http.StatusOK, u)
 }

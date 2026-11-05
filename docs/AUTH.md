@@ -65,6 +65,9 @@ unless you accept that.
 |---|---|---|
 | GET | /auth/me | `{data: User}` (401 when not logged in) |
 | PATCH | /auth/me | `{name?}` → User |
+| PUT | /auth/me/avatar | multipart `file`: one JPEG/PNG/WebP (sniffed, ≤ XPENSES_MAX_UPLOAD_BYTES); stored as a 256×256 JPEG → User with `avatar_updated_at` set. 422 for other files |
+| GET | /auth/me/avatar | the picture, `image/jpeg`, `Cache-Control: private` (append `?v=<avatar_updated_at>` to bust the cache); 404 when there is none |
+| DELETE | /auth/me/avatar | → User with `avatar_updated_at: null` |
 | PATCH | /auth/password | `{current_password, new_password}` → 204; every *other* session is revoked. 401 `invalid_credentials` if current is wrong |
 | POST | /auth/logout | → 204, clears cookie |
 | POST | /auth/logout-all | → 204, revokes all sessions incl. current |

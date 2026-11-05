@@ -58,6 +58,8 @@ func NewDeps(cfg config.Config, db *sql.DB) *Deps {
 	d.Auth = auth.NewService(db)
 	d.Auth.DefaultCurrency = cfg.DefaultCurrency
 	d.Auth.AttachmentsDir = cfg.AttachmentsDir()
+	d.Auth.AvatarsDir = cfg.AvatarsDir()
+	d.Auth.MaxUploadBytes = cfg.MaxUploadBytes
 	d.AuthMW = &auth.Middleware{Svc: d.Auth, SecureCookies: cfg.SecureCookies, TrustedProxy: cfg.TrustedProxy, AllowedOrigin: cfg.CORSOrigin}
 	return d
 }

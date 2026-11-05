@@ -157,6 +157,8 @@ type User struct {
 	LastLoginAt *string `json:"last_login_at"`
 	CreatedAt   string  `json:"created_at"`
 	UpdatedAt   string  `json:"updated_at"`
+	// AvatarUpdatedAt is set while the user has a profile picture.
+	AvatarUpdatedAt *string `json:"avatar_updated_at"`
 	// PasswordHash is never serialised.
 	PasswordHash string `json:"-"`
 }

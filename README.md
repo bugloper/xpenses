@@ -16,7 +16,7 @@ Multi-user with fully isolated data, installable as a PWA, with offline expense 
 - PWA: installable, offline shell, offline transaction queue with sync indicator, update notifications.
 - Share a payment screenshot from mBoB, mPay or any app straight into Xpenses (Android, installed app): it opens the add screen with the image attached. mBoB and mPay success screens are read on the server (Tesseract OCR): the amount and date are prefilled and the bank, journal number (RRNO for mPay), payment type and time are kept with the transaction and searchable.
 - Backup/restore (optionally AES-256-GCM encrypted), admin only.
-- Accounts: first-run owner setup, Argon2id passwords, cookie sessions, login throttling, invite-only or open registration, admin user management. Every user sees only their own data.
+- Accounts: first-run owner setup, Argon2id passwords, cookie sessions, login throttling, invite-only or open registration, admin user management, a profile picture per user (stored as a small JPEG under `data/avatars/`). Every user sees only their own data.
 
 ## First run and accounts
 
@@ -167,7 +167,7 @@ shown on its page. `XPENSES_TESSERACT` names the binary (`XPENSES_TESSERACT=` tu
 
 - **Backup (admin only):** Settings → Backup, or `GET /api/v1/backup` (`?passphrase=...` or header `X-Backup-Passphrase` to receive an encrypted `.db.enc`). Snapshots are produced with `VACUUM INTO`, so they are consistent even while the app is running, and are written with `0600` permissions.
 - **Restore:** Settings → Restore (upload the `.db` or `.db.enc` plus passphrase), or `POST /api/v1/restore` (multipart `file`, `passphrase`). The current database is snapshotted to `data/backups/` first, then the snapshot's tables are copied in inside one transaction. The backup must be from the same schema version.
-- **Manual:** stop the server and copy `data/xpenses.db` (also copy `-wal`/`-shm` if present) and `data/attachments/`.
+- **Manual:** stop the server and copy `data/xpenses.db` (also copy `-wal`/`-shm` if present), `data/attachments/` and `data/avatars/`.
 
 Encrypted backups use PBKDF2-SHA256 (200k iterations) + AES-256-GCM.
 

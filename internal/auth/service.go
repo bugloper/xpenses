@@ -45,6 +45,10 @@ type Service struct {
 	DefaultCurrency string
 	// AttachmentsDir holds transaction images; a user's folder goes with the user.
 	AttachmentsDir string
+	// AvatarsDir holds profile pictures (one JPEG per user).
+	AvatarsDir string
+	// MaxUploadBytes caps an uploaded picture (0 = 10 MB).
+	MaxUploadBytes int64
 
 	// signup serialises Setup and Register. SQLite resolves two concurrent
 	// read-then-write transactions by failing one with SQLITE_BUSY, which would
@@ -518,9 +522,12 @@ func (s *Service) DeleteUser(ctx context.Context, actor *models.User, id string)
 	if err != nil {
 		return apperr.Internal(err)
 	}
-	// Their attached images live on disk, outside the cascade.
+	// Their attached images and picture live on disk, outside the cascade.
 	if s.AttachmentsDir != "" {
 		_ = os.RemoveAll(filepath.Join(s.AttachmentsDir, id))
+	}
+	if s.AvatarsDir != "" {
+		_ = os.Remove(s.avatarPath(id))
 	}
 	return nil
 }

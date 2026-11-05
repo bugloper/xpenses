@@ -1,5 +1,5 @@
 import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { api, isApiError } from '@/lib/api'
+import { api, isApiError, request, unwrapLoose } from '@/lib/api'
 import { adoptUser, purgeSessionData } from '@/lib/auth'
 import { queryClient } from '@/lib/queryClient'
 import type {
@@ -120,6 +120,37 @@ export function useUpdateProfile() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (body: UpdateProfileRequest) => api.patchLoose<User>('/auth/me', body),
+    onSuccess: (user) => {
+      qc.setQueryData(authKeys.me, user)
+      void adoptUser(user)
+    },
+  })
+}
+
+/** Where the browser fetches the signed-in user's picture; the version makes a new picture show at once. */
+export function avatarUrl(user: Pick<User, 'avatar_updated_at'>): string | null {
+  return user.avatar_updated_at ? `/api/v1/auth/me/avatar?v=${encodeURIComponent(user.avatar_updated_at)}` : null
+}
+
+export function useUploadAvatar() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (file: File) => {
+      const form = new FormData()
+      form.append('file', file, file.name || 'photo')
+      return request<unknown>('/auth/me/avatar', { method: 'PUT', form }).then(unwrapLoose<User>)
+    },
+    onSuccess: (user) => {
+      qc.setQueryData(authKeys.me, user)
+      void adoptUser(user)
+    },
+  })
+}
+
+export function useRemoveAvatar() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => request<unknown>('/auth/me/avatar', { method: 'DELETE' }).then(unwrapLoose<User>),
     onSuccess: (user) => {
       qc.setQueryData(authKeys.me, user)
       void adoptUser(user)

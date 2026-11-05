@@ -213,7 +213,7 @@ function unwrap<T>(r: Envelope<T> | undefined): T {
  * `/auth/sessions` and the `/admin/*` lists without the `{data}` envelope while
  * the user-returning routes have it; this accepts either.
  */
-function unwrapLoose<T>(r: unknown): T {
+export function unwrapLoose<T>(r: unknown): T {
   if (r && typeof r === 'object' && !Array.isArray(r) && 'data' in r) {
     const keys = Object.keys(r)
     if (keys.length === 1 || (keys.length === 2 && 'meta' in r)) return (r as Envelope<T>).data
