@@ -1,8 +1,9 @@
-import { ImagePlus, Paperclip, X } from 'lucide-react'
+import { Camera, ImagePlus, Paperclip, X } from 'lucide-react'
 import { useEffect, useMemo, useRef } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { attachmentProblem } from '@/lib/attachments'
+import { cn } from '@/lib/utils'
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
@@ -12,7 +13,8 @@ function formatSize(bytes: number): string {
 
 /**
  * The screenshot that goes with a transaction: a thumbnail when one is
- * attached (shared from a banking app, or picked here), else a button to pick one.
+ * attached (shared from a banking app, or picked here), else a card inviting
+ * one, with the camera on phones. `compact` keeps the card to one line.
  */
 export function AttachmentField({
   file,
@@ -24,6 +26,7 @@ export function AttachmentField({
   compact?: boolean
 }) {
   const input = useRef<HTMLInputElement>(null)
+  const camera = useRef<HTMLInputElement>(null)
   const preview = useMemo(() => (file ? URL.createObjectURL(file) : null), [file])
   useEffect(() => {
     return () => {
@@ -77,14 +80,41 @@ export function AttachmentField({
           </Button>
         </div>
       ) : (
-        <Button
-          type="button"
-          variant="outline"
-          size={compact ? 'sm' : 'default'}
-          onClick={() => input.current?.click()}
+        <div
+          className={cn(
+            'border-primary/30 bg-primary/5 flex gap-3 rounded-xl border border-dashed',
+            compact ? 'items-center px-3 py-2.5' : 'flex-col p-4 sm:flex-row sm:items-center',
+          )}
         >
-          <ImagePlus data-icon="inline-start" /> Attach screenshot
-        </Button>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium">Add the payment screenshot</p>
+            <p className="text-muted-foreground text-xs">
+              mBoB, mPay or any app. The amount, date and reference are filled in for you.
+            </p>
+          </div>
+          <div className="flex shrink-0 gap-2">
+            {/* The camera input only means something on a phone; desktops get the picker. */}
+            <input
+              ref={camera}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="sr-only"
+              aria-label="Take a photo of the receipt"
+              tabIndex={-1}
+              onChange={(e) => {
+                pick(e.target.files?.[0])
+                e.target.value = ''
+              }}
+            />
+            <Button type="button" variant="outline" size="sm" className="sm:hidden" onClick={() => camera.current?.click()}>
+              <Camera data-icon="inline-start" /> Camera
+            </Button>
+            <Button type="button" variant="outline" size="sm" onClick={() => input.current?.click()}>
+              <ImagePlus data-icon="inline-start" /> Choose image
+            </Button>
+          </div>
+        </div>
       )}
     </div>
   )

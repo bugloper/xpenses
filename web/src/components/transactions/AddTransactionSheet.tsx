@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { ResponsiveSheet } from '@/components/common/ResponsiveSheet'
 import { ListSkeleton } from '@/components/common/States'
 import { errorMessage, isApiError } from '@/lib/api'
+import { uploadAttachment } from '@/lib/attachments'
 import { minorToDecimalString } from '@/lib/money'
 import {
   getPending,
@@ -121,6 +122,7 @@ export function AddTransactionSheet() {
 }
 
 function SheetBody({ preset }: { preset: AddPreset | null }) {
+  const qc = useQueryClient()
   const currency = useDefaultCurrency()
   const { create, submitting, serverErrors, setServerErrors, setSubmitting } = useSaveTransaction()
   const update = useUpdateTransaction()
@@ -179,6 +181,11 @@ function SheetBody({ preset }: { preset: AddPreset | null }) {
       setSubmitting(true)
       try {
         await update.mutateAsync({ id: editing.id, ...toUpdateRequest(values, editing.currency || currency) })
+        // A screenshot added while editing goes up after the fields; the server reads it too.
+        if (attachment) {
+          await uploadAttachment(editing.id, attachment)
+          for (const k of transactionDependentKeys) void qc.invalidateQueries({ queryKey: k })
+        }
         toast.success('Transaction updated')
         uiStore.closeAdd()
       } catch (e) {
@@ -210,6 +217,11 @@ function SheetBody({ preset }: { preset: AddPreset | null }) {
         <div className="mb-4 flex flex-col gap-3">
           <AttachmentField file={attachment} onChange={setAttachment} compact />
           <ReceiptCard scan={scan} receipt={receipt} />
+        </div>
+      )}
+      {mode === 'edit' && editing && !editing.has_attachment && (
+        <div className="mb-4">
+          <AttachmentField file={attachment} onChange={setAttachment} compact />
         </div>
       )}
       <TransactionForm

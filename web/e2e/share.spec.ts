@@ -116,3 +116,32 @@ test('a screenshot picked in the add sheet is uploaded with the transaction', as
   const txs = (await listTransactions(page)) as Array<{ amount: number; has_attachment?: boolean }>
   expect(txs.find((t) => t.amount === 2500)?.has_attachment).toBe(true)
 })
+
+test('a screenshot can be added later, while editing a transaction that has none', async ({ page }) => {
+  await page.goto('/')
+  await loginAsNewUser(page)
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Add transaction' }).first().click()
+  await page.getByLabel('Amount').fill('40')
+  await page.getByRole('button', { name: 'Category', exact: true }).click()
+  await page.getByRole('button', { name: 'Food & Groceries' }).click()
+  await page.getByRole('radio', { name: 'Eating out' }).click()
+  await page.getByRole('button', { name: /^Save$/ }).click()
+  await expect(page.getByText('Transaction saved')).toBeVisible()
+  const saved = (await listTransactions(page)).find((t) => t.amount === 4000) as { id: string }
+
+  await page.goto(`/transactions/${saved.id}`)
+  await page.getByRole('button', { name: 'Edit' }).click()
+  await expect(page.getByRole('heading', { name: 'Edit transaction' })).toBeVisible()
+  // The transaction page behind the sheet has its own attach control; use the sheet's.
+  await page
+    .getByRole('dialog')
+    .getByLabel('Attach screenshot')
+    .setInputFiles({ name: 'mbob.png', mimeType: 'image/png', buffer: Buffer.from(PNG, 'base64') })
+  await expect(page.getByText('Screenshot attached')).toBeVisible()
+  await page.getByRole('button', { name: /^Save/ }).click()
+  await expect(page.getByText('Transaction updated')).toBeVisible()
+  await expect(page.getByRole('img', { name: 'Payment screenshot' })).toBeVisible()
+  const res = await page.request.get(`/api/v1/transactions/${saved.id}/attachment`)
+  expect(res.status()).toBe(200)
+})
