@@ -49,6 +49,39 @@ func TestParseMBoBOCRLookalikes(t *testing.T) {
 	}
 }
 
+// Text as Tesseract reads the mPay success screen. The From/To columns come
+// out interleaved, so no accounts are expected.
+const mpayText = `10:59 @ = koe cuttl C5):
+TRANSACTION SUCCESSFUL
+Nu.10.0
+RRNO : 630911234567
+From : Jos
+SENDER NAME XXXXX5678
+XXXXX1234 RECEIVER NAME
+Bank of Bhutan Ltd.
+Date : Thursday, 05 November 2026
+Time : 10:59:20 AM
+Purpose : Personal transfer
+Remarks :`
+
+func TestParseMPay(t *testing.T) {
+	r := Parse(mpayText)
+	want := Receipt{Recognised: true, Bank: "mPay", Amount: 1000, JournalNo: "630911234567",
+		PaymentType: "Personal transfer", Date: "2026-11-05", Time: "10:59:20"}
+	if r != want {
+		t.Fatalf("\n got %+v\nwant %+v", r, want)
+	}
+}
+
+func TestParseMPayTolerant(t *testing.T) {
+	// Thousands separator, OCR'd "O" for zero in the RRNO and day, no weekday, afternoon.
+	r := Parse("TRANSACTION SUCCESSFUL\nNu. 1,250.5\nRRNO: 63O911234567\nBank of Bhutan Ltd.\nDate: O5 November 2026\nTime: 3:05 PM\nPurpose: Bill payment\n")
+	if !r.Recognised || r.Bank != "mPay" || r.Amount != 125050 || r.JournalNo != "630911234567" ||
+		r.PaymentType != "Bill payment" || r.Date != "2026-11-05" || r.Time != "15:05:00" {
+		t.Fatalf("tolerant mPay parse: %+v", r)
+	}
+}
+
 func TestParseUnknownScreen(t *testing.T) {
 	r := Parse("Groceries\nTotal 450\nThank you for shopping")
 	if r.Recognised || r.Bank != "" || r.Amount != 0 {

@@ -1,7 +1,7 @@
 import { Loader2, ScanLine } from 'lucide-react'
 import { KV } from '@/components/common/kit'
 import { formatShortDate } from '@/lib/dates'
-import type { ScanState } from '@/lib/receipts'
+import { referenceLabel, type ScanState } from '@/lib/receipts'
 import type { Receipt } from '@/types/api'
 
 export function ReceiptDetails({ receipt }: { receipt: Receipt }) {
@@ -9,7 +9,7 @@ export function ReceiptDetails({ receipt }: { receipt: Receipt }) {
     <div className="divide-y" data-testid="receipt">
       {receipt.bank && <KV label="Bank">{receipt.bank}</KV>}
       {receipt.reference && (
-        <KV label="Journal no.">
+        <KV label={referenceLabel(receipt.bank)}>
           <span className="tabular">{receipt.reference}</span>
         </KV>
       )}

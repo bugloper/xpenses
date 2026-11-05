@@ -76,6 +76,11 @@ export function useScanAttachment() {
   })
 }
 
+/** What the app calls its reference: mBoB prints a journal number, mPay an RRNO. */
+export function referenceLabel(bank: string | null | undefined): string {
+  return bank === 'mPay' ? 'RRNO' : 'Journal no.'
+}
+
 /** "mBoB · 551-428182 · Personal Transfer" for compact places. */
 export function receiptSummary(r: Receipt | null | undefined): string {
   if (!r) return ''
