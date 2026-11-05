@@ -1,12 +1,15 @@
+import { useNavigate } from '@tanstack/react-router'
 import { Monitor, Smartphone, X } from 'lucide-react'
+import { useState } from 'react'
 import { toast } from 'sonner'
+import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { ErrorState } from '@/components/common/States'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { errorMessage } from '@/lib/api'
 import { relativeTime } from '@/lib/dates'
-import { useRevokeSession, useSessions } from '@/lib/queries/auth'
+import { performLogout, useRevokeSession, useSessions } from '@/lib/queries/auth'
 import type { AuthSession } from '@/types/api'
 
 /** "Chrome on macOS"-style label from a raw user agent; falls back to the raw string. */
@@ -79,8 +82,11 @@ function SessionRow({ s }: { s: AuthSession }) {
   )
 }
 
+/** Every device signed in, with revoke per device and sign-out of all of them at once. */
 export function SessionsSection() {
   const { data, isPending, error, refetch } = useSessions()
+  const navigate = useNavigate()
+  const [confirmAll, setConfirmAll] = useState(false)
   if (isPending) return <Skeleton className="h-24 w-full rounded-[1.25rem]" />
   if (error) return <ErrorState error={error} onRetry={() => void refetch()} compact />
   const sessions = [...data].sort((a, b) => Number(b.current) - Number(a.current))
@@ -91,6 +97,27 @@ export function SessionsSection() {
           <SessionRow key={s.id} s={s} />
         ))}
       </ul>
+      <div className="flex justify-end border-t py-2">
+        <Button variant="ghost" size="sm" className="text-destructive" onClick={() => setConfirmAll(true)}>
+          Log out everywhere
+        </Button>
+      </div>
+      <ConfirmDialog
+        open={confirmAll}
+        onOpenChange={setConfirmAll}
+        title="Log out of every device?"
+        description="All sessions, including this one, will be signed out. Unsynced transactions on this device are kept until you sign in again."
+        confirmLabel="Log out everywhere"
+        destructive
+        onConfirm={async () => {
+          try {
+            await performLogout({ everywhere: true })
+            await navigate({ to: '/login', search: {}, replace: true })
+          } catch (e) {
+            toast.error(errorMessage(e, 'Could not log out'))
+          }
+        }}
+      />
     </div>
   )
 }

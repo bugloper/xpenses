@@ -4,7 +4,7 @@ import { toast } from 'sonner'
 import { PageHeader, Section } from '@/components/common/PageHeader'
 import { Segmented } from '@/components/common/Segmented'
 import { useTheme } from '@/components/layout/ThemeProvider'
-import { PasswordSection, ProfileSection, SignOutSection } from '@/components/settings/AccountSection'
+import { PasswordSection, ProfileSection } from '@/components/settings/AccountSection'
 import { BackupSection } from '@/components/settings/BackupSection'
 import { RecurringSection } from '@/components/settings/RecurringSection'
 import { SessionsSection } from '@/components/settings/SessionsSection'
@@ -147,9 +147,6 @@ function SettingsPage() {
             <BackupSection />
           </Section>
         )}
-        <Section className="lg:col-span-2">
-          <SignOutSection />
-        </Section>
       </div>
     </div>
   )
