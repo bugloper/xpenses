@@ -1,10 +1,9 @@
 import { createRoute, Link } from '@tanstack/react-router'
 import { z } from 'zod'
-import { Suspense, lazy, useMemo, useState } from 'react'
-import { BudgetFormSheet, type BudgetDraft } from '@/components/budgets/BudgetFormSheet'
+import { Suspense, lazy, useMemo } from 'react'
 import { PageHeader, Section } from '@/components/common/PageHeader'
 import { TransactionList } from '@/components/transactions/TransactionList'
-import { BudgetList } from '@/components/dashboard/BudgetList'
+import { BudgetSummary } from '@/components/dashboard/BudgetSummary'
 import { Skeleton } from '@/components/ui/skeleton'
 import { PeriodSelector } from '@/components/dashboard/PeriodSelector'
 import { BalanceHero } from '@/components/dashboard/StatTiles'
@@ -19,7 +18,6 @@ import {
   trendRange,
   type PeriodPreset,
 } from '@/lib/dates'
-import { groupBudgets, overLimitLabel } from '@/lib/budgets'
 import { usePendingTransactions } from '@/lib/offline'
 import {
   useDefaultCurrency,
@@ -67,8 +65,6 @@ function DashboardPage() {
   const categories = useReportCategories(range.from, range.to, 'expense')
   const month = rangeMonth(range)
   const budgets = useReportBudgets(month)
-  const overCount = useMemo(() => groupBudgets(budgets.data ?? []).over.length, [budgets.data])
-  const [draft, setDraft] = useState<BudgetDraft | null | undefined>(undefined)
   const pending = usePendingTransactions()
   const recentGroups = useMemo(
     () => groupByDay((summary.data?.recent_transactions ?? []).slice(0, 8), pending.slice(0, 5)),
@@ -119,24 +115,18 @@ function DashboardPage() {
         <Section
           title={`Budgets · ${formatMonthLabel(month)}`}
           action={
-            <span className="flex items-center gap-3">
-              {overCount > 0 && (
-                <span className="text-expense hidden text-xs font-medium sm:inline">{overLimitLabel(overCount)}</span>
-              )}
-              <Button variant="link" size="sm" className="h-auto p-0" asChild>
-                <Link to="/budgets">Manage</Link>
-              </Button>
-            </span>
+            <Button variant="link" size="sm" className="h-auto p-0" asChild>
+              <Link to="/budgets">Manage</Link>
+            </Button>
           }
         >
           <div className="bg-card border rounded-[1.25rem] p-4">
-            <BudgetList
+            <BudgetSummary
               data={budgets.data}
               loading={budgets.isPending}
               error={budgets.error}
               onRetry={() => void budgets.refetch()}
               currency={currency}
-              onEdit={(b) => setDraft({ id: b.budget_id, category_id: b.category_id, amount: b.amount })}
             />
           </div>
         </Section>
@@ -174,7 +164,6 @@ function DashboardPage() {
           />
         </Section>
       </div>
-      <BudgetFormSheet open={draft !== undefined} onOpenChange={(o) => !o && setDraft(undefined)} draft={draft ?? null} currency={currency} />
     </div>
   )
 }
