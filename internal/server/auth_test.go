@@ -313,3 +313,59 @@ func TestPasswordChangeAndSessions(t *testing.T) {
 		t.Fatalf("after logout-all want 401 got %d", st)
 	}
 }
+
+func TestPasswordReset(t *testing.T) {
+	e := testutil.New(t)
+	admin := e.Setup("Owner", "owner@example.com")
+	st, inv := admin.Do("POST", "/admin/invites", map[string]any{"email": "bob@example.com"})
+	if st != 201 {
+		t.Fatalf("invite: %d %v", st, inv)
+	}
+	bob := e.Anon()
+	if st, _ := bob.Do("POST", "/auth/register", map[string]any{"name": "Bob", "email": "bob@example.com", "password": testutil.Password, "invite_token": testutil.Data(inv)["token"]}); st != 201 {
+		t.Fatalf("register: %d", st)
+	}
+	st, users := admin.Do("GET", "/admin/users", nil)
+	var bobID string
+	for _, u := range testutil.List(users) {
+		if u.(map[string]any)["email"] == "bob@example.com" {
+			bobID = u.(map[string]any)["id"].(string)
+		}
+	}
+	// Only an admin can issue a reset link, and only for a real user.
+	if st, _ := bob.Do("POST", "/admin/users/"+bobID+"/password-reset", nil); st != 403 {
+		t.Fatalf("user issuing reset want 403 got %d", st)
+	}
+	if st, _ := admin.Do("POST", "/admin/users/nope/password-reset", nil); st != 404 {
+		t.Fatalf("reset for unknown user want 404 got %d", st)
+	}
+	st, created := admin.Do("POST", "/admin/users/"+bobID+"/password-reset", nil)
+	if st != 201 || !strings.HasPrefix(testutil.Data(created)["reset_path"].(string), "/reset-password?token=") {
+		t.Fatalf("create reset: %d %v", st, created)
+	}
+	token := testutil.Data(created)["token"].(string)
+	anon := e.Anon()
+	// Weak password and bad token are rejected without spending the link.
+	if st, _ := anon.Do("POST", "/auth/reset-password", map[string]any{"token": token, "new_password": "short"}); st != 422 {
+		t.Fatalf("weak password want 422 got %d", st)
+	}
+	if st, b := anon.Do("POST", "/auth/reset-password", map[string]any{"token": "wrong", "new_password": "a-new-password-123"}); st != 400 || b["error"].(map[string]any)["code"] != "invalid_reset" {
+		t.Fatalf("bad token: %d %v", st, b)
+	}
+	if st, _ := anon.Do("POST", "/auth/reset-password", map[string]any{"token": token, "new_password": "a-new-password-123"}); st != 204 {
+		t.Fatalf("reset want 204 got %d", st)
+	}
+	// Bob's old session is gone, the old password no longer works, the new one does, the link is spent.
+	if st, _ := bob.Do("GET", "/auth/me", nil); st != 401 {
+		t.Fatalf("old session after reset want 401 got %d", st)
+	}
+	if st, _ := e.Anon().Do("POST", "/auth/login", map[string]any{"email": "bob@example.com", "password": testutil.Password}); st != 401 {
+		t.Fatalf("old password want 401 got %d", st)
+	}
+	if st, _ := e.Anon().Do("POST", "/auth/login", map[string]any{"email": "bob@example.com", "password": "a-new-password-123"}); st != 200 {
+		t.Fatalf("new password want 200 got %d", st)
+	}
+	if st, _ := e.Anon().Do("POST", "/auth/reset-password", map[string]any{"token": token, "new_password": "another-password-123"}); st != 400 {
+		t.Fatalf("reuse want 400 got %d", st)
+	}
+}

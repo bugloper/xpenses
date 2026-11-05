@@ -48,6 +48,9 @@ export function DateRangePicker({
       <PopoverContent className="w-auto p-0" align="start">
         <Calendar
           mode="range"
+          captionLayout="dropdown"
+          startMonth={new Date(2015, 0)}
+          endMonth={new Date(new Date().getFullYear() + 2, 11)}
           numberOfMonths={1}
           selected={selected}
           defaultMonth={selected?.from}

@@ -45,16 +45,16 @@ export function CategoryDonut({
       ]
     : top
   return (
-    <div className="flex flex-col items-center gap-4 sm:flex-row">
-      <div className="relative h-48 w-48 shrink-0">
+    <div className="flex flex-col items-center gap-5 sm:flex-row sm:gap-8">
+      <div className="relative h-52 w-52 shrink-0">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
               data={legend}
               dataKey="amount"
               nameKey="name"
-              innerRadius={58}
-              outerRadius={85}
+              innerRadius={64}
+              outerRadius={94}
               paddingAngle={2}
               stroke="none"
             >
@@ -79,18 +79,18 @@ export function CategoryDonut({
           <Money minor={total} currency={currency} className="text-sm font-semibold" />
         </div>
       </div>
-      <ul className="flex w-full flex-col gap-1.5">
+      <ul className="grid w-full gap-x-6 gap-y-1 lg:grid-cols-2">
         {legend.map((r, i) => {
           const pct = total > 0 ? Math.round((r.amount * 1000) / total) / 10 : 0
           const inner = (
             <>
               <CategoryIcon icon={r.icon} color={r.color} size="sm" />
-              <span className="min-w-0 flex-1 truncate text-sm">{r.name}</span>
-              <span className="text-muted-foreground tabular text-xs">{pct}%</span>
+              <span className="min-w-0 flex-1 text-sm">{r.name}</span>
+              <span className="text-muted-foreground tabular w-12 shrink-0 text-right text-xs">{pct}%</span>
               <Money
                 minor={r.amount}
                 currency={currency}
-                className="shrink-0 text-right text-sm font-medium whitespace-nowrap"
+                className="w-24 shrink-0 text-right text-sm font-medium whitespace-nowrap"
               />
             </>
           )
@@ -100,12 +100,12 @@ export function CategoryDonut({
                 <Link
                   to="/transactions"
                   search={{ category: r.category_id, from: range.from, to: range.to, tab: 'expense' }}
-                  className="hover:bg-muted/60 flex items-center gap-2 rounded-lg px-1 py-1"
+                  className="hover:bg-muted/60 flex items-center gap-3 rounded-lg px-1 py-1.5"
                 >
                   {inner}
                 </Link>
               ) : (
-                <div className="flex items-center gap-2 px-1 py-1">{inner}</div>
+                <div className="flex items-center gap-3 px-1 py-1.5">{inner}</div>
               )}
             </li>
           )

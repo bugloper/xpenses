@@ -14,10 +14,12 @@ import { useRetryCountdown } from './useRetryCountdown'
 export function LoginForm({
   onSuccess,
   onSetupRequired,
+  onForgotPassword,
 }: {
   onSuccess: (user: User) => void
   /** The server has no users yet: the page should go to /setup. */
   onSetupRequired: () => void
+  onForgotPassword?: () => void
 }) {
   const login = useLogin()
   const [formError, setFormError] = useState<AuthErrorInfo | null>(null)
@@ -78,6 +80,15 @@ export function LoginForm({
           {...form.register('password')}
         />
         <FieldError errors={[form.formState.errors.password]} />
+        {onForgotPassword && (
+          <button
+            type="button"
+            onClick={onForgotPassword}
+            className="text-primary self-end text-xs font-medium hover:underline"
+          >
+            Forgot password?
+          </button>
+        )}
       </Field>
       <Button
         type="submit"

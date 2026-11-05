@@ -12,7 +12,7 @@ Multi-user with fully isolated data, installable as a PWA, with offline expense 
 - Expenses, income, transfers, refunds, adjustments; accounts (bank, cash, mobile wallet, credit card, savings) with ledger-calculated balances.
 - Two-level categories: 12 expense and 4 income main categories with sub-categories seeded by default, your own on top; a compact picker with search and recently used chips; monthly budgets per category (a main category's budget covers its sub-categories) with 75/90/100% warnings.
 - Recurring transactions (daily/weekly/monthly/yearly) generated as drafts or real entries, never duplicated.
-- Reports (monthly, daily, weekly, category, merchant, income vs expense, accounts, budgets) with CSV and PDF export.
+- Reports (overview, categories, daily/weekly spending, accounts) over this week, this month, the previous month, the last 3 months or any range, with CSV and PDF export. Budgets have their own page: any month is two taps away, budgets over their limit are called out first, and untouched ones stay folded away.
 - PWA: installable, offline shell, offline transaction queue with sync indicator, update notifications.
 - Share a payment screenshot from mBoB, mPay or any app straight into Xpenses (Android, installed app): it opens the add screen with the image attached. mBoB and mPay success screens are read on the server (Tesseract OCR): the amount and date are prefilled and the bank, journal number (RRNO for mPay), payment type and time are kept with the transaction and searchable.
 - Backup/restore (optionally AES-256-GCM encrypted), admin only.
@@ -23,7 +23,8 @@ Multi-user with fully isolated data, installable as a PWA, with offline expense 
 1. Open the app. With no users yet it shows **Set up Xpenses**: create the owner account (you become the `admin`).
 2. Registration is closed by default. To let someone else in, go to **Admin → Invites** and send them the one-time link, or switch **Registration** on for open sign-up.
 3. Every user gets their own accounts, categories (defaults seeded on sign-up), transactions, budgets and settings. The admin can disable, promote or delete users (deleting a user deletes all their data) but cannot see their data.
-4. Passwords are hashed with Argon2id. Sessions are HttpOnly, SameSite=Strict cookies (Secure over HTTPS), idle timeout 30 days, absolute 180 days. Ten failed logins per email (or thirty per IP) in 15 minutes pause sign-in. See `docs/AUTH.md` for the full contract.
+4. Forgotten password: the server sends no email, so the admin issues a one-time reset link from **Admin → Users → Reset password** (valid 24 hours) and passes it on; the sign-in page's **Forgot password?** explains this.
+5. Passwords are hashed with Argon2id. Sessions are HttpOnly, SameSite=Strict cookies (Secure over HTTPS), idle timeout 30 days, absolute 180 days. Ten failed logins per email (or thirty per IP) in 15 minutes pause sign-in. See `docs/AUTH.md` for the full contract.
 
 ## Development setup
 

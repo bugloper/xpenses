@@ -7,8 +7,10 @@ import {
   authErrorInfo,
   authStore,
   initials,
+  isAuthPath,
   parseLoginSearch,
   parseRegisterSearch,
+  parseResetSearch,
   purgeSessionData,
   resolveAuthRedirect,
   safeRedirect,
@@ -135,6 +137,12 @@ describe('search helpers', () => {
     expect(parseRegisterSearch({ invite: 'tok' })).toEqual({ invite: 'tok' })
     expect(parseRegisterSearch({ invite: '' })).toEqual({})
   })
+  it('parses ?token= for the reset page, which is a signed-out page', () => {
+    expect(parseResetSearch({ token: 'tok' })).toEqual({ token: 'tok' })
+    expect(parseResetSearch({ token: '' })).toEqual({})
+    expect(isAuthPath('/reset-password')).toBe(true)
+    expect(safeRedirect('/reset-password?token=x')).toBe('/')
+  })
   it('initials', () => {
     expect(initials('Nima Yonten')).toBe('NY')
     expect(initials('nima')).toBe('N')
@@ -152,6 +160,7 @@ describe('authErrorInfo', () => {
     expect(authErrorInfo(err(409, 'already_set_up')).alreadySetUp).toBe(true)
     expect(authErrorInfo(err(403, 'registration_closed')).message).toMatch(/closed/)
     expect(authErrorInfo(err(400, 'invalid_invite')).message).toMatch(/invite/)
+    expect(authErrorInfo(err(400, 'invalid_reset')).message).toMatch(/reset link/)
     expect(authErrorInfo(err(409, 'email_taken'))).toMatchObject({ field: 'email' })
   })
   it('too_many_attempts prefers details.retry_after, then the header', () => {

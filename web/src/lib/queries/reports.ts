@@ -6,7 +6,6 @@ import type {
   ReportBudget,
   ReportCashFlow,
   ReportCategory,
-  ReportMerchant,
   ReportSummary,
 } from '@/types/api'
 import { keys } from './keys'
@@ -41,13 +40,6 @@ export function useReportBudgets(month: string) {
   })
 }
 
-export function useReportMerchants(from: string, to: string, type: FlowType = 'expense') {
-  return useQuery({
-    queryKey: keys.reports.merchants(from, to, type),
-    queryFn: ({ signal }) =>
-      api.get<ReportMerchant[]>(`/reports/merchants${toQuery({ from, to, type })}`, signal),
-  })
-}
 
 export function useReportAccounts(from: string, to: string) {
   return useQuery({

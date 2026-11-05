@@ -276,6 +276,47 @@ func (Repo) DeleteInvite(ctx context.Context, db repositories.DBTX, id string) (
 	return n > 0, nil
 }
 
+// Password resets
+
+func (Repo) InsertPasswordReset(ctx context.Context, db repositories.DBTX, r *models.PasswordReset, tokenHash string) error {
+	_, err := db.ExecContext(ctx, `INSERT INTO password_resets (id, token_hash, user_id, created_by, created_at, expires_at) VALUES (?,?,?,?,?,?)`,
+		r.ID, tokenHash, r.UserID, r.CreatedBy, r.CreatedAt, r.ExpiresAt)
+	return err
+}
+
+func (Repo) GetPasswordResetByHash(ctx context.Context, db repositories.DBTX, tokenHash string) (*models.PasswordReset, error) {
+	var r models.PasswordReset
+	var used sql.NullString
+	err := db.QueryRowContext(ctx, `SELECT id, user_id, created_by, created_at, expires_at, used_at FROM password_resets WHERE token_hash = ?`, tokenHash).
+		Scan(&r.ID, &r.UserID, &r.CreatedBy, &r.CreatedAt, &r.ExpiresAt, &used)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if used.Valid {
+		v := used.String
+		r.UsedAt = &v
+	}
+	return &r, nil
+}
+
+// UsePasswordReset marks the reset used; false when it was already used.
+func (Repo) UsePasswordReset(ctx context.Context, db repositories.DBTX, id, at string) (bool, error) {
+	res, err := db.ExecContext(ctx, `UPDATE password_resets SET used_at = ? WHERE id = ? AND used_at IS NULL`, at, id)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n > 0, nil
+}
+
+func (Repo) PurgePasswordResets(ctx context.Context, db repositories.DBTX, before string) error {
+	_, err := db.ExecContext(ctx, `DELETE FROM password_resets WHERE expires_at < ? OR used_at IS NOT NULL`, before)
+	return err
+}
+
 // App settings
 
 func (Repo) GetAppSetting(ctx context.Context, db repositories.DBTX, key, def string) (string, error) {

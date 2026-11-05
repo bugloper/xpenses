@@ -6,9 +6,9 @@ import type { CashFlowGranularity, ExportFormat, ExportReport, FlowType, ReportC
 
 export type ReportPeriodPreset = 'month' | 'prev_month' | 'week' | 'last3' | 'custom'
 export const REPORT_PRESETS: { value: ReportPeriodPreset; label: string }[] = [
+  { value: 'week', label: 'This week' },
   { value: 'month', label: 'This month' },
   { value: 'prev_month', label: 'Previous month' },
-  { value: 'week', label: 'This week' },
   { value: 'last3', label: 'Last 3 months' },
 ]
 

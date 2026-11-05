@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { formatShortDate, parseISODate, toISODate, today, yesterday } from '@/lib/dates'
+import { formatShortDate, isISODate, parseISODate, toISODate, today, yesterday } from '@/lib/dates'
 import { cn } from '@/lib/utils'
 
 /** Single-date picker: quick chips (Today / Yesterday) + calendar popover. */
@@ -55,8 +55,26 @@ export function DateField({
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="start">
+          {/* Type a date to jump straight to it; the grid below follows. */}
+          <div className="flex items-center gap-2 border-b px-3 py-2">
+            <label htmlFor={`${id ?? 'date'}-typed`} className="text-muted-foreground text-xs">
+              Go to
+            </label>
+            <input
+              id={`${id ?? 'date'}-typed`}
+              type="date"
+              value={value}
+              onChange={(e) => {
+                if (isISODate(e.target.value)) onChange(e.target.value)
+              }}
+              className="bg-background h-8 flex-1 rounded-lg border px-2 text-sm"
+            />
+          </div>
           <Calendar
             mode="single"
+            captionLayout="dropdown"
+            startMonth={new Date(2015, 0)}
+            endMonth={new Date(new Date().getFullYear() + 2, 11)}
             selected={selected}
             defaultMonth={selected}
             onSelect={(d) => {

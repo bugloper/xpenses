@@ -307,6 +307,15 @@ export type SetupRequest = { name: string; email: string; password: string }
 export type RegisterRequest = { name: string; email: string; password: string; invite_token?: string }
 export type UpdateProfileRequest = { name?: string }
 export type ChangePasswordRequest = { current_password: string; new_password: string }
+export type ResetPasswordRequest = { token: string; new_password: string }
+/** POST /admin/users/:id/password-reset response: the token is only ever returned here. */
+export type CreatedPasswordReset = {
+  id: string
+  user_id: string
+  expires_at: string
+  token: string
+  reset_path: string
+}
 export type AuthSession = {
   id: string
   created_at: string

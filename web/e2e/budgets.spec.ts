@@ -17,9 +17,20 @@ test('set, edit and remove a monthly budget from the Budgets page', async ({ pag
   await page.getByRole('button', { name: 'Set budget' }).click()
   await expect(page.getByText('Budget set')).toBeVisible()
 
+  // Nothing spent yet: the row says so, and sits in the "Not used yet" fold (open, since it is the only one).
   const row = page.getByRole('button', { name: 'Edit Eating out budget' })
   await expect(row).toBeVisible()
   await expect(row).toContainText('Nu. 5,000')
+  await expect(row).toContainText('Nothing spent yet')
+  await expect(page.getByRole('button', { name: /Not used yet/ })).toHaveAttribute('aria-expanded', 'true')
+
+  // Any month is two taps away: a year and a month, no arrow runs.
+  await page.getByRole('button', { name: /Choose month/ }).click()
+  await page.getByRole('button', { name: 'Previous year' }).click()
+  await page.getByRole('option', { name: 'Jan' }).click()
+  await expect(page.getByRole('button', { name: /Choose month, currently Jan 2025/ })).toBeVisible()
+  await page.getByRole('button', { name: 'Back to this month' }).click()
+  await expect(row).toBeVisible()
 
   // Edit: the amount is prefilled, the category already chosen.
   await row.click()

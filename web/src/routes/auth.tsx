@@ -1,9 +1,13 @@
 import { Link, Outlet, createRoute, useNavigate } from '@tanstack/react-router'
+import { useState } from 'react'
+import { toast } from 'sonner'
 import { AuthLayout } from '@/components/auth/AuthLayout'
+import { ForgotPasswordDialog } from '@/components/auth/ForgotPasswordDialog'
 import { LoginForm } from '@/components/auth/LoginForm'
 import { RegisterForm } from '@/components/auth/RegisterForm'
+import { ResetPasswordForm } from '@/components/auth/ResetPasswordForm'
 import { SetupForm } from '@/components/auth/SetupForm'
-import { parseLoginSearch, parseRegisterSearch, safeRedirect } from '@/lib/auth'
+import { parseLoginSearch, parseRegisterSearch, parseResetSearch, safeRedirect } from '@/lib/auth'
 import { useAuthStatus } from '@/lib/queries/auth'
 import { rootRoute } from './__root'
 
@@ -19,6 +23,7 @@ function LoginPage() {
   const { redirect } = loginRoute.useSearch()
   const status = useAuthStatus()
   const registrationOpen = status.data?.registration_open ?? false
+  const [forgot, setForgot] = useState(false)
   return (
     <AuthLayout
       title="Sign in"
@@ -37,7 +42,9 @@ function LoginPage() {
       <LoginForm
         onSuccess={() => void navigate({ href: safeRedirect(redirect), replace: true })}
         onSetupRequired={() => void navigate({ to: '/setup', replace: true })}
+        onForgotPassword={() => setForgot(true)}
       />
+      <ForgotPasswordDialog open={forgot} onOpenChange={setForgot} />
     </AuthLayout>
   )
 }
@@ -106,4 +113,41 @@ export const registerRoute = createRoute({
   path: '/register',
   validateSearch: parseRegisterSearch,
   component: RegisterPage,
+})
+
+function ResetPasswordPage() {
+  const navigate = useNavigate()
+  const { token } = resetPasswordRoute.useSearch()
+  return (
+    <AuthLayout
+      title="Choose a new password"
+      description={
+        token
+          ? 'This link came from your administrator. It works once.'
+          : 'This reset link is incomplete. Ask your administrator for a new one.'
+      }
+      footer={
+        <Link to="/login" search={{}} className="text-primary font-medium hover:underline">
+          Back to sign in
+        </Link>
+      }
+    >
+      {token && (
+        <ResetPasswordForm
+          token={token}
+          onSuccess={() => {
+            toast.success('Password changed', { description: 'Sign in with your new password.' })
+            void navigate({ to: '/login', search: {}, replace: true })
+          }}
+        />
+      )}
+    </AuthLayout>
+  )
+}
+
+export const resetPasswordRoute = createRoute({
+  getParentRoute: () => authLayoutRoute,
+  path: '/reset-password',
+  validateSearch: parseResetSearch,
+  component: ResetPasswordPage,
 })

@@ -70,25 +70,40 @@ function ProfileRows({ name: initialName, email }: { name: string; email: string
   )
 }
 
-/** Profile + password + sign-out controls on the Settings page. */
-export function AccountSection() {
+/** Who is signed in, with the editable name. */
+export function ProfileSection() {
   const { user } = useAuth()
-  const navigate = useNavigate()
-  const [confirmAll, setConfirmAll] = useState(false)
   if (!user) return null
   return (
-    <div className="flex flex-col gap-4">
-      <div className="bg-card border divide-y rounded-[1.25rem] px-4">
-        <div className="flex items-center gap-2 py-4">
-          <p className="text-sm font-medium">Signed in as {user.name}</p>
-          <RoleBadge user={user} />
-        </div>
-        {/* Keyed on the server value so an external rename resets the draft. */}
-        <ProfileRows key={user.name} name={user.name} email={user.email} />
+    <div className="bg-card border divide-y rounded-[1.25rem] px-4">
+      <div className="flex items-center gap-2 py-4">
+        <p className="text-sm font-medium">Signed in as {user.name}</p>
+        <RoleBadge user={user} />
       </div>
-      <div className="bg-card border rounded-[1.25rem] p-4">
-        <h3 className="mb-3 text-sm font-medium">Change password</h3>
-        <ChangePasswordForm />
+      {/* Keyed on the server value so an external rename resets the draft. */}
+      <ProfileRows key={user.name} name={user.name} email={user.email} />
+    </div>
+  )
+}
+
+/** The change-password form in its own panel. */
+export function PasswordSection() {
+  return (
+    <div className="bg-card border rounded-[1.25rem] p-4">
+      <ChangePasswordForm />
+    </div>
+  )
+}
+
+/** Sign out of this device, or of all of them. */
+export function SignOutSection() {
+  const navigate = useNavigate()
+  const [confirmAll, setConfirmAll] = useState(false)
+  return (
+    <div className="bg-card border flex flex-col gap-3 rounded-[1.25rem] p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <p className="text-sm font-medium">Sign out</p>
+        <p className="text-muted-foreground text-xs">Unsynced transactions on this device are kept until you sign in again.</p>
       </div>
       <div className="flex flex-wrap gap-2">
         <Button variant="outline" onClick={() => uiStore.requestLogout()}>

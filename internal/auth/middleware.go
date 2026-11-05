@@ -37,7 +37,7 @@ const APIPrefix = "/api/v1"
 
 // publicPaths (relative to APIPrefix) need no session.
 var publicPaths = map[string]bool{
-	"/health": true, "/auth/status": true, "/auth/setup": true, "/auth/register": true, "/auth/login": true,
+	"/health": true, "/auth/status": true, "/auth/setup": true, "/auth/register": true, "/auth/login": true, "/auth/reset-password": true,
 }
 
 // adminOnly reports whether a relative API path is restricted to administrators.

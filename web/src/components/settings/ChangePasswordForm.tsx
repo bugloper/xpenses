@@ -41,12 +41,8 @@ export function ChangePasswordForm() {
   })
 
   return (
-    <form onSubmit={(e) => void submit(e)} className="grid gap-4 sm:grid-cols-3" noValidate>
-      {formError && (
-        <div className="sm:col-span-3">
-          <FormAlert>{formError}</FormAlert>
-        </div>
-      )}
+    <form onSubmit={(e) => void submit(e)} className="grid gap-4" noValidate>
+      {formError && <FormAlert>{formError}</FormAlert>}
       <Field data-invalid={!!errors.current_password || undefined}>
         <FieldLabel htmlFor="pw-current">Current password</FieldLabel>
         <Input
@@ -81,7 +77,7 @@ export function ChangePasswordForm() {
         />
         <FieldError errors={[errors.confirm_password]} />
       </Field>
-      <div className="sm:col-span-3">
+      <div>
         <Button type="submit" variant="outline" disabled={change.isPending}>
           {change.isPending ? 'Changing…' : 'Change password'}
         </Button>

@@ -57,6 +57,7 @@ and `/auth/setup` can only ever create one owner however many requests race for 
 open, anyone can create accounts (each costing one Argon2id hash); keep it closed and use invites
 unless you accept that.
 | POST | /auth/login | `{email, password}` → 200 `{data: User}` + cookie | 401 `invalid_credentials`, 403 `account_disabled`, 403 `setup_required`, 429 `too_many_attempts` |
+| POST | /auth/reset-password | `{token, new_password}` → 204; the user's sessions are all revoked. The token comes from an admin-issued reset link (below); the server sends no email | 400 `invalid_reset` (bad, expired or already used), 422 validation |
 
 ## Authenticated routes
 
@@ -88,6 +89,7 @@ reverse proxy's access log may.
 | GET | /admin/users | `[User & {account_count: number, transaction_count: number}]` |
 | PATCH | /admin/users/:id | `{is_active?, role?}` → User. 422 when targeting yourself (cannot disable/demote the last admin or self). Disabling revokes the user's sessions |
 | DELETE | /admin/users/:id | → 204. Deletes the user **and all their data**; 422 for self |
+| POST | /admin/users/:id/password-reset | → 201 `{id, user_id, expires_at, token, reset_path: "/reset-password?token=<token>"}` — a single-use link valid 24 h, shown **once**; the admin passes it to the user ("Forgot password?" on the sign-in page explains this) |
 | GET | /admin/settings | `{registration_open: boolean}` |
 | PATCH | /admin/settings | `{registration_open}` → same |
 | POST | /admin/invites | `{email?, expires_in_hours?}` (default 72, max 720) → 201 `{id, token, email, expires_at, register_path: "/register?invite=<token>"}` — the token is shown **once** |

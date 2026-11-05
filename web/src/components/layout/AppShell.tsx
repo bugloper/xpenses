@@ -9,6 +9,7 @@ import { useAuth } from '@/lib/auth'
 import { uiStore, useUIStore } from '@/lib/ui-store'
 import { cn } from '@/lib/utils'
 import { Logo } from './Brand'
+import { CurrencyMenu } from './CurrencyMenu'
 import { ALL_NAV, MORE_NAV, PRIMARY_NAV, visibleNav, type NavItem } from './nav'
 import { PendingSheet } from './PendingSheet'
 import { PwaInstallPrompt } from './PwaInstallPrompt'
@@ -84,7 +85,7 @@ function Topbar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname })
   const page = pageFor(pathname)
   return (
-    <header className="bg-background/85 sticky top-0 z-20 grid h-16 grid-cols-[2.75rem_1fr_2.75rem] items-center gap-2 px-4 backdrop-blur-xl sm:px-6 md:h-18 md:px-8">
+    <header className="bg-background/85 sticky top-0 z-20 grid h-16 grid-cols-[2.75rem_1fr_auto] items-center gap-2 px-4 backdrop-blur-xl sm:px-6 md:h-18 md:px-8">
       {page.back ? (
         <Link to={page.back} aria-label="Back" className={roundButton}>
           <ChevronLeft className="size-5" />
@@ -97,9 +98,12 @@ function Topbar() {
         <span />
       )}
       <div className="min-w-0 truncate text-center text-lg font-semibold tracking-tight md:invisible">{page.title}</div>
-      <button type="button" onClick={toggle} aria-label="Toggle theme" className={roundButton}>
-        {theme === 'dark' ? <Sun className="size-5" /> : <Moon className="size-5" />}
-      </button>
+      <div className="flex items-center gap-2">
+        <CurrencyMenu />
+        <button type="button" onClick={toggle} aria-label="Toggle theme" className={roundButton}>
+          {theme === 'dark' ? <Sun className="size-5" /> : <Moon className="size-5" />}
+        </button>
+      </div>
     </header>
   )
 }

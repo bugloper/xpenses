@@ -10,9 +10,11 @@ import type {
   ChangePasswordRequest,
   CreateInviteRequest,
   CreatedInvite,
+  CreatedPasswordReset,
   Invite,
   LoginRequest,
   RegisterRequest,
+  ResetPasswordRequest,
   SetupRequest,
   UpdateAdminUserRequest,
   UpdateProfileRequest,
@@ -131,6 +133,21 @@ export function useChangePassword() {
     mutationFn: (body: ChangePasswordRequest) => api.patchLoose<void>('/auth/password', body),
     // Every other session was revoked: refresh the list.
     onSuccess: () => void qc.invalidateQueries({ queryKey: authKeys.sessions }),
+  })
+}
+
+/** Anonymous: spends an admin-issued reset link. */
+export function useResetPassword() {
+  return useMutation({
+    mutationFn: (body: ResetPasswordRequest) => api.postLoose<void>('/auth/reset-password', body),
+  })
+}
+
+/** Admin: issues a one-time reset link for a user. */
+export function useCreatePasswordReset() {
+  return useMutation({
+    mutationFn: (userId: string) =>
+      api.postLoose<CreatedPasswordReset>(`/admin/users/${userId}/password-reset`, {}),
   })
 }
 

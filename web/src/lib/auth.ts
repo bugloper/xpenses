@@ -15,7 +15,7 @@ export const API_RUNTIME_CACHE = 'xpenses-api'
 /** Remembers which user the local caches belong to, so a user switch purges them. */
 export const LAST_USER_STORAGE_KEY = 'xpenses-last-user'
 
-export const AUTH_PATHS = ['/login', '/setup', '/register'] as const
+export const AUTH_PATHS = ['/login', '/setup', '/register', '/reset-password'] as const
 
 export function isAuthPath(path: string): boolean {
   return AUTH_PATHS.some((p) => path === p || path.startsWith(p + '/'))
@@ -173,6 +173,12 @@ export function parseRegisterSearch(s: Record<string, unknown>): RegisterSearch 
   return typeof s.invite === 'string' && s.invite ? { invite: s.invite } : {}
 }
 
+export type ResetSearch = { token?: string }
+/** `/reset-password?token=` search validation. */
+export function parseResetSearch(s: Record<string, unknown>): ResetSearch {
+  return typeof s.token === 'string' && s.token ? { token: s.token } : {}
+}
+
 /**
  * Validates a `?redirect=` value: only same-app absolute paths, never an auth
  * page (which would bounce back to `/`), never a protocol-relative URL.
@@ -233,6 +239,8 @@ export function authErrorInfo(e: unknown): AuthErrorInfo {
       return { message: 'Registration is closed. Ask the administrator for an invite link.' }
     case 'invalid_invite':
       return { message: 'This invite link is invalid, expired or has already been used.' }
+    case 'invalid_reset':
+      return { message: 'This reset link is invalid, expired or has already been used. Ask your administrator for a new one.' }
     case 'email_taken':
       return { message: 'An account with this email already exists.', field: 'email' }
     case 'csrf_rejected':

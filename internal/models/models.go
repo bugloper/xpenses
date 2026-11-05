@@ -172,6 +172,17 @@ type Session struct {
 	Current    bool   `json:"current"`
 }
 
+// PasswordReset is an admin-issued, single-use link that lets a user choose
+// a new password without knowing the old one.
+type PasswordReset struct {
+	ID        string  `json:"id"`
+	UserID    string  `json:"user_id"`
+	CreatedBy string  `json:"-"`
+	CreatedAt string  `json:"created_at"`
+	ExpiresAt string  `json:"expires_at"`
+	UsedAt    *string `json:"used_at"`
+}
+
 type Invite struct {
 	ID          string  `json:"id"`
 	Email       string  `json:"email"`

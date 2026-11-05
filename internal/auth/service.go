@@ -556,6 +556,83 @@ func (s *Service) CreateInvite(ctx context.Context, actor *models.User, email st
 	return &CreatedInvite{Invite: inv, Token: tok, RegisterPath: "/register?invite=" + tok}, nil
 }
 
+// CreatedPasswordReset is the one-time answer to an admin's reset request:
+// the token appears here and nowhere else.
+type CreatedPasswordReset struct {
+	models.PasswordReset
+	Token     string `json:"token"`
+	ResetPath string `json:"reset_path"`
+}
+
+const passwordResetTTL = 24 * time.Hour
+
+// CreatePasswordReset issues a single-use link (valid 24h) for the user with
+// the given id. The admin passes it on; the server never emails it.
+func (s *Service) CreatePasswordReset(ctx context.Context, actor *models.User, userID string) (*CreatedPasswordReset, error) {
+	u, err := s.Repo.GetUser(ctx, s.DB, userID)
+	if err != nil {
+		return nil, apperr.Internal(err)
+	}
+	if u == nil {
+		return nil, apperr.NotFound("user")
+	}
+	tok, err := newToken()
+	if err != nil {
+		return nil, apperr.Internal(err)
+	}
+	t := now()
+	r := models.PasswordReset{ID: uuid.NewString(), UserID: u.ID, CreatedBy: actor.ID, CreatedAt: fmtTime(t), ExpiresAt: fmtTime(t.Add(passwordResetTTL))}
+	if err := s.Repo.InsertPasswordReset(ctx, s.DB, &r, hashToken(tok)); err != nil {
+		return nil, apperr.Internal(err)
+	}
+	return &CreatedPasswordReset{PasswordReset: r, Token: tok, ResetPath: "/reset-password?token=" + tok}, nil
+}
+
+var errInvalidReset = &apperr.Error{Status: 400, Code: "invalid_reset", Message: "this reset link is invalid, expired or already used"}
+
+// ResetPassword sets a new password from a reset link and signs the user out
+// everywhere. The link is spent even if the user had been disabled meanwhile
+// (they still cannot sign in; Login checks is_active).
+func (s *Service) ResetPassword(ctx context.Context, token, newPw string) error {
+	if token == "" {
+		return errInvalidReset
+	}
+	if err := ValidatePassword(newPw); err != nil {
+		return apperr.Validation("validation failed", map[string]string{"new_password": err.Error()})
+	}
+	hash, err := HashPassword(newPw)
+	if err != nil {
+		return apperr.Internal(err)
+	}
+	err = repositories.WithTx(ctx, s.DB, func(tx *sql.Tx) error {
+		r, err := s.Repo.GetPasswordResetByHash(ctx, tx, hashToken(token))
+		if err != nil {
+			return err
+		}
+		if r == nil || r.UsedAt != nil || r.ExpiresAt < fmtTime(now()) {
+			return errInvalidReset
+		}
+		used, err := s.Repo.UsePasswordReset(ctx, tx, r.ID, fmtTime(now()))
+		if err != nil {
+			return err
+		}
+		if !used {
+			return errInvalidReset
+		}
+		if err := s.Repo.UpdateUserPassword(ctx, tx, r.UserID, hash, fmtTime(now())); err != nil {
+			return err
+		}
+		return s.Repo.DeleteUserSessions(ctx, tx, r.UserID, "")
+	})
+	if err != nil {
+		if ae, ok := apperr.As(err); ok {
+			return ae
+		}
+		return apperr.Internal(err)
+	}
+	return nil
+}
+
 func (s *Service) ListInvites(ctx context.Context) ([]models.Invite, error) {
 	list, err := s.Repo.ListInvites(ctx, s.DB)
 	if err != nil {
@@ -580,6 +657,7 @@ func (s *Service) Housekeeping(ctx context.Context) {
 	t := now()
 	_ = s.Repo.PurgeExpiredSessions(ctx, s.DB, fmtTime(t), fmtTime(t.Add(-SessionIdle)))
 	_ = s.Repo.PurgeAttempts(ctx, s.DB, fmtTime(t.Add(-24*time.Hour)))
+	_ = s.Repo.PurgePasswordResets(ctx, s.DB, fmtTime(t))
 }
 
 func truncate(s string, n int) string {

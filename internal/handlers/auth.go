@@ -29,6 +29,7 @@ func (h *AuthHandler) RegisterPublic(g *echo.Group) {
 	g.POST("/auth/setup", h.Setup)
 	g.POST("/auth/register", h.RegisterUser)
 	g.POST("/auth/login", h.Login)
+	g.POST("/auth/reset-password", h.ResetPassword)
 }
 
 // Register mounts the authenticated routes.
@@ -126,6 +127,22 @@ func (h *AuthHandler) Login(c echo.Context) error {
 		return err
 	}
 	return JSON(c, http.StatusOK, u)
+}
+
+// ResetPassword spends an admin-issued reset link. The caller is anonymous;
+// the token is the credential.
+func (h *AuthHandler) ResetPassword(c echo.Context) error {
+	var req struct {
+		Token       string `json:"token"`
+		NewPassword string `json:"new_password"`
+	}
+	if err := bindAuth(c, &req); err != nil {
+		return err
+	}
+	if err := h.Svc.ResetPassword(c.Request().Context(), req.Token, req.NewPassword); err != nil {
+		return err
+	}
+	return c.NoContent(http.StatusNoContent)
 }
 
 func (h *AuthHandler) Me(c echo.Context) error {

@@ -53,6 +53,6 @@ test('create a new category from inside the add sheet and save with it', async (
 
   // The new sub-category shows under its group on the Categories page.
   await page.goto('/categories')
-  await page.getByRole('button', { name: 'Expand Food & Groceries' }).click()
+  await page.getByRole('button', { name: 'Food & Groceries', exact: true }).click()
   await expect(page.getByText('Momo')).toBeVisible()
 })

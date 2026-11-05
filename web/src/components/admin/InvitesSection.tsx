@@ -1,4 +1,4 @@
-import { Check, Copy, Link2, Plus, X } from 'lucide-react'
+import { Link2, Plus, X } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
@@ -14,6 +14,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
+import { LinkDialog } from './LinkDialog'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { errorMessage } from '@/lib/api'
@@ -110,49 +111,6 @@ function CreateInviteDialog({
   )
 }
 
-function InviteLinkDialog({ invite, onClose }: { invite: CreatedInvite | null; onClose: () => void }) {
-  const [copied, setCopied] = useState(false)
-  const url = invite ? inviteUrl(invite) : ''
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(url)
-      setCopied(true)
-      toast.success('Link copied')
-      setTimeout(() => setCopied(false), 2000)
-    } catch {
-      toast.error('Could not copy. Select the link and copy it manually.')
-    }
-  }
-  return (
-    <Dialog open={invite !== null} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Invite link</DialogTitle>
-          <DialogDescription>
-            This link is shown once. Copy it now; it cannot be retrieved later, only revoked.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="flex gap-2">
-          <Input readOnly value={url} aria-label="Invite link" onFocus={(e) => e.currentTarget.select()} />
-          <Button type="button" onClick={() => void copy()} aria-label="Copy invite link">
-            {copied ? <Check data-icon="inline-start" /> : <Copy data-icon="inline-start" />}
-            {copied ? 'Copied' : 'Copy'}
-          </Button>
-        </div>
-        {invite && (
-          <p className="text-muted-foreground text-xs">
-            {invite.email ? `For ${invite.email} · ` : ''}expires {relativeTime(invite.expires_at)}
-          </p>
-        )}
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={onClose}>
-            Done
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}
 
 const STATUS_BADGE: Record<
   InviteStatus,
@@ -231,7 +189,18 @@ export function InvitesSection() {
           setCreated(i)
         }}
       />
-      <InviteLinkDialog invite={created} onClose={() => setCreated(null)} />
+      <LinkDialog
+        open={created !== null}
+        onClose={() => setCreated(null)}
+        title="Invite link"
+        label="Invite link"
+        url={created ? inviteUrl(created) : ''}
+        note={
+          created
+            ? `${created.email ? `For ${created.email} · ` : ''}expires ${relativeTime(created.expires_at)}`
+            : undefined
+        }
+      />
       <ConfirmDialog
         open={doomed !== null}
         onOpenChange={(o) => !o && setDoomed(null)}

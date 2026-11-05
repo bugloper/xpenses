@@ -18,6 +18,7 @@ func (h *AdminHandler) Register(g *echo.Group) {
 	g.GET("/admin/users", h.ListUsers)
 	g.PATCH("/admin/users/:id", h.UpdateUser)
 	g.DELETE("/admin/users/:id", h.DeleteUser)
+	g.POST("/admin/users/:id/password-reset", h.CreatePasswordReset)
 	g.GET("/admin/settings", h.GetSettings)
 	g.PATCH("/admin/settings", h.UpdateSettings)
 	g.GET("/admin/invites", h.ListInvites)
@@ -53,6 +54,16 @@ func (h *AdminHandler) DeleteUser(c echo.Context) error {
 		return err
 	}
 	return c.NoContent(http.StatusNoContent)
+}
+
+// CreatePasswordReset issues a one-time reset link for a user; the token is
+// returned here only.
+func (h *AdminHandler) CreatePasswordReset(c echo.Context) error {
+	r, err := h.Svc.CreatePasswordReset(c.Request().Context(), auth.CurrentUser(c), c.Param("id"))
+	if err != nil {
+		return err
+	}
+	return JSON(c, http.StatusCreated, r)
 }
 
 func (h *AdminHandler) GetSettings(c echo.Context) error {

@@ -1,14 +1,17 @@
 import { createRoute } from '@tanstack/react-router'
-import { ChevronLeft, ChevronRight, Plus, Target } from 'lucide-react'
-import { useState } from 'react'
+import { ChevronDown, ChevronLeft, ChevronRight, Plus, Target } from 'lucide-react'
+import { useMemo, useState } from 'react'
 import { z } from 'zod'
+import { AttentionCard } from '@/components/budgets/AttentionCard'
 import { BudgetFormSheet, type BudgetDraft } from '@/components/budgets/BudgetFormSheet'
-import { CategoryIcon } from '@/components/common/CategoryIcon'
+import { BudgetRow } from '@/components/budgets/BudgetRow'
 import { Money } from '@/components/common/Money'
+import { MonthPicker } from '@/components/common/MonthPicker'
 import { PageHeader } from '@/components/common/PageHeader'
 import { EmptyState, ErrorState, ListSkeleton } from '@/components/common/States'
 import { Button } from '@/components/ui/button'
-import { currentMonth, formatMonthLabel } from '@/lib/dates'
+import { groupBudgets } from '@/lib/budgets'
+import { currentMonth } from '@/lib/dates'
 import { useDefaultCurrency, useReportBudgets } from '@/lib/queries'
 import { isMonth, stepMonth } from '@/lib/reports'
 import { cn } from '@/lib/utils'
@@ -17,13 +20,6 @@ import { appRoute } from './__root'
 
 const searchSchema = z.object({ month: z.string().optional().catch(undefined) })
 
-const LEVEL: Record<ReportBudget['level'], { bar: string; text: string; label: string }> = {
-  ok: { bar: 'bg-income', text: 'text-income', label: 'On track' },
-  warn75: { bar: 'bg-warning', text: 'text-warning', label: '75% used' },
-  warn90: { bar: 'bg-orange-500', text: 'text-orange-500', label: '90% used' },
-  over: { bar: 'bg-expense', text: 'text-expense', label: 'Over budget' },
-}
-
 function BudgetsPage() {
   const search = budgetsRoute.useSearch()
   const navigate = budgetsRoute.useNavigate()
@@ -31,17 +27,21 @@ function BudgetsPage() {
   const currency = useDefaultCurrency()
   const q = useReportBudgets(month)
   const [draft, setDraft] = useState<BudgetDraft | null | undefined>(undefined)
-  const rows = q.data ?? []
+  const [showUnused, setShowUnused] = useState<boolean | null>(null)
+  const rows = useMemo(() => q.data ?? [], [q.data])
+  const groups = useMemo(() => groupBudgets(rows), [rows])
   const totalBudget = rows.reduce((n, r) => n + r.amount, 0)
   const totalSpent = rows.reduce((n, r) => n + r.spent, 0)
-  const setMonth = (m: string) =>
-    void navigate({ search: m === currentMonth() ? {} : { month: m }, replace: true })
+  // Untouched budgets stay folded away unless they are all there is.
+  const unusedOpen = showUnused ?? groups.active.length === 0
+  const setMonth = (m: string) => void navigate({ search: m === currentMonth() ? {} : { month: m }, replace: true })
+  const edit = (b: ReportBudget) => setDraft({ id: b.budget_id, category_id: b.category_id, amount: b.amount })
 
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
         title="Budgets"
-        description="Monthly limits per category"
+        description="Set a monthly limit per category and see how much of it has gone."
         actions={
           <Button size="sm" onClick={() => setDraft({})}>
             <Plus data-icon="inline-start" /> New budget
@@ -49,34 +49,18 @@ function BudgetsPage() {
         }
       />
       <div className="flex items-center justify-between gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          size="icon-sm"
-          aria-label="Previous month"
-          onClick={() => setMonth(stepMonth(month, -1))}
-        >
+        <Button type="button" variant="outline" size="icon-sm" aria-label="Previous month" onClick={() => setMonth(stepMonth(month, -1))}>
           <ChevronLeft />
         </Button>
-        <div className="text-center">
-          <p className="font-medium">{formatMonthLabel(month)}</p>
+        <div className="flex flex-col items-center">
+          <MonthPicker value={month} onChange={setMonth} />
           {month !== currentMonth() && (
-            <button
-              type="button"
-              className="text-primary text-xs hover:underline"
-              onClick={() => setMonth(currentMonth())}
-            >
+            <button type="button" className="text-primary text-xs hover:underline" onClick={() => setMonth(currentMonth())}>
               Back to this month
             </button>
           )}
         </div>
-        <Button
-          type="button"
-          variant="outline"
-          size="icon-sm"
-          aria-label="Next month"
-          onClick={() => setMonth(stepMonth(month, 1))}
-        >
+        <Button type="button" variant="outline" size="icon-sm" aria-label="Next month" onClick={() => setMonth(stepMonth(month, 1))}>
           <ChevronRight />
         </Button>
       </div>
@@ -93,88 +77,47 @@ function BudgetsPage() {
         />
       ) : (
         <>
+          <AttentionCard over={groups.over} currency={currency} onEdit={edit} />
           <div className="bg-card border flex items-center justify-between gap-3 rounded-[1.25rem] px-4 py-3 text-sm">
-            <span className="text-muted-foreground">Total</span>
+            <span className="text-muted-foreground">Spent this month</span>
             <span className="tabular">
-              <Money
-                minor={totalSpent}
-                currency={currency}
-                className={cn('font-semibold', totalSpent > totalBudget && 'text-expense')}
-              />{' '}
-              / <Money minor={totalBudget} currency={currency} />
-              <span className="text-muted-foreground">
-                {' '}
-                · {totalBudget > 0 ? Math.round((totalSpent * 100) / totalBudget) : 0}%
-              </span>
+              <Money minor={totalSpent} currency={currency} className={cn('font-semibold', totalSpent > totalBudget && 'text-expense')} /> /{' '}
+              <Money minor={totalBudget} currency={currency} />
+              <span className="text-muted-foreground"> · {totalBudget > 0 ? Math.round((totalSpent * 100) / totalBudget) : 0}%</span>
             </span>
           </div>
-          <ul className="bg-card border divide-y rounded-[1.25rem] px-2" aria-label="Budgets">
-            {rows.map((b) => {
-              const lvl = LEVEL[b.level] ?? LEVEL.ok
-              const width = Math.max(0, Math.min(100, b.pct))
-              return (
-                <li key={b.budget_id}>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setDraft({ id: b.budget_id, category_id: b.category_id, amount: b.amount })
-                    }
-                    className="hover:bg-muted/60 flex w-full items-center gap-3 rounded-xl px-2 py-3 text-left transition-colors"
-                    aria-label={`Edit ${b.name} budget`}
-                  >
-                    <CategoryIcon icon={b.icon} color={b.color} size="sm" />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-2 text-sm">
-                        <span className="truncate font-medium">{b.name}</span>
-                        <span className="tabular text-muted-foreground text-xs">
-                          <Money
-                            minor={b.spent}
-                            currency={currency}
-                            className={cn(b.level === 'over' && 'text-expense')}
-                          />{' '}
-                          / <Money minor={b.amount} currency={currency} />
-                        </span>
-                      </div>
-                      <div
-                        className="bg-muted mt-1.5 h-1.5 w-full overflow-hidden rounded-full"
-                        role="progressbar"
-                        aria-valuenow={b.pct}
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                        aria-label={`${b.name} budget`}
-                      >
-                        <div
-                          className={cn('h-full rounded-full transition-all', lvl.bar)}
-                          style={{ width: `${width}%` }}
-                        />
-                      </div>
-                      <div className="mt-1 flex items-center justify-between gap-2 text-[11px]">
-                        <span className={lvl.text}>{lvl.label}</span>
-                        <span
-                          className={cn(
-                            'tabular',
-                            b.remaining < 0 ? 'text-expense' : 'text-muted-foreground',
-                          )}
-                        >
-                          {b.remaining < 0 ? 'over by ' : 'remaining '}
-                          <Money minor={Math.abs(b.remaining)} currency={currency} />
-                        </span>
-                      </div>
-                    </div>
-                    <ChevronRight className="text-muted-foreground size-4 shrink-0" />
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
+          {groups.active.length > 0 && (
+            <ul className="bg-card border divide-y rounded-[1.25rem] px-2" aria-label="Budgets in use">
+              {groups.active.map((b) => (
+                <BudgetRow key={b.budget_id} b={b} currency={currency} onEdit={() => edit(b)} />
+              ))}
+            </ul>
+          )}
+          {groups.unused.length > 0 && (
+            <section className="bg-card border rounded-[1.25rem] px-2">
+              <button
+                type="button"
+                aria-expanded={unusedOpen}
+                onClick={() => setShowUnused(!unusedOpen)}
+                className="flex w-full items-center justify-between gap-2 px-2 py-3 text-left text-sm"
+              >
+                <span className="font-medium">
+                  Not used yet <span className="text-muted-foreground font-normal">· {groups.unused.length}</span>
+                </span>
+                <ChevronDown className={cn('text-muted-foreground size-4 transition-transform', unusedOpen && 'rotate-180')} />
+              </button>
+              {unusedOpen && (
+                <ul className="divide-y border-t" aria-label="Budgets not used yet">
+                  {groups.unused.map((b) => (
+                    <BudgetRow key={b.budget_id} b={b} currency={currency} onEdit={() => edit(b)} />
+                  ))}
+                </ul>
+              )}
+            </section>
+          )}
         </>
       )}
-      <BudgetFormSheet
-        open={draft !== undefined}
-        onOpenChange={(o) => !o && setDraft(undefined)}
-        draft={draft ?? null}
-        currency={currency}
-      />
+      <BudgetFormSheet open={draft !== undefined} onOpenChange={(o) => !o && setDraft(undefined)} draft={draft ?? null} currency={currency} />
     </div>
   )
 }

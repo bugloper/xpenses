@@ -90,6 +90,8 @@ test.describe('PWA', () => {
     })
     const install = page.getByRole('button', { name: 'Install app' })
     await expect(install).toBeVisible()
+    // Settings is long now; bring the button clear of the phone's bottom tab bar.
+    await install.evaluate((el) => el.scrollIntoView({ block: 'center' }))
     await install.click()
     await expect
       .poll(() => page.evaluate(() => (window as unknown as { __installCalls: number }).__installCalls))
