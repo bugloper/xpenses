@@ -8,7 +8,7 @@ import path from 'node:path'
 // Run `bun run build` first (or `bun run test:e2e`, which does).
 export const E2E_PORT = 18090
 export const E2E_BASE_URL = process.env.E2E_BASE_URL ?? `http://127.0.0.1:${E2E_PORT}`
-export const E2E_DATA_DIR = path.join(os.tmpdir(), `xpensiv-e2e-${process.pid}`)
+export const E2E_DATA_DIR = path.join(os.tmpdir(), `xpenses-e2e-${process.pid}`)
 
 export default defineConfig({
   testDir: './e2e',
@@ -38,12 +38,12 @@ export default defineConfig({
         timeout: 120_000,
         reuseExistingServer: false,
         env: {
-          XPENSIV_ADDR: `127.0.0.1:${E2E_PORT}`,
-          XPENSIV_DATA_DIR: E2E_DATA_DIR,
-          XPENSIV_STATIC_DIR: path.resolve(import.meta.dirname, 'dist'),
-          XPENSIV_CORS_ORIGIN: '',
-          XPENSIV_SECURE_COOKIES: 'false',
-          XPENSIV_LOG_LEVEL: 'warn',
+          XPENSES_ADDR: `127.0.0.1:${E2E_PORT}`,
+          XPENSES_DATA_DIR: E2E_DATA_DIR,
+          XPENSES_STATIC_DIR: path.resolve(import.meta.dirname, 'dist'),
+          XPENSES_CORS_ORIGIN: '',
+          XPENSES_SECURE_COOKIES: 'false',
+          XPENSES_LOG_LEVEL: 'warn',
         },
       },
 })

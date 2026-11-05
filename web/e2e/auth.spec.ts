@@ -45,7 +45,7 @@ test.describe('authentication', () => {
       await page.getByRole('menuitem', { name: 'Log out' }).click()
     }
     await expect(page).toHaveURL(/\/login/)
-    const cached = await page.evaluate(() => localStorage.getItem('xpensiv-query-cache'))
+    const cached = await page.evaluate(() => localStorage.getItem('xpenses-query-cache'))
     expect(cached).toBeNull()
     const me = await page.request.get('/api/v1/auth/me')
     expect(me.status()).toBe(401)

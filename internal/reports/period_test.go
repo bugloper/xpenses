@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	apperr "github.com/bugloper/xpensiv/internal/errors"
+	apperr "github.com/bugloper/xpenses/internal/errors"
 )
 
 func TestParsePeriodDefaultsToCurrentMonth(t *testing.T) {

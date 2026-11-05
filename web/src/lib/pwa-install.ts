@@ -71,8 +71,8 @@ export async function promptInstall(): Promise<'accepted' | 'dismissed' | 'unava
 // "Share → Add to Home Screen" instructions on iOS, which has no such event.
 // Dismissing the offer snoozes it; installing (or running installed) ends it.
 
-export const INSTALL_SNOOZE_KEY = 'xpensiv:install-offer-snoozed-until'
-export const INSTALL_SESSION_KEY = 'xpensiv:install-offer-shown'
+export const INSTALL_SNOOZE_KEY = 'xpenses:install-offer-snoozed-until'
+export const INSTALL_SESSION_KEY = 'xpenses:install-offer-shown'
 export const INSTALL_SNOOZE_MS = 14 * 24 * 60 * 60 * 1000
 
 export type InstallOffer = 'native' | 'ios' | null

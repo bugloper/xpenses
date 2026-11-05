@@ -16,10 +16,10 @@ import (
 
 	"github.com/google/uuid"
 
-	apperr "github.com/bugloper/xpensiv/internal/errors"
-	"github.com/bugloper/xpensiv/internal/models"
-	"github.com/bugloper/xpensiv/internal/repositories"
-	"github.com/bugloper/xpensiv/internal/validators"
+	apperr "github.com/bugloper/xpenses/internal/errors"
+	"github.com/bugloper/xpenses/internal/models"
+	"github.com/bugloper/xpenses/internal/repositories"
+	"github.com/bugloper/xpenses/internal/validators"
 )
 
 const (

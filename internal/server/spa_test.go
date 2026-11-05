@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bugloper/xpensiv/internal/config"
-	"github.com/bugloper/xpensiv/internal/database"
-	"github.com/bugloper/xpensiv/internal/server"
+	"github.com/bugloper/xpenses/internal/config"
+	"github.com/bugloper/xpenses/internal/database"
+	"github.com/bugloper/xpenses/internal/server"
 )
 
 func TestSPAServing(t *testing.T) {

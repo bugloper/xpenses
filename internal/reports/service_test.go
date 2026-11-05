@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bugloper/xpensiv/internal/auth"
-	"github.com/bugloper/xpensiv/internal/database"
-	"github.com/bugloper/xpensiv/internal/models"
+	"github.com/bugloper/xpenses/internal/auth"
+	"github.com/bugloper/xpenses/internal/database"
+	"github.com/bugloper/xpenses/internal/models"
 )
 
 const ts = "2026-11-04T00:00:00Z"
@@ -361,7 +361,7 @@ func TestExportCSV(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if doc.Filename != "xpensiv-categories-expense-2026-11-01_2026-11-30" {
+	if doc.Filename != "xpenses-categories-expense-2026-11-01_2026-11-30" {
 		t.Fatalf("filename: %s", doc.Filename)
 	}
 	var buf bytes.Buffer
@@ -387,7 +387,7 @@ func TestExportCSV(t *testing.T) {
 	}
 	buf.Reset()
 	_ = WriteCSV(&buf, doc)
-	if doc.Filename != "xpensiv-budgets-2026-11" || !strings.Contains(buf.String(), "Eating out,50.00,40.00,10.00,80,warn75") {
+	if doc.Filename != "xpenses-budgets-2026-11" || !strings.Contains(buf.String(), "Eating out,50.00,40.00,10.00,80,warn75") {
 		t.Fatalf("budgets csv: %s\n%s", doc.Filename, buf.String())
 	}
 }

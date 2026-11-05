@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"time"
 
-	apperr "github.com/bugloper/xpensiv/internal/errors"
-	"github.com/bugloper/xpensiv/internal/models"
+	apperr "github.com/bugloper/xpenses/internal/errors"
+	"github.com/bugloper/xpenses/internal/models"
 )
 
 // Period is an inclusive range of local calendar dates.

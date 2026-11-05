@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bugloper/xpensiv/internal/auth"
-	"github.com/bugloper/xpensiv/internal/testutil"
+	"github.com/bugloper/xpenses/internal/auth"
+	"github.com/bugloper/xpenses/internal/testutil"
 )
 
 func TestSetupLoginLogoutFlow(t *testing.T) {

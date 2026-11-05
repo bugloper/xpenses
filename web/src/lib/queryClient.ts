@@ -5,7 +5,7 @@ import { isApiError } from './api'
 const ONE_DAY = 24 * 60 * 60 * 1000
 
 /** localStorage key of the persisted query cache (removed on logout). */
-export const QUERY_CACHE_STORAGE_KEY = 'xpensiv-query-cache'
+export const QUERY_CACHE_STORAGE_KEY = 'xpenses-query-cache'
 
 export const queryClient = new QueryClient({
   defaultOptions: {

@@ -3,7 +3,7 @@ package auth
 import (
 	"context"
 
-	"github.com/bugloper/xpensiv/internal/models"
+	"github.com/bugloper/xpenses/internal/models"
 )
 
 type ctxKey struct{}

@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"errors"
 
-	"github.com/bugloper/xpensiv/internal/models"
+	"github.com/bugloper/xpenses/internal/models"
 )
 
 type CategoryRepo struct{}

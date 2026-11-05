@@ -1,21 +1,21 @@
-# Xpensiv authentication & multi-user contract
+# Xpenses authentication & multi-user contract
 
-Xpensiv is multi-user with **fully isolated data per user**: every account, category,
+Xpenses is multi-user with **fully isolated data per user**: every account, category,
 transaction, budget, recurring rule and setting belongs to
 exactly one user. There is one `admin` role (the instance owner) and the `user` role.
 
 ## Sessions
 
-- Cookie `xpensiv_session`: random 256-bit token; only its SHA-256 is stored. Flags:
+- Cookie `xpenses_session`: random 256-bit token; only its SHA-256 is stored. Flags:
   `HttpOnly`, `SameSite=Strict`, `Path=/`, `Secure` when the request is HTTPS (direct TLS or
-  `X-Forwarded-Proto: https` from a trusted proxy) or `XPENSIV_SECURE_COOKIES=true`.
+  `X-Forwarded-Proto: https` from a trusted proxy) or `XPENSES_SECURE_COOKIES=true`.
 - Idle timeout 30 days (sliding, refreshed at most every 5 minutes), absolute lifetime 180 days.
 - Passwords: Argon2id (t=3, m=64 MiB, p=1, 16-byte salt), minimum 10 characters, maximum 200.
 - Login throttling: after 10 failed attempts for an email **or** 30 for an IP within 15 minutes →
   `429 too_many_attempts` with `Retry-After` seconds. Attempts for the email are cleared on a
   successful login. The per-email counter is deliberately a lockout: anyone who knows an email can
   keep its owner out for 15 minutes (accepted; it is the price of stopping online guessing).
-- Client IP: with `XPENSIV_TRUSTED_PROXY=true` the IP is the **last** entry of `X-Forwarded-For`
+- Client IP: with `XPENSES_TRUSTED_PROXY=true` the IP is the **last** entry of `X-Forwarded-For`
   (the one appended by the single proxy hop in front); earlier entries are client-supplied and
   ignored. Without it `X-Forwarded-For` is ignored entirely. Never set it unless exactly one proxy
   you control sits in front, or clients can forge their IP for the throttle.
@@ -23,10 +23,10 @@ exactly one user. There is one `admin` role (the instance owner) and the `user` 
 - Signing in while a session cookie is already present revokes that previous session: a browser
   holds at most one live session, and switching users never leaves the earlier user's session alive.
 - **CSRF**: every mutating request (POST/PATCH/PUT/DELETE) must carry the header
-  `X-Xpensiv-Client: web` (or any value). Missing header → `403 csrf_rejected`. If an `Origin`
-  header is present it must match the request host (or `XPENSIV_CORS_ORIGIN`) → else `403 csrf_rejected`;
+  `X-Xpenses-Client: web` (or any value). Missing header → `403 csrf_rejected`. If an `Origin`
+  header is present it must match the request host (or `XPENSES_CORS_ORIGIN`) → else `403 csrf_rejected`;
   on an HTTPS request (direct TLS or `X-Forwarded-Proto: https` from the trusted proxy) an `http://`
-  origin is rejected too. `XPENSIV_CORS_ORIGIN=` (explicitly empty) disables the dev origin; the
+  origin is rejected too. `XPENSES_CORS_ORIGIN=` (explicitly empty) disables the dev origin; the
   production compose/Dockerfile set it that way.
   Browsers cannot add custom headers cross-site without a CORS preflight, so together with
   `SameSite=Strict` this blocks CSRF without a token dance.
@@ -101,9 +101,9 @@ reverse proxy's access log may.
   Every other route requires a session: the root route's `beforeLoad` resolves `/auth/status` +
   `/auth/me`, redirects to `/setup` or `/login` as needed. A `401` from any request logs the user out
   client-side and redirects to `/login`.
-- Send `X-Xpensiv-Client: web` on every request. Handle `403 csrf_rejected` as a bug (toast).
+- Send `X-Xpenses-Client: web` on every request. Handle `403 csrf_rejected` as a bug (toast).
 - **Logout / user switch on a shared device must not leak data**: on logout clear the persisted
-  TanStack Query cache, the TanStack in-memory cache, the Workbox runtime cache (`caches.delete('xpensiv-api')`),
+  TanStack Query cache, the TanStack in-memory cache, the Workbox runtime cache (`caches.delete('xpenses-api')`),
   and `localStorage` UI prefs that reference ids (last account/category). The offline queue stores
   `user_id` on each item; the sync manager only drains items whose `user_id` matches the current user,
   other users' items stay untouched and hidden. On logout with pending items, warn and offer

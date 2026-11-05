@@ -5,7 +5,7 @@ dev:
 	@$(MAKE) -j2 dev-api dev-web
 
 dev-api:
-	XPENSIV_STATIC_DIR= go run ./cmd/server
+	XPENSES_STATIC_DIR= go run ./cmd/server
 
 dev-web:
 	cd web && bun run dev
@@ -16,7 +16,7 @@ build-web:
 	cd web && bun install && bun run build
 
 build-api:
-	CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o bin/xpensiv ./cmd/server
+	CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o bin/xpenses ./cmd/server
 
 test: test-api test-web
 

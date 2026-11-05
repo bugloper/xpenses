@@ -73,11 +73,11 @@ describe('request error mapping', () => {
       }),
     )
     const handler = vi.fn()
-    window.addEventListener('xpensiv:request-ok', handler)
+    window.addEventListener('xpenses:request-ok', handler)
     const data = await api.get<{ id: string }>('/x')
     expect(data.id).toBe('1')
     expect(handler).toHaveBeenCalled()
-    window.removeEventListener('xpensiv:request-ok', handler)
+    window.removeEventListener('xpenses:request-ok', handler)
   })
 
   it('handles 204', async () => {
@@ -104,7 +104,7 @@ describe('auth behaviour', () => {
     last_login_at: null,
   }
 
-  it('sends X-Xpensiv-Client: web and same-origin credentials on every request', async () => {
+  it('sends X-Xpenses-Client: web and same-origin credentials on every request', async () => {
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
       .mockImplementation(async () => new Response(JSON.stringify({ data: user }), { status: 200 }))
@@ -116,7 +116,7 @@ describe('auth behaviour', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(5)
     for (const [, init] of fetchSpy.mock.calls) {
       const headers = init?.headers as Record<string, string>
-      expect(headers['X-Xpensiv-Client']).toBe('web')
+      expect(headers['X-Xpenses-Client']).toBe('web')
       expect(init?.credentials).toBe('same-origin')
     }
   })

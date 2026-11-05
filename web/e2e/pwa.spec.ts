@@ -23,7 +23,7 @@ test.describe('PWA', () => {
       display: string
       icons: Array<{ sizes: string; purpose?: string }>
     }
-    expect(manifest.name).toBe('Xpensiv')
+    expect(manifest.name).toBe('Xpenses')
     expect(manifest.display).toBe('standalone')
     expect(manifest.icons.some((i) => i.sizes === '512x512' && i.purpose === 'maskable')).toBe(true)
   })

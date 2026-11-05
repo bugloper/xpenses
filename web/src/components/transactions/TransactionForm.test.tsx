@@ -143,7 +143,7 @@ describe('transactionSchema', () => {
 describe('defaultValues', () => {
   it('ignores undefined preset keys and falls back to last-used ids', () => {
     localStorage.setItem(
-      'xpensiv-last-used',
+      'xpenses-last-used',
       JSON.stringify({ expense: { account_id: 'acc-9', category_id: 'cat-food' } }),
     )
     const v = defaultValues({ type: undefined, account_id: undefined, category_id: undefined })
@@ -214,10 +214,10 @@ describe('TransactionForm', () => {
     expect(values.account_id).toBe('acc-1')
     expect(values.category_id).toBe('cat-food')
     expect(toCreateRequest(values, 'BTN').amount).toBe(8540)
-    expect(JSON.parse(localStorage.getItem('xpensiv-last-used') ?? '{}')).toMatchObject({
+    expect(JSON.parse(localStorage.getItem('xpenses-last-used') ?? '{}')).toMatchObject({
       expense: { account_id: 'acc-1', category_id: 'cat-food' },
     })
-    expect(JSON.parse(localStorage.getItem('xpensiv-recent-categories') ?? '{}')).toEqual({ expense: ['cat-food'] })
+    expect(JSON.parse(localStorage.getItem('xpenses-recent-categories') ?? '{}')).toEqual({ expense: ['cat-food'] })
   })
 
   it('hides categories and shows the destination account for transfers', async () => {
@@ -284,7 +284,7 @@ describe('new category from the picker', () => {
 
 describe('recent categories', () => {
   it('offers recently used categories as one-tap chips', async () => {
-    localStorage.setItem('xpensiv-recent-categories', JSON.stringify({ expense: ['cat-food'] }))
+    localStorage.setItem('xpenses-recent-categories', JSON.stringify({ expense: ['cat-food'] }))
     const user = userEvent.setup()
     const onSubmit = renderForm()
     const chip = await screen.findByRole('radio', { name: 'Food' })

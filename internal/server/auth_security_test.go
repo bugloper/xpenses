@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bugloper/xpensiv/internal/auth"
-	"github.com/bugloper/xpensiv/internal/testutil"
+	"github.com/bugloper/xpenses/internal/auth"
+	"github.com/bugloper/xpenses/internal/testutil"
 )
 
 // The auth gate keys on the decoded URL path while Echo routes on the raw one;

@@ -16,7 +16,7 @@ import (
 
 	"golang.org/x/crypto/pbkdf2"
 
-	apperr "github.com/bugloper/xpensiv/internal/errors"
+	apperr "github.com/bugloper/xpenses/internal/errors"
 )
 
 // BackupService produces consistent SQLite snapshots with VACUUM INTO and can
@@ -29,7 +29,10 @@ type BackupService struct {
 }
 
 const (
-	backupMagic = "XPENSIVENC1"
+	backupMagic = "XPENSESENC1"
+	// Backups written before the app was renamed carry the old header; they
+	// are still restorable.
+	legacyMagic = "XPENSIVENC1"
 	pbkdfIters  = 200_000
 	saltLen     = 16
 	nonceLen    = 12
@@ -42,7 +45,7 @@ func (s *BackupService) Create(ctx context.Context, passphrase string) (string, 
 		return "", apperr.Internal(err)
 	}
 	stamp := time.Now().UTC().Format("20060102-150405")
-	plain := filepath.Join(s.BackupsDir, "xpensiv-"+stamp+".db")
+	plain := filepath.Join(s.BackupsDir, "xpenses-"+stamp+".db")
 	// VACUUM INTO produces a consistent copy without blocking writers for long.
 	if _, err := s.DB.ExecContext(ctx, `VACUUM INTO ?`, plain); err != nil {
 		return "", apperr.Internal(fmt.Errorf("vacuum into: %w", err))
@@ -69,6 +72,10 @@ func (s *BackupService) Create(ctx context.Context, passphrase string) (string, 
 
 // Encrypt seals data with a passphrase-derived key.
 func Encrypt(data []byte, passphrase string) ([]byte, error) {
+	return encryptWith(data, passphrase, backupMagic)
+}
+
+func encryptWith(data []byte, passphrase string, magic string) ([]byte, error) {
 	salt := make([]byte, saltLen)
 	if _, err := rand.Read(salt); err != nil {
 		return nil, err
@@ -86,21 +93,29 @@ func Encrypt(data []byte, passphrase string) ([]byte, error) {
 	if _, err := rand.Read(nonce); err != nil {
 		return nil, err
 	}
-	out := []byte(backupMagic)
+	out := []byte(magic)
 	out = append(out, salt...)
 	out = append(out, nonce...)
-	return gcm.Seal(out, nonce, data, []byte(backupMagic)), nil
+	return gcm.Seal(out, nonce, data, []byte(magic)), nil
+}
+
+// magicOf returns the header the payload starts with, or "" for a plain file.
+func magicOf(data []byte) string {
+	for _, m := range []string{backupMagic, legacyMagic} {
+		if len(data) >= len(m) && string(data[:len(m)]) == m {
+			return m
+		}
+	}
+	return ""
 }
 
 // Decrypt reverses Encrypt. Returns ErrNotEncrypted if the payload lacks the magic header.
 func Decrypt(data []byte, passphrase string) ([]byte, error) {
-	if len(data) < len(backupMagic)+saltLen+nonceLen {
+	magic := magicOf(data)
+	if magic == "" || len(data) < len(magic)+saltLen+nonceLen {
 		return nil, ErrNotEncrypted
 	}
-	if string(data[:len(backupMagic)]) != backupMagic {
-		return nil, ErrNotEncrypted
-	}
-	rest := data[len(backupMagic):]
+	rest := data[len(magic):]
 	salt, nonce, ct := rest[:saltLen], rest[saltLen:saltLen+nonceLen], rest[saltLen+nonceLen:]
 	key := pbkdf2.Key([]byte(passphrase), salt, pbkdfIters, keyLen, sha256.New)
 	block, err := aes.NewCipher(key)
@@ -111,7 +126,7 @@ func Decrypt(data []byte, passphrase string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	pt, err := gcm.Open(nil, nonce, ct, []byte(backupMagic))
+	pt, err := gcm.Open(nil, nonce, ct, []byte(magic))
 	if err != nil {
 		return nil, errors.New("decryption failed: wrong passphrase or corrupted backup")
 	}
@@ -122,7 +137,7 @@ var ErrNotEncrypted = errors.New("backup is not encrypted")
 
 // IsEncrypted reports whether the payload carries the encrypted-backup header.
 func IsEncrypted(data []byte) bool {
-	return len(data) >= len(backupMagic) && string(data[:len(backupMagic)]) == backupMagic
+	return magicOf(data) != ""
 }
 
 // restoreTables lists every table in dependency order (parents first). A
@@ -187,7 +202,7 @@ func (s *BackupService) Restore(ctx context.Context, r io.Reader, passphrase str
 		UNION ALL
 		SELECT version FROM restore_src.schema_migrations EXCEPT SELECT version FROM main.schema_migrations)`).Scan(&mismatch)
 	if err != nil {
-		return apperr.BadRequest("backup does not contain an Xpensiv database")
+		return apperr.BadRequest("backup does not contain an Xpenses database")
 	}
 	if mismatch != 0 {
 		return apperr.BadRequest("backup was made with a different schema version and cannot be restored by this server")

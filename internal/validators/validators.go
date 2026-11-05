@@ -5,8 +5,8 @@ import (
 	"regexp"
 	"strings"
 
-	apperr "github.com/bugloper/xpensiv/internal/errors"
-	"github.com/bugloper/xpensiv/internal/models"
+	apperr "github.com/bugloper/xpenses/internal/errors"
+	"github.com/bugloper/xpenses/internal/models"
 )
 
 // Errors accumulates field errors.

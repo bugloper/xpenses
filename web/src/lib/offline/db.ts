@@ -27,7 +27,7 @@ export type PendingTransaction = {
 /** An image queued alongside a transaction, uploaded once the transaction exists. */
 export type PendingAttachment = { client_id: string; blob: Blob; name: string; type: string }
 
-interface XpensivDB extends DBSchema {
+interface XpensesDB extends DBSchema {
   pendingTransactions: {
     key: string
     value: PendingTransaction
@@ -36,14 +36,14 @@ interface XpensivDB extends DBSchema {
   pendingAttachments: { key: string; value: PendingAttachment }
 }
 
-const DB_NAME = 'xpensiv'
+const DB_NAME = 'xpenses'
 const DB_VERSION = 2
 
-let dbPromise: Promise<IDBPDatabase<XpensivDB>> | null = null
+let dbPromise: Promise<IDBPDatabase<XpensesDB>> | null = null
 
-export function getDB(): Promise<IDBPDatabase<XpensivDB>> {
+export function getDB(): Promise<IDBPDatabase<XpensesDB>> {
   if (!dbPromise) {
-    dbPromise = openDB<XpensivDB>(DB_NAME, DB_VERSION, {
+    dbPromise = openDB<XpensesDB>(DB_NAME, DB_VERSION, {
       upgrade(db, oldVersion) {
         if (oldVersion < 1) {
           const store = db.createObjectStore('pendingTransactions', { keyPath: 'client_id' })

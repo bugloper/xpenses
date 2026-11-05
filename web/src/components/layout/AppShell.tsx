@@ -27,7 +27,7 @@ function pageFor(pathname: string): { title: string; back?: string } {
   if (first === 'accounts' && second) return { title: 'Account', back: '/accounts' }
   if (first === 'add') return { title: 'Add transaction', back: '/' }
   const item = ALL_NAV.find((i) => (i.exact ? pathname === i.to : first === i.to.slice(1)))
-  return { title: item?.label ?? 'Xpensiv' }
+  return { title: item?.label ?? 'Xpenses' }
 }
 
 function Sidebar() {

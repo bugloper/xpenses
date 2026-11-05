@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bugloper/xpensiv/internal/testutil"
+	"github.com/bugloper/xpenses/internal/testutil"
 )
 
 const reportTS = "2026-11-04T00:00:00Z"
@@ -140,7 +140,7 @@ func TestReportsExport(t *testing.T) {
 	if st != 200 || !strings.HasPrefix(h.Get("Content-Type"), "text/csv") {
 		t.Fatalf("csv: %d %v", st, h)
 	}
-	if cd := h.Get("Content-Disposition"); cd != `attachment; filename="xpensiv-cash-flow-day-2026-11-01_2026-11-02.csv"` {
+	if cd := h.Get("Content-Disposition"); cd != `attachment; filename="xpenses-cash-flow-day-2026-11-01_2026-11-02.csv"` {
 		t.Fatalf("disposition: %s", cd)
 	}
 	lines := strings.Split(strings.TrimRight(string(body), "\n"), "\n")
@@ -153,13 +153,13 @@ func TestReportsExport(t *testing.T) {
 	if st != 200 || h.Get("Content-Type") != "application/pdf" || !strings.HasPrefix(string(body), "%PDF-") {
 		t.Fatalf("pdf: %d %v %.8s", st, h, body)
 	}
-	if cd := h.Get("Content-Disposition"); cd != `attachment; filename="xpensiv-summary-2026-11-01_2026-11-30.pdf"` {
+	if cd := h.Get("Content-Disposition"); cd != `attachment; filename="xpenses-summary-2026-11-01_2026-11-30.pdf"` {
 		t.Fatalf("disposition: %s", cd)
 	}
 
 	// format defaults to csv.
 	st, h, _ = get(t, c, "/reports/export?report=budgets&month=2026-11")
-	if st != 200 || !strings.HasPrefix(h.Get("Content-Type"), "text/csv") || !strings.Contains(h.Get("Content-Disposition"), "xpensiv-budgets-2026-11.csv") {
+	if st != 200 || !strings.HasPrefix(h.Get("Content-Type"), "text/csv") || !strings.Contains(h.Get("Content-Disposition"), "xpenses-budgets-2026-11.csv") {
 		t.Fatalf("default format: %d %v", st, h)
 	}
 }

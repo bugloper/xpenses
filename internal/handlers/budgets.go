@@ -5,8 +5,8 @@ import (
 
 	"github.com/labstack/echo/v4"
 
-	"github.com/bugloper/xpensiv/internal/dto"
-	"github.com/bugloper/xpensiv/internal/services"
+	"github.com/bugloper/xpenses/internal/dto"
+	"github.com/bugloper/xpenses/internal/services"
 )
 
 type BudgetHandler struct{ Svc *services.BudgetService }

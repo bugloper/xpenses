@@ -5,7 +5,7 @@
 // and never interferes with the offline queue's schema.
 import { openDB, type DBSchema } from 'idb'
 
-export const SHARE_DB_NAME = 'xpensiv-share'
+export const SHARE_DB_NAME = 'xpenses-share'
 export const SHARE_PARAM = 'shared'
 
 export type SharedFile = { id: string; blob: Blob; name: string; type: string; created_at: number }

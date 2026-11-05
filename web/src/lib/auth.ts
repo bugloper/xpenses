@@ -11,9 +11,9 @@ import { QUERY_CACHE_STORAGE_KEY, queryClient, queryPersister } from './queryCli
 import type { User } from '@/types/api'
 
 /** Workbox runtime cache for GET /api/* (see vite.config.ts). */
-export const API_RUNTIME_CACHE = 'xpensiv-api'
+export const API_RUNTIME_CACHE = 'xpenses-api'
 /** Remembers which user the local caches belong to, so a user switch purges them. */
-export const LAST_USER_STORAGE_KEY = 'xpensiv-last-user'
+export const LAST_USER_STORAGE_KEY = 'xpenses-last-user'
 
 export const AUTH_PATHS = ['/login', '/setup', '/register'] as const
 
@@ -217,9 +217,9 @@ export function authErrorInfo(e: unknown): AuthErrorInfo {
     case 'account_disabled':
       return { message: 'This account has been disabled. Contact your administrator.' }
     case 'setup_required':
-      return { message: 'No account exists yet. Set up Xpensiv first.', setupRequired: true }
+      return { message: 'No account exists yet. Set up Xpenses first.', setupRequired: true }
     case 'already_set_up':
-      return { message: 'Xpensiv is already set up. Sign in instead.', alreadySetUp: true }
+      return { message: 'Xpenses is already set up. Sign in instead.', alreadySetUp: true }
     case 'too_many_attempts': {
       const secs = retrySeconds(e.details, e.retryAfter)
       return {

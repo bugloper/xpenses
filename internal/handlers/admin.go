@@ -5,7 +5,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 
-	"github.com/bugloper/xpensiv/internal/auth"
+	"github.com/bugloper/xpenses/internal/auth"
 )
 
 // AdminHandler exposes user, registration and invite management. Mount it on

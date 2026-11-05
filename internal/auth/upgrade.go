@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/bugloper/xpensiv/internal/models"
+	"github.com/bugloper/xpenses/internal/models"
 )
 
 // legacyTargets maps the flat default categories of earlier releases to a

@@ -1,0 +1,14 @@
+# Xpenses's site on the VM's shared Caddy (README "Deploying on a server").
+# XPENSES_DOMAIN is set in the proxy's .env.
+{$XPENSES_DOMAIN} {
+	encode zstd gzip
+	# Restore uploads are capped by the app (XPENSES_MAX_UPLOAD_BYTES × 10).
+	request_body {
+		max_size 128MB
+	}
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+	reverse_proxy xpenses:8080
+}

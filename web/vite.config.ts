@@ -18,15 +18,15 @@ export default defineConfig({
       filename: 'sw.ts',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
       manifest: {
-        name: 'Xpensiv',
-        short_name: 'Xpensiv',
+        name: 'Xpenses',
+        short_name: 'Xpenses',
         description: 'Personal expense tracker',
         theme_color: '#f7f7f9',
         background_color: '#f7f7f9',
         display: 'standalone',
         start_url: '/',
         scope: '/',
-        // Android's share sheet offers Xpensiv for images; the worker takes the
+        // Android's share sheet offers Xpenses for images; the worker takes the
         // POST and opens the add screen with the screenshot attached.
         share_target: {
           action: '/share',

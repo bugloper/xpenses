@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/bugloper/xpensiv/internal/receipts/synth"
+	"github.com/bugloper/xpenses/internal/receipts/synth"
 )
 
 func main() {

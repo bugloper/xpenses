@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/bugloper/xpensiv/internal/auth"
-	"github.com/bugloper/xpensiv/internal/testutil"
+	"github.com/bugloper/xpenses/internal/auth"
+	"github.com/bugloper/xpenses/internal/testutil"
 )
 
 // A user from before the two-level tree has the old flat defaults. The

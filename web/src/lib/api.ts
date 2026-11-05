@@ -3,13 +3,13 @@ import type { ApiErrorBody, Envelope, Paginated } from '@/types/api'
 export const API_BASE = '/api/v1'
 
 /** Sent on every request; the server rejects mutations without it (CSRF, see docs/AUTH.md). */
-export const CLIENT_HEADER = 'X-Xpensiv-Client'
+export const CLIENT_HEADER = 'X-Xpenses-Client'
 export const CLIENT_HEADER_VALUE = 'web'
 
 /** Dispatched on `window` when the server answers 401 to a request that should have had a session. */
-export const UNAUTHENTICATED_EVENT = 'xpensiv:unauthenticated'
+export const UNAUTHENTICATED_EVENT = 'xpenses:unauthenticated'
 /** Dispatched on `window` when the server answers 403 csrf_rejected (a client bug, never expected). */
-export const CSRF_REJECTED_EVENT = 'xpensiv:csrf-rejected'
+export const CSRF_REJECTED_EVENT = 'xpenses:csrf-rejected'
 
 /**
  * Auth endpoints whose 401/403 is part of the normal flow (wrong password, disabled
@@ -129,11 +129,11 @@ export async function errorFromResponse(res: Response): Promise<ApiError> {
 
 /** Signals the offline sync manager that the server is reachable. */
 function notifyRequestOk() {
-  if (typeof window !== 'undefined') window.dispatchEvent(new Event('xpensiv:request-ok'))
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event('xpenses:request-ok'))
 }
 
 /** Fired when a request failed at the transport level: the sync manager treats it as being offline. */
-export const REQUEST_FAILED_EVENT = 'xpensiv:request-failed'
+export const REQUEST_FAILED_EVENT = 'xpenses:request-failed'
 export function notifyRequestFailed() {
   if (typeof window !== 'undefined') window.dispatchEvent(new Event(REQUEST_FAILED_EVENT))
 }

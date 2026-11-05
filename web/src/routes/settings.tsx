@@ -127,12 +127,12 @@ function OfflineRow() {
 function InstallRow() {
   const pwa = usePwaInstall()
   if (pwa.standalone || pwa.installed)
-    return <p className="text-muted-foreground text-sm">Xpensiv is installed on this device.</p>
+    return <p className="text-muted-foreground text-sm">Xpenses is installed on this device.</p>
   return (
     <div className="flex items-center justify-between gap-3">
       <p className="text-muted-foreground text-sm">
         {pwa.canInstall
-          ? 'Add Xpensiv to your home screen for quick access.'
+          ? 'Add Xpenses to your home screen for quick access.'
           : 'Use your browser menu → "Add to Home Screen" to install.'}
       </p>
       {pwa.canInstall && (
@@ -198,7 +198,7 @@ function SettingsPage() {
           <InstallRow />
           <Field>
             <FieldLabel>Version</FieldLabel>
-            <FieldDescription>Xpensiv web {version}</FieldDescription>
+            <FieldDescription>Xpenses web {version}</FieldDescription>
           </Field>
         </div>
       </Section>

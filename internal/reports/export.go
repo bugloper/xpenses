@@ -9,7 +9,7 @@ import (
 
 	"github.com/go-pdf/fpdf"
 
-	apperr "github.com/bugloper/xpensiv/internal/errors"
+	apperr "github.com/bugloper/xpenses/internal/errors"
 )
 
 // Export formats.
@@ -82,7 +82,7 @@ func (s *Service) Export(ctx context.Context, req ExportRequest) (*Document, err
 			return nil, err
 		}
 		doc.Title = "Summary"
-		doc.Filename = "xpensiv-summary-" + req.Period.From + "_" + req.Period.To
+		doc.Filename = "xpenses-summary-" + req.Period.From + "_" + req.Period.To
 		change := "n/a"
 		if r.ExpenseChangePct != nil {
 			change = strconv.FormatFloat(*r.ExpenseChangePct, 'f', 1, 64) + "%"
@@ -110,7 +110,7 @@ func (s *Service) Export(ctx context.Context, req ExportRequest) (*Document, err
 			return nil, err
 		}
 		doc.Title = "Categories (" + req.Type + ")"
-		doc.Filename = "xpensiv-categories-" + req.Type + "-" + req.Period.From + "_" + req.Period.To
+		doc.Filename = "xpenses-categories-" + req.Type + "-" + req.Period.From + "_" + req.Period.To
 		sec := Section{Columns: []string{"Category", "Count", "Amount", "%"}}
 		for _, r := range rows {
 			sec.Rows = append(sec.Rows, []any{r.Name, strconv.Itoa(r.Count), Money(r.Amount), strconv.FormatFloat(r.Pct, 'f', 1, 64)})
@@ -122,7 +122,7 @@ func (s *Service) Export(ctx context.Context, req ExportRequest) (*Document, err
 			return nil, err
 		}
 		doc.Title = "Cash flow (" + req.Granularity + ")"
-		doc.Filename = "xpensiv-cash-flow-" + req.Granularity + "-" + req.Period.From + "_" + req.Period.To
+		doc.Filename = "xpenses-cash-flow-" + req.Granularity + "-" + req.Period.From + "_" + req.Period.To
 		sec := Section{Columns: []string{"Period", "Income", "Expenses", "Net"}}
 		for _, r := range rows {
 			sec.Rows = append(sec.Rows, []any{r.Period, Money(r.Income), Money(r.Expenses), Money(r.Net)})
@@ -134,7 +134,7 @@ func (s *Service) Export(ctx context.Context, req ExportRequest) (*Document, err
 			return nil, err
 		}
 		doc.Title = "Merchants (" + req.Type + ")"
-		doc.Filename = "xpensiv-merchants-" + req.Type + "-" + req.Period.From + "_" + req.Period.To
+		doc.Filename = "xpenses-merchants-" + req.Type + "-" + req.Period.From + "_" + req.Period.To
 		sec := Section{Columns: []string{"Payee", "Count", "Amount"}}
 		for _, r := range rows {
 			sec.Rows = append(sec.Rows, []any{r.Payee, strconv.Itoa(r.Count), Money(r.Amount)})
@@ -146,7 +146,7 @@ func (s *Service) Export(ctx context.Context, req ExportRequest) (*Document, err
 			return nil, err
 		}
 		doc.Title = "Accounts"
-		doc.Filename = "xpensiv-accounts-" + req.Period.From + "_" + req.Period.To
+		doc.Filename = "xpenses-accounts-" + req.Period.From + "_" + req.Period.To
 		sec := Section{Columns: []string{"Account", "Type", "Opening", "Income", "Expenses", "Transfers in", "Transfers out", "Balance"}}
 		for _, r := range rows {
 			sec.Rows = append(sec.Rows, []any{r.Name, r.Type, Money(r.OpeningBalance), Money(r.Income), Money(r.Expenses),
@@ -161,7 +161,7 @@ func (s *Service) Export(ctx context.Context, req ExportRequest) (*Document, err
 		month := req.Month.From[:7]
 		doc.Title = "Budgets"
 		doc.Subtitle = "Month: " + month
-		doc.Filename = "xpensiv-budgets-" + month
+		doc.Filename = "xpenses-budgets-" + month
 		sec := Section{Columns: []string{"Category", "Budget", "Spent", "Remaining", "%", "Level"}}
 		for _, r := range rows {
 			sec.Rows = append(sec.Rows, []any{r.Name, Money(r.Amount), Money(r.Spent), Money(r.Remaining), strconv.Itoa(r.Pct), r.Level})

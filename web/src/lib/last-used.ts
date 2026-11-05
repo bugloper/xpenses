@@ -2,7 +2,7 @@
 // mirrored to /settings ui.last_account_id + ui.last_category_id by the form.
 import type { TransactionType } from '@/types/api'
 
-const KEY = 'xpensiv-last-used'
+const KEY = 'xpenses-last-used'
 type Store = Partial<
   Record<TransactionType, { account_id?: string; category_id?: string; transfer_account_id?: string }>
 >

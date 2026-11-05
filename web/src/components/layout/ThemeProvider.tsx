@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 
-export const THEME_STORAGE_KEY = 'xpensiv-theme'
+export const THEME_STORAGE_KEY = 'xpenses-theme'
 
 export type Theme = 'dark' | 'light'
 

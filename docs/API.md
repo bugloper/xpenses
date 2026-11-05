@@ -1,4 +1,4 @@
-# Xpensiv REST API contract
+# Xpenses REST API contract
 
 Base path: `/api/v1`. All bodies are JSON unless stated. All monetary values are
 **integer minor units** (chhertum for BTN: `Nu. 12.50` is `1250`). Dates are
@@ -7,7 +7,7 @@ Base path: `/api/v1`. All bodies are JSON unless stated. All monetary values are
 ## Authentication
 
 Every endpoint below except `/health` and `/auth/*` requires a session cookie; mutating requests
-also need the `X-Xpensiv-Client` header. See `docs/AUTH.md`. All data is scoped to the signed-in
+also need the `X-Xpenses-Client` header. See `docs/AUTH.md`. All data is scoped to the signed-in
 user: ids belonging to another user behave as if they did not exist (`404`). `/backup` and
 `/restore` require the `admin` role.
 
@@ -36,7 +36,7 @@ Status codes: 200 OK, 201 Created, 204 No Content, 400 bad_request, 404 not_foun
 | POST | /transactions | see below. Returns 201, or 200 if `client_id` was already seen (idempotent replay) |
 | GET/PATCH/DELETE | /transactions/:id | PATCH is partial; `clear_category:true` / `clear_transfer_account:true` to null those. |
 | POST | /transactions/:id/duplicate | body `{transaction_date?}` default today → 201 |
-| PUT/POST | /transactions/:id/attachment | multipart `file`: one JPEG/PNG/WebP image (sniffed, ≤ XPENSIV_MAX_UPLOAD_BYTES) stored under `DATA_DIR/attachments/<user>/<id>`; replaces an earlier one → Transaction with `has_attachment: true` |
+| PUT/POST | /transactions/:id/attachment | multipart `file`: one JPEG/PNG/WebP image (sniffed, ≤ XPENSES_MAX_UPLOAD_BYTES) stored under `DATA_DIR/attachments/<user>/<id>`; replaces an earlier one → Transaction with `has_attachment: true` |
 | GET | /transactions/:id/attachment | the image bytes (`Cache-Control: private`) |
 | DELETE | /transactions/:id/attachment | → 204 |
 | POST | /transactions/:id/attachment/scan | OCRs the stored screenshot, saves what it says as `receipt` → the parsed scan (see /receipts/scan). 501 when the server has no Tesseract |

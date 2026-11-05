@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/bugloper/xpensiv/internal/testutil"
+	"github.com/bugloper/xpenses/internal/testutil"
 )
 
 // A 1×1 PNG; the service sniffs the bytes, so the file name does not matter.

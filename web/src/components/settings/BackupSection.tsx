@@ -22,7 +22,7 @@ export function BackupSection() {
     try {
       const name = await downloadFile(
         '/backup',
-        'xpensiv-backup.db',
+        'xpenses-backup.db',
         passphrase ? { 'X-Backup-Passphrase': passphrase } : undefined,
       )
       toast.success(`Backup downloaded (${name})`)
@@ -106,7 +106,7 @@ export function BackupSection() {
         open={confirm}
         onOpenChange={setConfirm}
         title="Replace all data with this backup?"
-        description={`Everything currently in Xpensiv will be overwritten by "${file?.name ?? ''}". This cannot be undone.`}
+        description={`Everything currently in Xpenses will be overwritten by "${file?.name ?? ''}". This cannot be undone.`}
         confirmLabel="Restore"
         destructive
         loading={busy === 'restore'}

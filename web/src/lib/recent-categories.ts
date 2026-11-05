@@ -2,7 +2,7 @@
 // one-tap chips above the category field so repeat entries stay fast.
 import type { CategoryType } from '@/types/api'
 
-export const RECENT_CATEGORIES_KEY = 'xpensiv-recent-categories'
+export const RECENT_CATEGORIES_KEY = 'xpenses-recent-categories'
 export const RECENT_LIMIT = 6
 
 type Store = Partial<Record<CategoryType, string[]>>

@@ -15,12 +15,12 @@ import (
 	"github.com/labstack/echo/v4"
 	echomw "github.com/labstack/echo/v4/middleware"
 
-	"github.com/bugloper/xpensiv/internal/auth"
-	"github.com/bugloper/xpensiv/internal/config"
-	"github.com/bugloper/xpensiv/internal/handlers"
-	"github.com/bugloper/xpensiv/internal/middleware"
-	"github.com/bugloper/xpensiv/internal/ocr"
-	"github.com/bugloper/xpensiv/internal/services"
+	"github.com/bugloper/xpenses/internal/auth"
+	"github.com/bugloper/xpenses/internal/config"
+	"github.com/bugloper/xpenses/internal/handlers"
+	"github.com/bugloper/xpenses/internal/middleware"
+	"github.com/bugloper/xpenses/internal/ocr"
+	"github.com/bugloper/xpenses/internal/services"
 )
 
 // Deps groups the services every handler needs. Build with NewDeps.
@@ -37,7 +37,7 @@ type Deps struct {
 }
 
 // NewDeps constructs the service graph over db.
-// ocrEngine builds the screenshot reader; XPENSIV_TESSERACT= switches it off.
+// ocrEngine builds the screenshot reader; XPENSES_TESSERACT= switches it off.
 func ocrEngine(cfg config.Config) *ocr.Engine {
 	if cfg.Tesseract == "" {
 		return nil

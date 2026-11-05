@@ -53,7 +53,7 @@ function SetupPage() {
   const navigate = useNavigate()
   return (
     <AuthLayout
-      title="Set up Xpensiv"
+      title="Set up Xpenses"
       description="Create the first account. It becomes the administrator of this instance."
     >
       <SetupForm
@@ -79,7 +79,7 @@ function RegisterPage() {
     <AuthLayout
       title="Create your account"
       description={
-        invite ? 'You have been invited to Xpensiv.' : 'Your data is private to you on this instance.'
+        invite ? 'You have been invited to Xpenses.' : 'Your data is private to you on this instance.'
       }
       footer={
         <>

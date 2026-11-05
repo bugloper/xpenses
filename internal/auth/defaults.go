@@ -5,8 +5,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/bugloper/xpensiv/internal/models"
-	"github.com/bugloper/xpensiv/internal/repositories"
+	"github.com/bugloper/xpenses/internal/models"
+	"github.com/bugloper/xpenses/internal/repositories"
 )
 
 // DefaultSub is a sub-category seeded under a default group. It shares the

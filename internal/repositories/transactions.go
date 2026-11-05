@@ -6,8 +6,8 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/bugloper/xpensiv/internal/dto"
-	"github.com/bugloper/xpensiv/internal/models"
+	"github.com/bugloper/xpenses/internal/dto"
+	"github.com/bugloper/xpenses/internal/models"
 )
 
 type TransactionRepo struct{}

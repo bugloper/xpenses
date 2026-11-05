@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bugloper/xpensiv/internal/ocr"
-	"github.com/bugloper/xpensiv/internal/receipts"
-	"github.com/bugloper/xpensiv/internal/receipts/synth"
+	"github.com/bugloper/xpenses/internal/ocr"
+	"github.com/bugloper/xpenses/internal/receipts"
+	"github.com/bugloper/xpenses/internal/receipts/synth"
 )
 
 func expectMBoB(t *testing.T, r receipts.Receipt, text string) {

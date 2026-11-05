@@ -9,13 +9,13 @@ import (
 
 	"github.com/labstack/echo/v4"
 
-	apperr "github.com/bugloper/xpensiv/internal/errors"
-	"github.com/bugloper/xpensiv/internal/models"
+	apperr "github.com/bugloper/xpenses/internal/errors"
+	"github.com/bugloper/xpenses/internal/models"
 )
 
 const (
-	CookieName   = "xpensiv_session"
-	ClientHeader = "X-Xpensiv-Client"
+	CookieName   = "xpenses_session"
+	ClientHeader = "X-Xpenses-Client"
 	ctxUserKey   = "auth_user"
 	ctxTokenKey  = "auth_token"
 )

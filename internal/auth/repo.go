@@ -6,8 +6,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/bugloper/xpensiv/internal/models"
-	"github.com/bugloper/xpensiv/internal/repositories"
+	"github.com/bugloper/xpenses/internal/models"
+	"github.com/bugloper/xpenses/internal/repositories"
 )
 
 type Repo struct{}

@@ -8,10 +8,10 @@ import (
 
 	"github.com/labstack/echo/v4"
 
-	"github.com/bugloper/xpensiv/internal/dto"
-	apperr "github.com/bugloper/xpensiv/internal/errors"
-	"github.com/bugloper/xpensiv/internal/models"
-	"github.com/bugloper/xpensiv/internal/services"
+	"github.com/bugloper/xpenses/internal/dto"
+	apperr "github.com/bugloper/xpenses/internal/errors"
+	"github.com/bugloper/xpenses/internal/models"
+	"github.com/bugloper/xpenses/internal/services"
 )
 
 type TransactionHandler struct{ Svc *services.TransactionService }

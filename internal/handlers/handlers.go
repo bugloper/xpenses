@@ -11,9 +11,9 @@ import (
 
 	"github.com/labstack/echo/v4"
 
-	"github.com/bugloper/xpensiv/internal/dto"
-	apperr "github.com/bugloper/xpensiv/internal/errors"
-	"github.com/bugloper/xpensiv/internal/middleware"
+	"github.com/bugloper/xpenses/internal/dto"
+	apperr "github.com/bugloper/xpenses/internal/errors"
+	"github.com/bugloper/xpenses/internal/middleware"
 )
 
 // ErrorHandler converts errors into the consistent JSON error envelope.

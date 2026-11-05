@@ -1,4 +1,4 @@
-module github.com/bugloper/xpensiv
+module github.com/bugloper/xpenses
 
 go 1.26.4
 

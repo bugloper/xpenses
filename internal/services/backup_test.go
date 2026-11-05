@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/bugloper/xpensiv/internal/database"
+	"github.com/bugloper/xpenses/internal/database"
 )
 
 func TestEncryptDecryptRoundTrip(t *testing.T) {
@@ -28,6 +28,22 @@ func TestEncryptDecryptRoundTrip(t *testing.T) {
 	}
 	if _, err := Decrypt(plain, "x"); err != ErrNotEncrypted {
 		t.Fatalf("want ErrNotEncrypted got %v", err)
+	}
+}
+
+func TestDecryptLegacyHeader(t *testing.T) {
+	// A backup made before the rename starts with the old header and must still restore.
+	plain := []byte("SQLite format 3\x00 old")
+	enc, err := encryptWith(plain, "pw", legacyMagic)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !IsEncrypted(enc) {
+		t.Fatal("legacy header not recognised")
+	}
+	dec, err := Decrypt(enc, "pw")
+	if err != nil || !bytes.Equal(dec, plain) {
+		t.Fatalf("legacy round trip failed: %v", err)
 	}
 }
 

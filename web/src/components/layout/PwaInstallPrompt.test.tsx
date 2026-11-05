@@ -44,7 +44,7 @@ describe('PwaInstallPrompt', () => {
 
     expect(toastMock).toHaveBeenCalledTimes(1)
     const [title, opts] = toastMock.mock.calls[0] as unknown as [string, { description: string; action: { label: string; onClick: () => void } }]
-    expect(title).toBe('Install Xpensiv')
+    expect(title).toBe('Install Xpenses')
     expect(opts.description).toMatch(/home screen/i)
     expect(opts.action.label).toBe('Install')
     expect(sessionStorage.getItem(INSTALL_SESSION_KEY)).toBe('1')

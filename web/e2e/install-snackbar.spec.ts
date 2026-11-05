@@ -16,16 +16,16 @@ test.describe('install snackbar after sign-in', () => {
     await page.goto('/')
     await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible()
 
-    await expect(page.getByText('Install Xpensiv')).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText('Install Xpenses')).toBeVisible({ timeout: 10_000 })
     await expect(page.getByText(/Tap Share, then "Add to Home Screen"/)).toBeVisible()
 
     await page.getByRole('button', { name: 'Not now' }).click()
-    await expect(page.getByText('Install Xpensiv')).toBeHidden()
+    await expect(page.getByText('Install Xpenses')).toBeHidden()
 
     // Snoozed: a later visit stays quiet.
     await page.reload()
     await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible()
     await page.waitForTimeout(2_500)
-    await expect(page.getByText('Install Xpensiv')).toBeHidden()
+    await expect(page.getByText('Install Xpenses')).toBeHidden()
   })
 })

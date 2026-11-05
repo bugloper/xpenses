@@ -4,7 +4,7 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* Xpensiv's design system, shared with Bangkee: shadcn's theme variables, a
+/* Xpenses's design system, shared with Bangkee: shadcn's theme variables, a
    light grey base with white cards, and one vivid indigo accent. Money carries
    meaning in colour — spent, received, over budget — and only as text or a
    faint tint, never as big blocks. */

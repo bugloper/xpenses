@@ -1,7 +1,7 @@
 import { expect, type APIRequestContext, type Page } from '@playwright/test'
 
 export const OWNER = { name: 'Owner', email: 'owner@example.com', password: 'owner-password-123' }
-export const HEADERS = { 'X-Xpensiv-Client': 'e2e' }
+export const HEADERS = { 'X-Xpenses-Client': 'e2e' }
 
 let counter = 0
 /** A fresh, unique email for tests that need their own isolated user. */

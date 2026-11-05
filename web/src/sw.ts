@@ -1,5 +1,5 @@
 /// <reference lib="webworker" />
-// Xpensiv's service worker: the precached app shell, a network-first cache
+// Xpenses's service worker: the precached app shell, a network-first cache
 // for API reads, and the Web Share Target that lets a payment screenshot be
 // shared straight into the add screen.
 import { CacheableResponsePlugin } from 'workbox-cacheable-response'
@@ -26,7 +26,7 @@ registerRoute(
 registerRoute(
   ({ url, request }) => request.method === 'GET' && url.pathname.startsWith('/api/'),
   new NetworkFirst({
-    cacheName: 'xpensiv-api',
+    cacheName: 'xpenses-api',
     networkTimeoutSeconds: 5,
     plugins: [
       new CacheableResponsePlugin({ statuses: [0, 200] }),

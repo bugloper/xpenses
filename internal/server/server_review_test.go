@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/bugloper/xpensiv/internal/auth"
+	"github.com/bugloper/xpenses/internal/auth"
 )
 
 // Errors raised by Echo itself (unknown route, wrong method, body limit) must

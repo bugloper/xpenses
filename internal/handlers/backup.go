@@ -7,8 +7,8 @@ import (
 
 	"github.com/labstack/echo/v4"
 
-	apperr "github.com/bugloper/xpensiv/internal/errors"
-	"github.com/bugloper/xpensiv/internal/services"
+	apperr "github.com/bugloper/xpenses/internal/errors"
+	"github.com/bugloper/xpenses/internal/services"
 )
 
 type BackupHandler struct {

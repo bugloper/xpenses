@@ -104,7 +104,7 @@ export function AttachmentPanel({ tx }: { tx: Transaction }) {
         </div>
       ) : (
         <p className="text-muted-foreground text-sm">
-          No screenshot. Share one from your banking app into Xpensiv, or attach it here.
+          No screenshot. Share one from your banking app into Xpenses, or attach it here.
         </p>
       )}
     </Panel>

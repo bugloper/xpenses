@@ -17,7 +17,7 @@ export const INSTALL_OFFER_DELAY_MS = 1500
 
 /**
  * Snackbar shown once per session after sign-in inviting the user to install
- * Xpensiv. Native install where the browser supports it; on iOS the
+ * Xpenses. Native install where the browser supports it; on iOS the
  * "Add to Home Screen" steps. Mounted in the signed-in shell only.
  */
 export function PwaInstallPrompt() {
@@ -38,7 +38,7 @@ export function PwaInstallPrompt() {
     const timer = setTimeout(() => {
       markOfferShown()
       const snooze = () => snoozeInstallOffer()
-      toast('Install Xpensiv', {
+      toast('Install Xpenses', {
         id: INSTALL_TOAST_ID,
         description:
           offer === 'native'

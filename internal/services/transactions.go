@@ -5,13 +5,13 @@ import (
 	"database/sql"
 	"strings"
 
-	"github.com/bugloper/xpensiv/internal/auth"
-	"github.com/bugloper/xpensiv/internal/dto"
-	apperr "github.com/bugloper/xpensiv/internal/errors"
-	"github.com/bugloper/xpensiv/internal/models"
-	"github.com/bugloper/xpensiv/internal/ocr"
-	"github.com/bugloper/xpensiv/internal/repositories"
-	"github.com/bugloper/xpensiv/internal/validators"
+	"github.com/bugloper/xpenses/internal/auth"
+	"github.com/bugloper/xpenses/internal/dto"
+	apperr "github.com/bugloper/xpenses/internal/errors"
+	"github.com/bugloper/xpenses/internal/models"
+	"github.com/bugloper/xpenses/internal/ocr"
+	"github.com/bugloper/xpenses/internal/repositories"
+	"github.com/bugloper/xpenses/internal/validators"
 )
 
 var txTypes = []string{models.TxExpense, models.TxIncome, models.TxTransfer, models.TxRefund, models.TxAdjustment}

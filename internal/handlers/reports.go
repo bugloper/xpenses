@@ -6,7 +6,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 
-	"github.com/bugloper/xpensiv/internal/reports"
+	"github.com/bugloper/xpenses/internal/reports"
 )
 
 // ReportHandler serves the /reports/* endpoints.

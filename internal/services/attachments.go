@@ -8,8 +8,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/bugloper/xpensiv/internal/auth"
-	apperr "github.com/bugloper/xpensiv/internal/errors"
+	"github.com/bugloper/xpenses/internal/auth"
+	apperr "github.com/bugloper/xpenses/internal/errors"
 )
 
 // Image types a transaction attachment may have. The type is sniffed from the

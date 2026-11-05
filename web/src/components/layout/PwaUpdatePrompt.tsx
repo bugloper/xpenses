@@ -39,7 +39,7 @@ function ProdUpdatePrompt() {
   useEffect(() => {
     if (!needRefresh) return
     const id = toast('New version available', {
-      description: 'Reload to get the latest Xpensiv.',
+      description: 'Reload to get the latest Xpenses.',
       duration: Infinity,
       action: { label: 'Reload', onClick: () => void updateServiceWorker(true) },
       cancel: { label: 'Later', onClick: () => setNeedRefresh(false) },

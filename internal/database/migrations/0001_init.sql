@@ -1,4 +1,4 @@
--- Xpensiv initial schema. Every data table carries user_id: data is isolated per user.
+-- Xpenses initial schema. Every data table carries user_id: data is isolated per user.
 -- Money is stored as INTEGER minor units (e.g. chhertum for BTN). Never REAL.
 -- Timestamps (created_at/updated_at) are UTC RFC3339 strings.
 -- Financial dates (transaction_date, period_start, ...) are local calendar dates: 'YYYY-MM-DD'.

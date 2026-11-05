@@ -8,7 +8,7 @@ const POINTS = [
   'Your data stays yours, on your own server',
 ]
 
-/** The signed-out frame: a word about Xpensiv beside the form on a wide screen, just the form on a phone. */
+/** The signed-out frame: a word about Xpenses beside the form on a wide screen, just the form on a phone. */
 export function AuthLayout({
   title,
   description,

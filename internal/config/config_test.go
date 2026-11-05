@@ -6,19 +6,19 @@ import (
 )
 
 func TestCORSOriginExplicitlyEmptyDisablesDevOrigin(t *testing.T) {
-	t.Setenv("XPENSIV_CORS_ORIGIN", "")
+	t.Setenv("XPENSES_CORS_ORIGIN", "")
 	cfg, err := Load()
 	if err != nil {
 		t.Fatal(err)
 	}
 	if cfg.CORSOrigin != "" {
-		t.Fatalf("XPENSIV_CORS_ORIGIN= must disable CORS, got %q", cfg.CORSOrigin)
+		t.Fatalf("XPENSES_CORS_ORIGIN= must disable CORS, got %q", cfg.CORSOrigin)
 	}
 }
 
 func TestCORSOriginDefaultsToDevServer(t *testing.T) {
-	t.Setenv("XPENSIV_CORS_ORIGIN", "x") // registers the restore; now unset for the default case
-	if err := os.Unsetenv("XPENSIV_CORS_ORIGIN"); err != nil {
+	t.Setenv("XPENSES_CORS_ORIGIN", "x") // registers the restore; now unset for the default case
+	if err := os.Unsetenv("XPENSES_CORS_ORIGIN"); err != nil {
 		t.Fatal(err)
 	}
 	cfg, err := Load()

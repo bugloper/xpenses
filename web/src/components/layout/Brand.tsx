@@ -24,7 +24,7 @@ export function Logo({ className, sub }: { className?: string; sub?: React.React
     <span className={cn('flex items-center gap-2.5', className)}>
       <LogoMark />
       <span className="leading-tight">
-        <span className="block text-[0.9375rem] font-semibold tracking-tight">Xpensiv</span>
+        <span className="block text-[0.9375rem] font-semibold tracking-tight">Xpenses</span>
         {sub && <span className="text-muted-foreground block max-w-40 truncate text-xs">{sub}</span>}
       </span>
     </span>

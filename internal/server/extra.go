@@ -4,9 +4,9 @@ import (
 	"database/sql"
 	"log/slog"
 
-	"github.com/bugloper/xpensiv/internal/config"
-	"github.com/bugloper/xpensiv/internal/handlers"
-	"github.com/bugloper/xpensiv/internal/reports"
+	"github.com/bugloper/xpenses/internal/config"
+	"github.com/bugloper/xpenses/internal/handlers"
+	"github.com/bugloper/xpenses/internal/reports"
 )
 
 // ExtraRegistrars returns the report handlers. Keeping them here means

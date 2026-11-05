@@ -9,12 +9,12 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/bugloper/xpensiv/internal/auth"
-	"github.com/bugloper/xpensiv/internal/dto"
-	apperr "github.com/bugloper/xpensiv/internal/errors"
-	"github.com/bugloper/xpensiv/internal/models"
-	"github.com/bugloper/xpensiv/internal/repositories"
-	"github.com/bugloper/xpensiv/internal/validators"
+	"github.com/bugloper/xpenses/internal/auth"
+	"github.com/bugloper/xpenses/internal/dto"
+	apperr "github.com/bugloper/xpenses/internal/errors"
+	"github.com/bugloper/xpenses/internal/models"
+	"github.com/bugloper/xpenses/internal/repositories"
+	"github.com/bugloper/xpenses/internal/validators"
 )
 
 var accountTypes = []string{models.AccountBank, models.AccountCash, models.AccountMobileWallet, models.AccountCreditCard, models.AccountSavings}

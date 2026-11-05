@@ -38,7 +38,7 @@ test.describe('accessibility', () => {
   }
 
   test('axe: sign-in page', async ({ page }) => {
-    await page.request.post('/api/v1/auth/logout', { headers: { 'X-Xpensiv-Client': 'e2e' } })
+    await page.request.post('/api/v1/auth/logout', { headers: { 'X-Xpenses-Client': 'e2e' } })
     await page.goto('/login')
     await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
     const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze()

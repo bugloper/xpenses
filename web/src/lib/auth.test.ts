@@ -191,7 +191,7 @@ describe('purgeSessionData', () => {
   it('clears the query caches, the runtime cache and id-bearing prefs, keeps the theme', async () => {
     queryClient.setQueryData(['accounts', 'list'], [{ id: 'a1' }])
     localStorage.setItem(QUERY_CACHE_STORAGE_KEY, '{"clientState":{}}')
-    localStorage.setItem('xpensiv-theme', 'light')
+    localStorage.setItem('xpenses-theme', 'light')
     localStorage.setItem(LAST_USER_STORAGE_KEY, 'u1')
     setLastUsed('expense', { account_id: 'a1', category_id: 'c1' })
     sessionStorage.setItem('unrelated', 'keep')
@@ -205,7 +205,7 @@ describe('purgeSessionData', () => {
     expect(localStorage.getItem(LAST_USED_STORAGE_KEY)).toBeNull()
     expect(getLastUsed('expense')).toEqual({})
     expect(localStorage.getItem(LAST_USER_STORAGE_KEY)).toBeNull()
-    expect(localStorage.getItem('xpensiv-theme')).toBe('light')
+    expect(localStorage.getItem('xpenses-theme')).toBe('light')
     expect(sessionStorage.getItem('unrelated')).toBe('keep')
     expect(deleted).toEqual([API_RUNTIME_CACHE])
     expect(authStore.get().user).toBeNull()

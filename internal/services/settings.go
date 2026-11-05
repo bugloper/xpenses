@@ -4,9 +4,9 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/bugloper/xpensiv/internal/auth"
-	apperr "github.com/bugloper/xpensiv/internal/errors"
-	"github.com/bugloper/xpensiv/internal/repositories"
+	"github.com/bugloper/xpenses/internal/auth"
+	apperr "github.com/bugloper/xpenses/internal/errors"
+	"github.com/bugloper/xpenses/internal/repositories"
 )
 
 // Setting keys.

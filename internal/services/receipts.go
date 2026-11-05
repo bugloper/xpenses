@@ -7,11 +7,11 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/bugloper/xpensiv/internal/dto"
-	apperr "github.com/bugloper/xpensiv/internal/errors"
-	"github.com/bugloper/xpensiv/internal/models"
-	"github.com/bugloper/xpensiv/internal/ocr"
-	"github.com/bugloper/xpensiv/internal/receipts"
+	"github.com/bugloper/xpenses/internal/dto"
+	apperr "github.com/bugloper/xpenses/internal/errors"
+	"github.com/bugloper/xpenses/internal/models"
+	"github.com/bugloper/xpenses/internal/ocr"
+	"github.com/bugloper/xpenses/internal/receipts"
 )
 
 var (
@@ -81,7 +81,7 @@ func (s *TransactionService) ScanImage(ctx context.Context, r io.Reader) (receip
 	if err != nil || len(data) == 0 || int64(len(data)) > limit {
 		return receipts.Receipt{}, apperr.Validation("validation failed", map[string]string{"file": "the image is missing or too large"})
 	}
-	tmp, err := os.CreateTemp("", "xpensiv-scan-*")
+	tmp, err := os.CreateTemp("", "xpenses-scan-*")
 	if err != nil {
 		return receipts.Receipt{}, apperr.Internal(err)
 	}

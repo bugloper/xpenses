@@ -7,9 +7,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/bugloper/xpensiv/internal/database"
-	apperr "github.com/bugloper/xpensiv/internal/errors"
-	"github.com/bugloper/xpensiv/internal/models"
+	"github.com/bugloper/xpenses/internal/database"
+	apperr "github.com/bugloper/xpenses/internal/errors"
+	"github.com/bugloper/xpenses/internal/models"
 )
 
 const testPassword = "correct-horse-battery"

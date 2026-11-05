@@ -28,7 +28,7 @@ test('offline expense is queued and synced when back online', async ({ page, con
   const queued = await page.evaluate(
     () =>
       new Promise<number>((resolve, reject) => {
-        const req = indexedDB.open('xpensiv')
+        const req = indexedDB.open('xpenses')
         req.onerror = () => reject(req.error)
         req.onsuccess = () => {
           try {

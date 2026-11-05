@@ -62,7 +62,7 @@ func (e *Engine) Extract(ctx context.Context, path string) (string, error) {
 		return "", fmt.Errorf("ocr: decode image: %w", err)
 	}
 	prepared := prepare(img)
-	dir, err := os.MkdirTemp("", "xpensiv-ocr-")
+	dir, err := os.MkdirTemp("", "xpenses-ocr-")
 	if err != nil {
 		return "", err
 	}

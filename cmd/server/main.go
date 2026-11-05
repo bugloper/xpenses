@@ -1,4 +1,4 @@
-// Command server runs the Xpensiv API and serves the built frontend.
+// Command server runs the Xpenses API and serves the built frontend.
 package main
 
 import (
@@ -12,10 +12,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/bugloper/xpensiv/internal/auth"
-	"github.com/bugloper/xpensiv/internal/config"
-	"github.com/bugloper/xpensiv/internal/database"
-	"github.com/bugloper/xpensiv/internal/server"
+	"github.com/bugloper/xpenses/internal/auth"
+	"github.com/bugloper/xpenses/internal/config"
+	"github.com/bugloper/xpenses/internal/database"
+	"github.com/bugloper/xpenses/internal/server"
 )
 
 func main() {
@@ -88,7 +88,7 @@ func run() error {
 	}
 	errCh := make(chan error, 1)
 	go func() {
-		log.Info("xpensiv listening", "addr", cfg.Addr)
+		log.Info("xpenses listening", "addr", cfg.Addr)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
 		}

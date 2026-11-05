@@ -3,7 +3,7 @@ package reports
 import (
 	"testing"
 
-	"github.com/bugloper/xpensiv/internal/database"
+	"github.com/bugloper/xpenses/internal/database"
 )
 
 // The account balance expression (repositories/accounts.go) and the reports

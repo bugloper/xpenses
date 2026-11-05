@@ -20,7 +20,7 @@ import (
 var migrationFS embed.FS
 
 // Open opens (creating if necessary) the SQLite database at path with the
-// pragmas Xpensiv relies on: foreign keys, WAL journaling and a busy timeout.
+// pragmas Xpenses relies on: foreign keys, WAL journaling and a busy timeout.
 // The file is created with 0600 permissions since it holds financial data.
 func Open(path string) (*sql.DB, error) {
 	if path != ":memory:" {

@@ -5,14 +5,14 @@
 #
 #   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 services:
-  xpensiv:
+  xpenses:
     ports: !reset []
     expose:
       - "8080"
     environment:
-      XPENSIV_TRUSTED_PROXY: "true"
-      XPENSIV_SECURE_COOKIES: auto
-      XPENSIV_CORS_ORIGIN: ""
+      XPENSES_TRUSTED_PROXY: "true"
+      XPENSES_SECURE_COOKIES: auto
+      XPENSES_CORS_ORIGIN: ""
     networks:
       - default
       - edge

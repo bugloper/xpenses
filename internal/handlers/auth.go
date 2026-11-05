@@ -5,8 +5,8 @@ import (
 
 	"github.com/labstack/echo/v4"
 
-	"github.com/bugloper/xpensiv/internal/auth"
-	apperr "github.com/bugloper/xpensiv/internal/errors"
+	"github.com/bugloper/xpenses/internal/auth"
+	apperr "github.com/bugloper/xpenses/internal/errors"
 )
 
 // authBodyLimit caps credential bodies well below the global upload limit so an
