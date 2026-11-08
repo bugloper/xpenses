@@ -1,9 +1,10 @@
 import { Outlet, createRootRoute, createRoute, redirect } from '@tanstack/react-router'
+import { HomePage } from '@/components/auth/HomePage'
 import { AppShell } from '@/components/layout/AppShell'
 import { ErrorState } from '@/components/common/States'
 import { Toaster } from '@/components/ui/sonner'
 import { isApiError, isNetworkError } from '@/lib/api'
-import { accessExpired, adoptUser, authStore, resolveAuthRedirect } from '@/lib/auth'
+import { accessExpired, adoptUser, authStore, resolveAuthRedirect, useAuth } from '@/lib/auth'
 import { authKeys, authStatusQuery, meQuery } from '@/lib/queries/auth'
 import { queryClient } from '@/lib/queryClient'
 import type { AuthStatus, User } from '@/types/api'
@@ -81,9 +82,15 @@ export const rootRoute = createRootRoute({
   ),
 })
 
+/** The app shell for a signed-in user; the public home page for a visitor (the guard lets visitors reach only `/`). */
+function AppOrHome() {
+  const { user } = useAuth()
+  return user ? <AppShell /> : <HomePage />
+}
+
 /** Pathless layout: everything that needs a session renders inside the app shell. */
 export const appRoute = createRoute({
   getParentRoute: () => rootRoute,
   id: 'app',
-  component: AppShell,
+  component: AppOrHome,
 })

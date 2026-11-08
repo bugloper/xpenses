@@ -2,7 +2,8 @@ import { Check } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Logo } from '@/components/layout/Brand'
 
-const POINTS = [
+/** What Xpenses offers, shown beside the sign-in form and on the home page. */
+export const POINTS = [
   'Free for your first year',
   'Every expense in seconds, even offline',
   'Budgets that follow your own categories',

@@ -64,9 +64,9 @@ describe('resolveAuthRedirect', () => {
       { to: '/' },
     ],
     [
-      'signed out: / → /login without redirect',
+      'signed out: / is the public home page',
       { setup_required: false, authenticated: false, path: '/', isAdmin: false },
-      { to: '/login' },
+      null,
     ],
     [
       'signed out: deep link keeps the path',

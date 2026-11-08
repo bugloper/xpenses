@@ -24,7 +24,7 @@ test('an expired user sees the expired page until the admin extends their access
   await expect(page.getByRole('heading', { name: 'Your free year has ended' })).toBeVisible()
   expect((await page.request.get('/api/v1/accounts')).status()).toBe(403)
   await page.getByRole('button', { name: 'Log out' }).click()
-  await expect(page).toHaveURL(/\/login$/)
+  await expect(page).toHaveURL(/\/$/)
 
   // The admin extends by a year from the Users list.
   await loginAs(page)

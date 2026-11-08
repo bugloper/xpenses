@@ -180,7 +180,7 @@ function ExpiredPage() {
           className="self-start"
           onClick={() =>
             void performLogout()
-              .then(() => navigate({ to: '/login', search: {}, replace: true }))
+              .then(() => navigate({ to: '/', replace: true }))
               .catch((e: unknown) => toast.error(errorMessage(e, 'Could not log out')))
           }
         >

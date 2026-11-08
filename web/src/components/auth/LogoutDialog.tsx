@@ -41,7 +41,7 @@ function LogoutFlow() {
     try {
       await performLogout()
       uiStore.setLogout(false)
-      await navigate({ to: '/login', search: {}, replace: true })
+      await navigate({ to: '/', replace: true })
     } catch (e) {
       toast.error(errorMessage(e, 'Could not log out'))
       setBusy(null)

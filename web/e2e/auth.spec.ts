@@ -44,7 +44,11 @@ test.describe('authentication', () => {
       await page.getByRole('button', { name: /Signed in as/ }).click()
       await page.getByRole('menuitem', { name: 'Log out' }).click()
     }
-    await expect(page).toHaveURL(/\/login/)
+    // Logging out lands on the public home page, not the sign-in form.
+    await expect(page).toHaveURL(/\/$/)
+    await expect(page.getByRole('heading', { name: /expense book/ })).toBeVisible()
+    await page.getByRole('link', { name: 'Sign in' }).first().click()
+    await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
     const cached = await page.evaluate(() => localStorage.getItem('xpenses-query-cache'))
     expect(cached).toBeNull()
     const me = await page.request.get('/api/v1/auth/me')

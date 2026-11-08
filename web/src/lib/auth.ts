@@ -173,8 +173,10 @@ export function resolveAuthRedirect(input: GuardInput): GuardRedirect | null {
   if (setup_required) return path === '/setup' ? null : { to: '/setup' }
   if (path === '/setup') return authenticated ? { to: '/' } : { to: '/login' }
   if (!authenticated) {
-    if (isAuthPath(path) || path === EXPIRED_PATH) return path === EXPIRED_PATH ? { to: '/login' } : null
-    return path === '/' ? { to: '/login' } : { to: '/login', search: { redirect: path } }
+    // `/` is the public home page; the auth pages are theirs too.
+    if (path === '/' || isAuthPath(path)) return null
+    if (path === EXPIRED_PATH) return { to: '/login' }
+    return { to: '/login', search: { redirect: path } }
   }
   // A user whose free year has ended sees only the expired page.
   if (expired) return path === EXPIRED_PATH ? null : { to: '/expired' }

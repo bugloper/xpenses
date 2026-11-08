@@ -112,7 +112,7 @@ export function SessionsSection() {
         onConfirm={async () => {
           try {
             await performLogout({ everywhere: true })
-            await navigate({ to: '/login', search: {}, replace: true })
+            await navigate({ to: '/', replace: true })
           } catch (e) {
             toast.error(errorMessage(e, 'Could not log out'))
           }
