@@ -18,7 +18,12 @@ test('an admin-issued reset link lets a user choose a new password', async ({ pa
   await loginAs(page)
   await page.goto('/admin')
   // Other runs may have left users with the same name; find this one by email.
-  const row = page.locator('tr, li').filter({ hasText: user.email }).filter({ visible: true })
+  // The email also appears in the invite list ("used by …"): keep to the user's own row.
+  const row = page
+    .locator('tr, li')
+    .filter({ hasText: user.email })
+    .filter({ has: page.getByRole('button', { name: 'Actions for Forgetful' }) })
+    .filter({ visible: true })
   await row.getByRole('button', { name: 'Actions for Forgetful' }).click()
   await page.getByRole('menuitem', { name: 'Reset password…' }).click()
   const link = await page.getByRole('textbox', { name: 'Reset link' }).inputValue()

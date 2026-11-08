@@ -36,13 +36,14 @@ func (h *AdminHandler) ListUsers(c echo.Context) error {
 
 func (h *AdminHandler) UpdateUser(c echo.Context) error {
 	var req struct {
-		IsActive *bool   `json:"is_active"`
-		Role     *string `json:"role"`
+		IsActive    *bool   `json:"is_active"`
+		Role        *string `json:"role"`
+		AccessUntil *string `json:"access_until"`
 	}
 	if err := bind(c, &req); err != nil {
 		return err
 	}
-	u, err := h.Svc.UpdateUserAdmin(c.Request().Context(), auth.CurrentUser(c), c.Param("id"), req.IsActive, req.Role)
+	u, err := h.Svc.UpdateUserAdmin(c.Request().Context(), auth.CurrentUser(c), c.Param("id"), req.IsActive, req.Role, req.AccessUntil)
 	if err != nil {
 		return err
 	}

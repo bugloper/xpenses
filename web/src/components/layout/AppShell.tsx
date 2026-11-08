@@ -9,6 +9,7 @@ import { useAuth } from '@/lib/auth'
 import { uiStore, useUIStore } from '@/lib/ui-store'
 import { cn } from '@/lib/utils'
 import { Logo } from './Brand'
+import { AccessBanner } from './AccessBanner'
 import { CurrencyMenu } from './CurrencyMenu'
 import { ALL_NAV, MORE_NAV, PRIMARY_NAV, visibleNav, type NavItem } from './nav'
 import { PendingSheet } from './PendingSheet'
@@ -205,6 +206,7 @@ export function AppShell() {
         <Topbar />
         <main className="mx-auto w-full max-w-6xl px-4 pt-4 pb-28 sm:px-6 md:px-8 md:pt-6 md:pb-12">
           <div className="mb-4 grid gap-2 empty:hidden">
+            <AccessBanner />
             <SyncPill />
           </div>
           <Outlet />

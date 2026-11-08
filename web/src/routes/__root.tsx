@@ -3,7 +3,7 @@ import { AppShell } from '@/components/layout/AppShell'
 import { ErrorState } from '@/components/common/States'
 import { Toaster } from '@/components/ui/sonner'
 import { isApiError, isNetworkError } from '@/lib/api'
-import { adoptUser, authStore, resolveAuthRedirect } from '@/lib/auth'
+import { accessExpired, adoptUser, authStore, resolveAuthRedirect } from '@/lib/auth'
 import { authKeys, authStatusQuery, meQuery } from '@/lib/queries/auth'
 import { queryClient } from '@/lib/queryClient'
 import type { AuthStatus, User } from '@/types/api'
@@ -54,6 +54,7 @@ export const rootRoute = createRootRoute({
       setup_required: auth.status?.setup_required ?? false,
       authenticated: auth.user !== null,
       isAdmin: auth.user?.role === 'admin',
+      expired: auth.user ? accessExpired(auth.user) : false,
       path: location.pathname,
     })
     if (target) {

@@ -23,8 +23,9 @@ Multi-user with fully isolated data, installable as a PWA, with offline expense 
 1. Open the app. With no users yet it shows **Set up Xpenses**: create the owner account (you become the `admin`).
 2. Registration is closed by default. To let someone else in, go to **Admin → Invites** and send them the one-time link, or switch **Registration** on for open sign-up.
 3. Every user gets their own accounts, categories (defaults seeded on sign-up), transactions, budgets and settings. The admin can disable, promote or delete users (deleting a user deletes all their data) but cannot see their data.
-4. Forgotten password: the server sends no email, so the admin issues a one-time reset link from **Admin → Users → Reset password** (valid 24 hours) and passes it on; the sign-in page's **Forgot password?** explains this.
-5. Passwords are hashed with Argon2id. Sessions are HttpOnly, SameSite=Strict cookies (Secure over HTTPS), idle timeout 30 days, absolute 180 days. Ten failed logins per email (or thirty per IP) in 15 minutes pause sign-in. See `docs/AUTH.md` for the full contract.
+4. Free year: every user may use the app for one year from sign-up (`access_until`, shown in Settings and in **Admin → Users**). There is no payment system: when the year is up the app shows "your free year has ended" and refuses data calls until the admin extends the date from **Admin → Users → Extend access**. Admins are never cut off. A banner warns users during their last 30 days.
+5. Forgotten password: the server sends no email, so the admin issues a one-time reset link from **Admin → Users → Reset password** (valid 24 hours) and passes it on; the sign-in page's **Forgot password?** explains this.
+6. Passwords are hashed with Argon2id. Sessions are HttpOnly, SameSite=Strict cookies (Secure over HTTPS), idle timeout 30 days, absolute 180 days. Ten failed logins per email (or thirty per IP) in 15 minutes pause sign-in. See `docs/AUTH.md` for the full contract.
 
 ## Development setup
 

@@ -85,12 +85,22 @@ only survives if it existed in the snapshot, so the client must expect a `401` a
 Prefer the `X-Backup-Passphrase` header over `?passphrase=`; the app never logs query strings but a
 reverse proxy's access log may.
 
+## Free year
+
+Every user may use the app for one year from sign-up: `User.access_until` (YYYY-MM-DD, the last
+allowed day) is set at registration and existing users got a year from their `created_at`. There is
+no payment system; the administrator extends the date from the Users list. Administrators are never
+cut off. Once the date has passed, every data route answers `403 access_expired`; only
+`/auth/me`, `/auth/me/avatar`, `/auth/logout`, `/auth/logout-all`, `/auth/sessions*` and `/auth/password`
+still work, so the app can show the "your free year has ended" page and let the user sign out.
+Sign-in itself still succeeds (the page needs the user to show who they are).
+
 ## Admin routes (role `admin`)
 
 | Method | Path | Body → Result |
 |---|---|---|
 | GET | /admin/users | `[User & {account_count: number, transaction_count: number}]` |
-| PATCH | /admin/users/:id | `{is_active?, role?}` → User. 422 when targeting yourself (cannot disable/demote the last admin or self). Disabling revokes the user's sessions |
+| PATCH | /admin/users/:id | `{is_active?, role?, access_until?}` → User. 422 when changing your own role/status (cannot disable/demote the last admin or self). Disabling revokes the user's sessions. `access_until` (YYYY-MM-DD) extends or shortens a user's free year |
 | DELETE | /admin/users/:id | → 204. Deletes the user **and all their data**; 422 for self |
 | POST | /admin/users/:id/password-reset | → 201 `{id, user_id, expires_at, token, reset_path: "/reset-password?token=<token>"}` — a single-use link valid 24 h, shown **once**; the admin passes it to the user ("Forgot password?" on the sign-in page explains this) |
 | GET | /admin/settings | `{registration_open: boolean}` |

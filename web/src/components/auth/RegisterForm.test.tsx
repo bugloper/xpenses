@@ -49,6 +49,7 @@ describe('RegisterForm', () => {
       created_at: '',
       last_login_at: null,
       avatar_updated_at: null,
+      access_until: '2099-01-01',
     }
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')

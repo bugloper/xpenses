@@ -103,6 +103,7 @@ describe('auth behaviour', () => {
     created_at: '',
     last_login_at: null,
     avatar_updated_at: null,
+    access_until: '2099-01-01',
   }
 
   it('sends X-Xpenses-Client: web and same-origin credentials on every request', async () => {

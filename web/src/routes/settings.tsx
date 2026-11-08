@@ -9,7 +9,8 @@ import { BackupSection } from '@/components/settings/BackupSection'
 import { RecurringSection } from '@/components/settings/RecurringSection'
 import { SessionsSection } from '@/components/settings/SessionsSection'
 import { Button } from '@/components/ui/button'
-import { useAuth } from '@/lib/auth'
+import { accessDaysLeft, useAuth } from '@/lib/auth'
+import { formatShortDate } from '@/lib/dates'
 import { relativeTime } from '@/lib/dates'
 import { syncManager, useSyncState } from '@/lib/offline'
 import { usePwaInstall } from '@/lib/pwa-install'
@@ -94,6 +95,29 @@ function InstallRow() {
   )
 }
 
+/** How long the user may keep using the app. */
+function AccessRow() {
+  const { user } = useAuth()
+  if (!user) return null
+  const left = accessDaysLeft(user)
+  return (
+    <div className="bg-card border rounded-[1.25rem] px-4">
+      <SettingRow
+        label={left === null ? 'Administrator' : 'Free year'}
+        description={
+          left === null
+            ? 'No end date.'
+            : left < 0
+              ? `Ended on ${formatShortDate(user.access_until)}.`
+              : `Until ${formatShortDate(user.access_until)} · ${left === 0 ? 'last day' : `${left} day${left === 1 ? '' : 's'} left`}. The administrator can extend it.`
+        }
+      >
+        <span />
+      </SettingRow>
+    </div>
+  )
+}
+
 function SettingsPage() {
   const { theme, setTheme } = useTheme()
   const { isAdmin } = useAuth()
@@ -115,6 +139,9 @@ function SettingsPage() {
           <SessionsSection />
         </Section>
         <div className="flex flex-col gap-6">
+          <Section title="Access">
+            <AccessRow />
+          </Section>
           <Section title="Appearance">
             <div className="bg-card border rounded-[1.25rem] px-4">
               <SettingRow label="Theme">

@@ -7,6 +7,8 @@ import {
   authErrorInfo,
   authStore,
   initials,
+  accessDaysLeft,
+  accessExpired,
   isAuthPath,
   parseLoginSearch,
   parseRegisterSearch,
@@ -30,6 +32,7 @@ const user = (over: Partial<User> = {}): User => ({
   created_at: '',
   last_login_at: null,
   avatar_updated_at: null,
+  access_until: '2099-01-01',
   ...over,
 })
 
@@ -118,6 +121,31 @@ describe('resolveAuthRedirect', () => {
   ]
   it.each(cases)('%s', (_name, input, expected) => {
     expect(resolveAuthRedirect(input)).toEqual(expected)
+  })
+})
+
+describe('free year', () => {
+  const nov8 = new Date(2026, 10, 8, 15, 0)
+  it('counts the days left and treats the last day as allowed', () => {
+    expect(accessDaysLeft({ role: 'user', access_until: '2027-11-08' }, nov8)).toBe(365)
+    expect(accessDaysLeft({ role: 'user', access_until: '2026-11-08' }, nov8)).toBe(0)
+    expect(accessDaysLeft({ role: 'user', access_until: '2026-11-07' }, nov8)).toBe(-1)
+    expect(accessExpired({ role: 'user', access_until: '2026-11-08' }, nov8)).toBe(false)
+    expect(accessExpired({ role: 'user', access_until: '2026-11-07' }, nov8)).toBe(true)
+  })
+  it('never applies to admins', () => {
+    expect(accessDaysLeft({ role: 'admin', access_until: '2020-01-01' }, nov8)).toBeNull()
+    expect(accessExpired({ role: 'admin', access_until: '2020-01-01' }, nov8)).toBe(false)
+  })
+  it('the guard sends an expired user to the expired page and nowhere else', () => {
+    const base = { setup_required: false, authenticated: true, isAdmin: false, expired: true }
+    expect(resolveAuthRedirect({ ...base, path: '/' })).toEqual({ to: '/expired' })
+    expect(resolveAuthRedirect({ ...base, path: '/transactions' })).toEqual({ to: '/expired' })
+    expect(resolveAuthRedirect({ ...base, path: '/expired' })).toBeNull()
+    expect(resolveAuthRedirect({ ...base, expired: false, path: '/expired' })).toEqual({ to: '/' })
+    expect(resolveAuthRedirect({ ...base, authenticated: false, expired: false, path: '/expired' })).toEqual({
+      to: '/login',
+    })
   })
 })
 

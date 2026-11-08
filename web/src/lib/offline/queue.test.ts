@@ -51,6 +51,7 @@ beforeEach(() => {
     created_at: '',
     last_login_at: null,
     avatar_updated_at: null,
+    access_until: '2099-01-01',
   })
 })
 afterEach(() => {
@@ -262,6 +263,7 @@ describe('per-user queue isolation', () => {
     created_at: '',
     last_login_at: null,
     avatar_updated_at: null,
+    access_until: '2099-01-01',
   }
 
   it('stamps the signed-in user id on queued items', async () => {

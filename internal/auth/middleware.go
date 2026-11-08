@@ -40,6 +40,12 @@ var publicPaths = map[string]bool{
 	"/health": true, "/auth/status": true, "/auth/setup": true, "/auth/register": true, "/auth/login": true, "/auth/reset-password": true,
 }
 
+// expiredAllowed are the paths a user whose free year has ended may still
+// call: enough to see who they are, sign out and manage their sessions.
+var expiredAllowed = map[string]bool{
+	"/auth/me": true, "/auth/me/avatar": true, "/auth/logout": true, "/auth/logout-all": true, "/auth/sessions": true, "/auth/password": true,
+}
+
 // adminOnly reports whether a relative API path is restricted to administrators.
 func adminOnly(rel string) bool {
 	return strings.HasPrefix(rel, "/admin/") || rel == "/backup" || rel == "/restore"
@@ -138,8 +144,15 @@ func (m *Middleware) originAllowed(c echo.Context, origin string) bool {
 // RequireAuth rejects anonymous requests with 401.
 func RequireAuth(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
-		if CurrentUser(c) == nil {
+		u := CurrentUser(c)
+		if u == nil {
 			return &apperr.Error{Status: http.StatusUnauthorized, Code: "unauthenticated", Message: "sign in to continue"}
+		}
+		if AccessExpired(u, time.Now()) {
+			rel := strings.TrimPrefix(c.Request().URL.Path, APIPrefix)
+			if !expiredAllowed[rel] && !strings.HasPrefix(rel, "/auth/sessions/") {
+				return &apperr.Error{Status: http.StatusForbidden, Code: "access_expired", Message: "your free year has ended; ask the administrator to extend your access"}
+			}
 		}
 		return next(c)
 	}

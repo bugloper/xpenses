@@ -7,8 +7,11 @@ import { LoginForm } from '@/components/auth/LoginForm'
 import { RegisterForm } from '@/components/auth/RegisterForm'
 import { ResetPasswordForm } from '@/components/auth/ResetPasswordForm'
 import { SetupForm } from '@/components/auth/SetupForm'
-import { parseLoginSearch, parseRegisterSearch, parseResetSearch, safeRedirect } from '@/lib/auth'
-import { useAuthStatus } from '@/lib/queries/auth'
+import { parseLoginSearch, parseRegisterSearch, parseResetSearch, safeRedirect, useAuth } from '@/lib/auth'
+import { Button } from '@/components/ui/button'
+import { formatShortDate } from '@/lib/dates'
+import { errorMessage } from '@/lib/api'
+import { performLogout, useAuthStatus } from '@/lib/queries/auth'
 import { rootRoute } from './__root'
 
 /** Pathless layout for the public auth pages (no sidebar / bottom nav). */
@@ -86,7 +89,7 @@ function RegisterPage() {
     <AuthLayout
       title="Create your account"
       description={
-        invite ? 'You have been invited to Xpenses.' : 'Your data is private to you on this instance.'
+        invite ? 'You have been invited to Xpenses. Your first year is free.' : 'Your first year is free, and your data is private to you on this instance.'
       }
       footer={
         <>
@@ -150,4 +153,46 @@ export const resetPasswordRoute = createRoute({
   path: '/reset-password',
   validateSearch: parseResetSearch,
   component: ResetPasswordPage,
+})
+
+/** Shown to a signed-in user whose free year has ended. */
+function ExpiredPage() {
+  const navigate = useNavigate()
+  const { user } = useAuth()
+  return (
+    <AuthLayout
+      title="Your free year has ended"
+      description={
+        user?.access_until
+          ? `Your access to Xpenses ran out on ${formatShortDate(user.access_until)}.`
+          : 'Your access to Xpenses has run out.'
+      }
+    >
+      <div className="flex flex-col gap-4 text-sm">
+        <p className="text-muted-foreground">
+          Everything you recorded is safe. To keep using the app, ask the administrator of this Xpenses
+          instance to extend your access; the moment they do, sign in again and carry on where you left
+          off.
+        </p>
+        {user && <p className="text-muted-foreground">Signed in as {user.email}.</p>}
+        <Button
+          variant="outline"
+          className="self-start"
+          onClick={() =>
+            void performLogout()
+              .then(() => navigate({ to: '/login', search: {}, replace: true }))
+              .catch((e: unknown) => toast.error(errorMessage(e, 'Could not log out')))
+          }
+        >
+          Log out
+        </Button>
+      </div>
+    </AuthLayout>
+  )
+}
+
+export const expiredRoute = createRoute({
+  getParentRoute: () => authLayoutRoute,
+  path: '/expired',
+  component: ExpiredPage,
 })

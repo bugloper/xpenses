@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { Logo } from '@/components/layout/Brand'
 
 const POINTS = [
+  'Free for your first year',
   'Every expense in seconds, even offline',
   'Budgets that follow your own categories',
   'Your data stays yours, on your own server',

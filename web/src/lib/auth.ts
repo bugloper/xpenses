@@ -135,14 +135,33 @@ export async function adoptUser(user: User | null): Promise<void> {
 // ---------------------------------------------------------------------------
 // Route guard (pure)
 // ---------------------------------------------------------------------------
+/** Days of access left, negative once the date has passed; null for admins (never cut off). */
+export function accessDaysLeft(user: Pick<User, 'role' | 'access_until'>, today = new Date()): number | null {
+  if (user.role === 'admin' || !user.access_until) return null
+  const end = Date.parse(`${user.access_until}T00:00:00`)
+  const start = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()
+  if (Number.isNaN(end)) return null
+  return Math.round((end - start) / 86_400_000)
+}
+
+export function accessExpired(user: Pick<User, 'role' | 'access_until'>, today = new Date()): boolean {
+  const left = accessDaysLeft(user, today)
+  return left !== null && left < 0
+}
+
+/** The page shown to a user whose free year has ended. */
+export const EXPIRED_PATH = '/expired'
+
 export type GuardInput = {
   setup_required: boolean
   authenticated: boolean
   /** Pathname being navigated to (no search). */
   path: string
   isAdmin: boolean
+  /** The signed-in user's free year has ended (never true for admins). */
+  expired?: boolean
 }
-export type GuardRedirect = { to: '/setup' | '/login' | '/'; search?: { redirect: string } }
+export type GuardRedirect = { to: '/setup' | '/login' | '/' | '/expired'; search?: { redirect: string } }
 
 /**
  * Decides where a navigation must be redirected, or `null` to let it through.
@@ -150,13 +169,16 @@ export type GuardRedirect = { to: '/setup' | '/login' | '/'; search?: { redirect
  * then authentication, then role.
  */
 export function resolveAuthRedirect(input: GuardInput): GuardRedirect | null {
-  const { setup_required, authenticated, path, isAdmin } = input
+  const { setup_required, authenticated, path, isAdmin, expired = false } = input
   if (setup_required) return path === '/setup' ? null : { to: '/setup' }
   if (path === '/setup') return authenticated ? { to: '/' } : { to: '/login' }
   if (!authenticated) {
-    if (isAuthPath(path)) return null
+    if (isAuthPath(path) || path === EXPIRED_PATH) return path === EXPIRED_PATH ? { to: '/login' } : null
     return path === '/' ? { to: '/login' } : { to: '/login', search: { redirect: path } }
   }
+  // A user whose free year has ended sees only the expired page.
+  if (expired) return path === EXPIRED_PATH ? null : { to: '/expired' }
+  if (path === EXPIRED_PATH) return { to: '/' }
   if (isAuthPath(path)) return { to: '/' }
   if ((path === '/admin' || path.startsWith('/admin/')) && !isAdmin) return { to: '/' }
   return null
@@ -240,6 +262,8 @@ export function authErrorInfo(e: unknown): AuthErrorInfo {
       return { message: 'Registration is closed. Ask the administrator for an invite link.' }
     case 'invalid_invite':
       return { message: 'This invite link is invalid, expired or has already been used.' }
+    case 'access_expired':
+      return { message: 'Your free year has ended. Ask the administrator to extend your access.' }
     case 'invalid_reset':
       return { message: 'This reset link is invalid, expired or has already been used. Ask your administrator for a new one.' }
     case 'email_taken':

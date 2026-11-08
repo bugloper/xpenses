@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/bugloper/xpenses/internal/auth"
 	"github.com/bugloper/xpenses/internal/testutil"
@@ -414,5 +415,72 @@ func TestProfilePicture(t *testing.T) {
 	}
 	if st, _ := me.Do("GET", "/auth/me/avatar", nil); st != 404 {
 		t.Fatalf("after remove want 404 got %d", st)
+	}
+}
+
+func TestFreeYear(t *testing.T) {
+	e := testutil.New(t)
+	admin := e.Setup("Owner", "owner@example.com")
+	st, inv := admin.Do("POST", "/admin/invites", map[string]any{})
+	if st != 201 {
+		t.Fatalf("invite: %d", st)
+	}
+	bob := e.Anon()
+	st, created := bob.Do("POST", "/auth/register", map[string]any{"name": "Bob", "email": "bob@example.com", "password": testutil.Password, "invite_token": testutil.Data(inv)["token"]})
+	if st != 201 {
+		t.Fatalf("register: %d", st)
+	}
+	bobID := testutil.Data(created)["id"].(string)
+	// A new user gets a year from today.
+	want := time.Now().UTC().AddDate(1, 0, 0).Format("2006-01-02")
+	if got := testutil.Data(created)["access_until"]; got != want {
+		t.Fatalf("access_until want %s got %v", want, got)
+	}
+	if st, _ := bob.Do("GET", "/accounts", nil); st != 200 {
+		t.Fatalf("within the year want 200 got %d", st)
+	}
+	// The admin may not shorten their own year by mistake? They may; it does not matter: admins are exempt.
+	if st, b := admin.Do("PATCH", "/admin/users/"+bobID, map[string]any{"access_until": "not a date"}); st != 422 {
+		t.Fatalf("bad date want 422 got %d %v", st, b)
+	}
+	yesterday := time.Now().UTC().AddDate(0, 0, -1).Format("2006-01-02")
+	if st, b := admin.Do("PATCH", "/admin/users/"+bobID, map[string]any{"access_until": yesterday}); st != 200 || testutil.Data(b)["access_until"] != yesterday {
+		t.Fatalf("expire: %d %v", st, b)
+	}
+	// Data is refused, identity and sign-out still work, sign-in still succeeds.
+	if st, b := bob.Do("GET", "/accounts", nil); st != 403 || b["error"].(map[string]any)["code"] != "access_expired" {
+		t.Fatalf("expired data call: %d %v", st, b)
+	}
+	if st, _ := bob.Do("POST", "/transactions", map[string]any{"type": "expense", "amount": 1}); st != 403 {
+		t.Fatalf("expired write want 403 got %d", st)
+	}
+	if st, b := bob.Do("GET", "/auth/me", nil); st != 200 || testutil.Data(b)["access_until"] != yesterday {
+		t.Fatalf("me while expired: %d %v", st, b)
+	}
+	if st, _ := e.Anon().Do("POST", "/auth/login", map[string]any{"email": "bob@example.com", "password": testutil.Password}); st != 200 {
+		t.Fatalf("login while expired want 200 got %d", st)
+	}
+	// Today is still allowed; the admin extends by a year.
+	today := time.Now().UTC().Format("2006-01-02")
+	admin.Do("PATCH", "/admin/users/"+bobID, map[string]any{"access_until": today})
+	if st, _ := bob.Do("GET", "/accounts", nil); st != 200 {
+		t.Fatalf("last day want 200 got %d", st)
+	}
+	admin.Do("PATCH", "/admin/users/"+bobID, map[string]any{"access_until": yesterday})
+	if st, _ := admin.Do("PATCH", "/admin/users/"+bobID, map[string]any{"access_until": want}); st != 200 {
+		t.Fatalf("extend: %d", st)
+	}
+	if st, _ := bob.Do("GET", "/accounts", nil); st != 200 {
+		t.Fatalf("after extension want 200 got %d", st)
+	}
+	// Admins are never cut off, even with a past date.
+	if st, _ := admin.Do("PATCH", "/admin/users/"+admin.UserID, map[string]any{"access_until": yesterday}); st != 200 {
+		t.Fatalf("admin own date: %d", st)
+	}
+	if st, _ := admin.Do("GET", "/accounts", nil); st != 200 {
+		t.Fatalf("admin exempt want 200 got %d", st)
+	}
+	if st, _ := bob.Do("POST", "/auth/logout", nil); st != 204 {
+		t.Fatalf("logout want 204 got %d", st)
 	}
 }

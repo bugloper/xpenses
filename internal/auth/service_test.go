@@ -42,14 +42,14 @@ func TestStaleSnapshotCannotUndoAdminChanges(t *testing.T) {
 		t.Fatal(err)
 	}
 	admin := models.RoleAdmin
-	if _, err := svc.UpdateUserAdmin(ctx, owner, bob.ID, nil, &admin); err != nil {
+	if _, err := svc.UpdateUserAdmin(ctx, owner, bob.ID, nil, &admin, nil); err != nil {
 		t.Fatal(err)
 	}
 	// Bob's in-flight request holds a snapshot that still says admin...
 	snapshot, _ := svc.Repo.GetUser(ctx, db, bob.ID)
 	// ...while the owner demotes and disables him.
 	user, off := models.RoleUser, false
-	if _, err := svc.UpdateUserAdmin(ctx, owner, bob.ID, &off, &user); err != nil {
+	if _, err := svc.UpdateUserAdmin(ctx, owner, bob.ID, &off, &user, nil); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := svc.UpdateProfile(ctx, snapshot, "Robert"); err != nil {
@@ -67,7 +67,7 @@ func TestStaleSnapshotCannotUndoAdminChanges(t *testing.T) {
 	}
 	on := true
 	_ = adminSnapshot
-	if _, err := svc.UpdateUserAdmin(ctx, owner, bob.ID, &on, nil); err != nil {
+	if _, err := svc.UpdateUserAdmin(ctx, owner, bob.ID, &on, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 	got, _ = svc.Repo.GetUser(ctx, db, bob.ID)

@@ -63,6 +63,19 @@ func now() time.Time { return time.Now().UTC() }
 
 func fmtTime(t time.Time) string { return t.Format(time.RFC3339) }
 
+func fmtDate(t time.Time) string { return t.Format("2006-01-02") }
+
+// FreeTrial is how long a new user may use the app before an administrator
+// has to extend their access.
+const FreeTrial = "1 year"
+
+// AccessExpired reports whether the user's access date has passed.
+// Administrators are never cut off, and a user without a date (never the case
+// after migration 0007) is left alone.
+func AccessExpired(u *models.User, today time.Time) bool {
+	return u.Role != models.RoleAdmin && u.AccessUntil != "" && u.AccessUntil < fmtDate(today)
+}
+
 func hashToken(tok string) string {
 	sum := sha256.Sum256([]byte(tok))
 	return hex.EncodeToString(sum[:])
@@ -177,8 +190,9 @@ func (s *Service) createUser(ctx context.Context, tx *sql.Tx, name, email, passw
 	if err != nil {
 		return nil, err
 	}
-	ts := fmtTime(now())
-	u := &models.User{ID: uuid.NewString(), Name: strings.TrimSpace(name), Email: email, PasswordHash: hash, Role: role, IsActive: true, CreatedAt: ts, UpdatedAt: ts}
+	t := now()
+	ts := fmtTime(t)
+	u := &models.User{ID: uuid.NewString(), Name: strings.TrimSpace(name), Email: email, PasswordHash: hash, Role: role, IsActive: true, CreatedAt: ts, UpdatedAt: ts, AccessUntil: fmtDate(t.AddDate(1, 0, 0))}
 	if err := s.Repo.InsertUser(ctx, tx, u); err != nil {
 		if strings.Contains(err.Error(), "UNIQUE") {
 			return nil, &apperr.Error{Status: 409, Code: "email_taken", Message: "an account with that email already exists"}
@@ -468,9 +482,14 @@ func (s *Service) ListUsers(ctx context.Context) ([]AdminUser, error) {
 	return out, nil
 }
 
-func (s *Service) UpdateUserAdmin(ctx context.Context, actor *models.User, id string, isActive *bool, role *string) (*models.User, error) {
-	if id == actor.ID {
+func (s *Service) UpdateUserAdmin(ctx context.Context, actor *models.User, id string, isActive *bool, role *string, accessUntil *string) (*models.User, error) {
+	if id == actor.ID && (isActive != nil || role != nil) {
 		return nil, apperr.Validation("validation failed", map[string]string{"id": "you cannot change your own role or status"})
+	}
+	if accessUntil != nil {
+		if _, err := time.Parse("2006-01-02", *accessUntil); err != nil {
+			return nil, apperr.Validation("validation failed", map[string]string{"access_until": "must be a date (YYYY-MM-DD)"})
+		}
 	}
 	u, err := s.Repo.GetUser(ctx, s.DB, id)
 	if err != nil {
@@ -488,10 +507,18 @@ func (s *Service) UpdateUserAdmin(ctx context.Context, actor *models.User, id st
 	if isActive != nil {
 		u.IsActive = *isActive
 	}
+	if accessUntil != nil {
+		u.AccessUntil = *accessUntil
+	}
 	u.UpdatedAt = fmtTime(now())
 	err = repositories.WithTx(ctx, s.DB, func(tx *sql.Tx) error {
 		if err := s.Repo.UpdateUserRoleActive(ctx, tx, u.ID, u.Role, u.IsActive, u.UpdatedAt); err != nil {
 			return err
+		}
+		if accessUntil != nil {
+			if err := s.Repo.UpdateUserAccess(ctx, tx, u.ID, u.AccessUntil, u.UpdatedAt); err != nil {
+				return err
+			}
 		}
 		if !u.IsActive {
 			return s.Repo.DeleteUserSessions(ctx, tx, u.ID, "")

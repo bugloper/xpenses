@@ -159,6 +159,9 @@ type User struct {
 	UpdatedAt   string  `json:"updated_at"`
 	// AvatarUpdatedAt is set while the user has a profile picture.
 	AvatarUpdatedAt *string `json:"avatar_updated_at"`
+	// AccessUntil is the last day (YYYY-MM-DD) the user may use the app: a
+	// year from sign-up, extended by an administrator. Administrators are exempt.
+	AccessUntil string `json:"access_until"`
 	// PasswordHash is never serialised.
 	PasswordHash string `json:"-"`
 }

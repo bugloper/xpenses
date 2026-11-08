@@ -10,6 +10,8 @@ export const CLIENT_HEADER_VALUE = 'web'
 export const UNAUTHENTICATED_EVENT = 'xpenses:unauthenticated'
 /** Dispatched on `window` when the server answers 403 csrf_rejected (a client bug, never expected). */
 export const CSRF_REJECTED_EVENT = 'xpenses:csrf-rejected'
+/** Dispatched on `window` when the server answers 403 access_expired: the user's free year has ended. */
+export const ACCESS_EXPIRED_EVENT = 'xpenses:access-expired'
 
 /**
  * Auth endpoints whose 401/403 is part of the normal flow (wrong password, disabled
@@ -154,6 +156,8 @@ function notifyAuthFailure(path: string, err: ApiError) {
   if (AUTH_FLOW_PATHS.has(basePath)) return
   const lostSession = err.status === 401 || (err.status === 403 && err.code === 'account_disabled')
   if (lostSession) window.dispatchEvent(new CustomEvent(UNAUTHENTICATED_EVENT, { detail: err }))
+  if (err.status === 403 && err.code === 'access_expired')
+    window.dispatchEvent(new CustomEvent(ACCESS_EXPIRED_EVENT, { detail: err }))
 }
 
 function baseHeaders(extra?: Record<string, string>): Record<string, string> {

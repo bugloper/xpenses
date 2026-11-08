@@ -12,13 +12,13 @@ import (
 
 type Repo struct{}
 
-const userCols = `id, email, name, password_hash, role, is_active, last_login_at, created_at, updated_at, avatar_updated_at`
+const userCols = `id, email, name, password_hash, role, is_active, last_login_at, created_at, updated_at, avatar_updated_at, access_until`
 
 func scanUser(s interface{ Scan(...any) error }) (*models.User, error) {
 	var u models.User
 	var active int
 	var last, avatar sql.NullString
-	if err := s.Scan(&u.ID, &u.Email, &u.Name, &u.PasswordHash, &u.Role, &active, &last, &u.CreatedAt, &u.UpdatedAt, &avatar); err != nil {
+	if err := s.Scan(&u.ID, &u.Email, &u.Name, &u.PasswordHash, &u.Role, &active, &last, &u.CreatedAt, &u.UpdatedAt, &avatar, &u.AccessUntil); err != nil {
 		return nil, err
 	}
 	u.IsActive = active == 1
@@ -79,8 +79,8 @@ func (Repo) ListUsers(ctx context.Context, db repositories.DBTX) ([]models.User,
 }
 
 func (Repo) InsertUser(ctx context.Context, db repositories.DBTX, u *models.User) error {
-	_, err := db.ExecContext(ctx, `INSERT INTO users (id, email, name, password_hash, role, is_active, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)`,
-		u.ID, u.Email, u.Name, u.PasswordHash, u.Role, boolInt(u.IsActive), u.CreatedAt, u.UpdatedAt)
+	_, err := db.ExecContext(ctx, `INSERT INTO users (id, email, name, password_hash, role, is_active, created_at, updated_at, access_until) VALUES (?,?,?,?,?,?,?,?,?)`,
+		u.ID, u.Email, u.Name, u.PasswordHash, u.Role, boolInt(u.IsActive), u.CreatedAt, u.UpdatedAt, u.AccessUntil)
 	return err
 }
 
@@ -96,6 +96,11 @@ func (Repo) UpdateUserName(ctx context.Context, db repositories.DBTX, id, name, 
 
 func (Repo) UpdateUserPassword(ctx context.Context, db repositories.DBTX, id, hash, updatedAt string) error {
 	_, err := db.ExecContext(ctx, `UPDATE users SET password_hash=?, updated_at=? WHERE id=?`, hash, updatedAt, id)
+	return err
+}
+
+func (Repo) UpdateUserAccess(ctx context.Context, db repositories.DBTX, id, accessUntil, updatedAt string) error {
+	_, err := db.ExecContext(ctx, `UPDATE users SET access_until = ?, updated_at = ? WHERE id = ?`, accessUntil, updatedAt, id)
 	return err
 }
 
@@ -134,10 +139,10 @@ func (Repo) GetSession(ctx context.Context, db repositories.DBTX, id string) (*m
 	var active int
 	var last, avatar sql.NullString
 	err := db.QueryRowContext(ctx, `SELECT s.id, s.user_id, s.created_at, s.last_seen_at, s.expires_at, s.user_agent, s.ip,
-		u.id, u.email, u.name, u.password_hash, u.role, u.is_active, u.last_login_at, u.created_at, u.updated_at, u.avatar_updated_at
+		u.id, u.email, u.name, u.password_hash, u.role, u.is_active, u.last_login_at, u.created_at, u.updated_at, u.avatar_updated_at, u.access_until
 		FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.id = ?`, id).
 		Scan(&s.ID, &s.UserID, &s.CreatedAt, &s.LastSeenAt, &s.ExpiresAt, &s.UserAgent, &s.IP,
-			&u.ID, &u.Email, &u.Name, &u.PasswordHash, &u.Role, &active, &last, &u.CreatedAt, &u.UpdatedAt, &avatar)
+			&u.ID, &u.Email, &u.Name, &u.PasswordHash, &u.Role, &active, &last, &u.CreatedAt, &u.UpdatedAt, &avatar, &u.AccessUntil)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil, nil
 	}

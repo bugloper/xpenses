@@ -302,6 +302,8 @@ export type User = {
   last_login_at: string | null
   /** Set while the user has a profile picture; changes whenever it does. */
   avatar_updated_at: string | null
+  /** Last day (YYYY-MM-DD) the user may use the app: a free year from sign-up, extended by an admin. Admins are exempt. */
+  access_until: string
 }
 export type AuthStatus = { setup_required: boolean; registration_open: boolean; authenticated: boolean }
 export type LoginRequest = { email: string; password: string }
@@ -327,7 +329,7 @@ export type AuthSession = {
 }
 
 export type AdminUser = User & { account_count: number; transaction_count: number }
-export type UpdateAdminUserRequest = { is_active?: boolean; role?: UserRole }
+export type UpdateAdminUserRequest = { is_active?: boolean; role?: UserRole; access_until?: string }
 export type AdminSettings = { registration_open: boolean }
 export type CreateInviteRequest = { email?: string; expires_in_hours?: number }
 /** POST /admin/invites response: the token is only ever returned here. */

@@ -14,8 +14,8 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Skeleton } from '@/components/ui/skeleton'
 import { errorMessage } from '@/lib/api'
-import { useAuth } from '@/lib/auth'
-import { relativeTime } from '@/lib/dates'
+import { accessDaysLeft, useAuth } from '@/lib/auth'
+import { formatShortDate, relativeTime } from '@/lib/dates'
 import {
   useAdminUsers,
   useCreatePasswordReset,
@@ -23,18 +23,34 @@ import {
   useUpdateAdminUser,
 } from '@/lib/queries/auth'
 import type { AdminUser, CreatedPasswordReset } from '@/types/api'
+import { ExtendAccessDialog } from './ExtendAccessDialog'
 import { LinkDialog } from './LinkDialog'
+
+/** "Until 8 Nov 2027" for users, "No end date" for admins, with the expired state in red. */
+function AccessCell({ u }: { u: AdminUser }) {
+  const left = accessDaysLeft(u)
+  if (left === null) return <span className="text-muted-foreground">No end date</span>
+  if (left < 0) return <Badge variant="destructive">Expired {formatShortDate(u.access_until)}</Badge>
+  return (
+    <span className={left <= 30 ? 'text-warning font-medium' : undefined}>
+      {formatShortDate(u.access_until)}
+      {left <= 30 && <span className="font-normal"> · {left === 0 ? 'last day' : `${left} days`}</span>}
+    </span>
+  )
+}
 
 function UserActions({
   u,
   self,
   onDelete,
   onReset,
+  onExtend,
 }: {
   u: AdminUser
   self: boolean
   onDelete: () => void
   onReset: (r: CreatedPasswordReset) => void
+  onExtend: () => void
 }) {
   const update = useUpdateAdminUser()
   const reset = useCreatePasswordReset()
@@ -56,6 +72,7 @@ function UserActions({
         >
           Reset password…
         </DropdownMenuItem>
+        {u.role !== 'admin' && <DropdownMenuItem onSelect={onExtend}>Extend access…</DropdownMenuItem>}
         {!self && (
           <>
             {u.is_active ? (
@@ -93,6 +110,7 @@ export function UsersSection() {
   const del = useDeleteAdminUser()
   const [doomed, setDoomed] = useState<AdminUser | null>(null)
   const [reset, setReset] = useState<{ user: AdminUser; link: CreatedPasswordReset } | null>(null)
+  const [extending, setExtending] = useState<AdminUser | null>(null)
   if (isPending) return <Skeleton className="h-40 w-full rounded-[1.25rem]" />
   if (error) return <ErrorState error={error} onRetry={() => void refetch()} compact />
   return (
@@ -107,6 +125,7 @@ export function UsersSection() {
               <th className="px-2 py-3 text-left font-medium">Status</th>
               <th className="px-2 py-3 text-right font-medium">Accounts</th>
               <th className="px-2 py-3 text-right font-medium">Transactions</th>
+              <th className="px-2 py-3 text-left font-medium">Access until</th>
               <th className="px-2 py-3 text-left font-medium">Last login</th>
               <th className="px-2 py-3" />
             </tr>
@@ -133,6 +152,9 @@ export function UsersSection() {
                   </td>
                   <td className="px-2 py-3 text-right tabular-nums">{u.account_count}</td>
                   <td className="px-2 py-3 text-right tabular-nums">{u.transaction_count}</td>
+                  <td className="px-2 py-3 text-xs">
+                    <AccessCell u={u} />
+                  </td>
                   <td className="text-muted-foreground px-2 py-3 text-xs">
                     {u.last_login_at ? relativeTime(u.last_login_at) : 'never'}
                   </td>
@@ -142,6 +164,7 @@ export function UsersSection() {
                       self={self}
                       onDelete={() => setDoomed(u)}
                       onReset={(link) => setReset({ user: u, link })}
+                      onExtend={() => setExtending(u)}
                     />
                   </td>
                 </tr>
@@ -169,18 +192,23 @@ export function UsersSection() {
                     {u.account_count} accounts · {u.transaction_count} transactions · last login{' '}
                     {u.last_login_at ? relativeTime(u.last_login_at) : 'never'}
                   </p>
+                  <p className="mt-1 text-xs">
+                    Access: <AccessCell u={u} />
+                  </p>
                 </div>
                 <UserActions
                       u={u}
                       self={self}
                       onDelete={() => setDoomed(u)}
                       onReset={(link) => setReset({ user: u, link })}
+                      onExtend={() => setExtending(u)}
                     />
               </li>
             )
           })}
         </ul>
       </div>
+      <ExtendAccessDialog user={extending} onClose={() => setExtending(null)} />
       <LinkDialog
         open={reset !== null}
         onClose={() => setReset(null)}

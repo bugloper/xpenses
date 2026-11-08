@@ -4,8 +4,9 @@ import { RouterProvider } from '@tanstack/react-router'
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
 import { toast } from 'sonner'
 import { ThemeProvider } from '@/components/layout/ThemeProvider'
-import { CSRF_REJECTED_EVENT, UNAUTHENTICATED_EVENT } from '@/lib/api'
+import { ACCESS_EXPIRED_EVENT, CSRF_REJECTED_EVENT, UNAUTHENTICATED_EVENT } from '@/lib/api'
 import { isAuthPath, purgeSessionData } from '@/lib/auth'
+import { authKeys } from '@/lib/queries/auth'
 import { persistOptions, queryClient } from '@/lib/queryClient'
 import { syncManager } from '@/lib/offline'
 import { transactionDependentKeys } from '@/lib/queries/keys'
@@ -33,6 +34,13 @@ window.addEventListener(UNAUTHENTICATED_EVENT, () => {
         signingOut = false
       })
   })
+})
+
+// The free year ended while the app was open: show the page that says so.
+window.addEventListener(ACCESS_EXPIRED_EVENT, () => {
+  if (router.state.location.pathname === '/expired') return
+  void queryClient.invalidateQueries({ queryKey: authKeys.me })
+  void router.navigate({ to: '/expired', replace: true })
 })
 
 // The server rejected a mutation for lacking the client header: a bug, not a user error.
