@@ -1,6 +1,6 @@
 import { createRoute } from '@tanstack/react-router'
 import { CloudOff, CloudUpload, Download as InstallIcon } from 'lucide-react'
-import { useEffect, useState, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { toast } from 'sonner'
 import { Panel } from '@/components/common/kit'
 import { PageHeader } from '@/components/common/PageHeader'
@@ -151,31 +151,6 @@ function DeviceSection({ id }: { id: string }) {
 
 type IndexItem = { id: string; label: string }
 
-/** Highlights the section nearest the top of the screen. */
-function useCurrentSection(ids: string[]) {
-  const [current, setCurrent] = useState(ids[0])
-  const key = ids.join(',')
-  useEffect(() => {
-    const els = key
-      .split(',')
-      .map((id) => document.getElementById(id))
-      .filter((el): el is HTMLElement => !!el)
-    if (els.length === 0 || typeof IntersectionObserver === 'undefined') return
-    const io = new IntersectionObserver(
-      (entries) => {
-        const top = entries
-          .filter((e) => e.isIntersecting)
-          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0]
-        if (top) setCurrent(top.target.id)
-      },
-      { rootMargin: '-96px 0px -60% 0px' },
-    )
-    els.forEach((el) => io.observe(el))
-    return () => io.disconnect()
-  }, [key])
-  return current
-}
-
 function SettingsPage() {
   const { isAdmin } = useAuth()
   const version = __APP_VERSION__
@@ -189,7 +164,6 @@ function SettingsPage() {
     { id: 'recurring', label: 'Recurring' },
     ...(isAdmin ? [{ id: 'backup', label: 'Backup & restore' }] : []),
   ]
-  const current = useCurrentSection(index.map((i) => i.id))
   const jump = (id: string) =>
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 
@@ -202,7 +176,7 @@ function SettingsPage() {
       />
       <nav
         aria-label="Settings sections"
-        className="no-scrollbar -mx-4 flex gap-1.5 overflow-x-auto px-4 lg:hidden"
+        className="no-scrollbar -mx-4 flex gap-1.5 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0"
       >
         {index.map((i) => (
           <button
@@ -215,49 +189,16 @@ function SettingsPage() {
           </button>
         ))}
       </nav>
-      <div className="grid gap-8 lg:grid-cols-12">
-        <aside className="hidden lg:col-span-3 lg:block">
-          <nav aria-label="Settings sections" className="sticky top-24">
-            <p className="eyebrow mb-3">On this page</p>
-            <ul className="border-l">
-              {index.map((i) => {
-                const on = current === i.id
-                return (
-                  <li key={i.id}>
-                    <a
-                      href={`#${i.id}`}
-                      onClick={(e) => {
-                        e.preventDefault()
-                        jump(i.id)
-                      }}
-                      aria-current={on ? 'location' : undefined}
-                      className={cn(
-                        '-ml-px block border-l-[3px] py-1.5 pl-4 text-sm transition-colors',
-                        on
-                          ? 'border-saffron text-foreground font-medium'
-                          : 'text-muted-foreground hover:text-foreground border-transparent',
-                      )}
-                    >
-                      {i.label}
-                    </a>
-                  </li>
-                )
-              })}
-            </ul>
-            <p className="text-muted-foreground mt-6 font-mono text-[0.6875rem]">Xpenses web {version}</p>
-          </nav>
-        </aside>
-        <div className="flex min-w-0 flex-col gap-6 lg:col-span-9 [&>section]:scroll-mt-24">
-          <ProfileSection id="profile" />
-          <PasswordSection id="password" />
-          <SessionsSection id="devices" />
-          <AccessSection id="access" />
-          <AppearanceSection id="appearance" />
-          <DeviceSection id="this-device" />
-          <RecurringSection id="recurring" />
-          {isAdmin && <BackupSection id="backup" />}
-          <p className="text-muted-foreground font-mono text-[0.6875rem] lg:hidden">Xpenses web {version}</p>
-        </div>
+      <div className="flex min-w-0 flex-col gap-6 [&>section]:scroll-mt-24">
+        <ProfileSection id="profile" />
+        <PasswordSection id="password" />
+        <SessionsSection id="devices" />
+        <AccessSection id="access" />
+        <AppearanceSection id="appearance" />
+        <DeviceSection id="this-device" />
+        <RecurringSection id="recurring" />
+        {isAdmin && <BackupSection id="backup" />}
+        <p className="text-muted-foreground font-mono text-[0.6875rem]">Xpenses web {version}</p>
       </div>
     </div>
   )

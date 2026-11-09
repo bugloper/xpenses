@@ -62,9 +62,8 @@ export function SpendingTab({
         ]}
       />
 
-      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
+      <div className="grid grid-cols-1 items-start gap-6">
         <Panel
-          className="lg:col-span-8"
           eyebrow="Expenses only"
           title={granularity === 'day' ? 'Daily spending' : 'Weekly spending'}
           action={
@@ -112,12 +111,7 @@ export function SpendingTab({
           )}
         </Panel>
 
-        <Panel
-          className="lg:col-span-4"
-          eyebrow="Ranked"
-          title={granularity === 'day' ? 'Biggest days' : 'Biggest weeks'}
-          flush
-        >
+        <Panel eyebrow="Ranked" title={granularity === 'day' ? 'Biggest days' : 'Biggest weeks'} flush>
           {q.isPending ? (
             <div className="flex flex-col gap-3 p-5">
               {Array.from({ length: 4 }, (_, i) => (

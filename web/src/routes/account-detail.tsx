@@ -1,7 +1,8 @@
 import { createRoute, Link } from '@tanstack/react-router'
-import { ArrowLeft, ArrowLeftRight, Pencil, Plus } from 'lucide-react'
+import { ArrowLeft, ArrowLeftRight, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { AccountFormSheet } from '@/components/accounts/AccountForm'
+import { DeleteAccountDialog } from '@/components/accounts/DeleteAccountDialog'
 import { TransferDialog } from '@/components/accounts/TransferDialog'
 import { AccountIcon, accountTypeLabel } from '@/components/common/AccountIcon'
 import { Section } from '@/components/common/PageHeader'
@@ -31,6 +32,8 @@ function AccountDetailPage() {
   const pending = usePendingTransactions()
   const [edit, setEdit] = useState(false)
   const [transfer, setTransfer] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const navigate = accountDetailRoute.useNavigate()
   const rows = useMemo(() => txs.data?.pages.flatMap((p) => p.data) ?? [], [txs.data])
   const groups = useMemo(
     () =>
@@ -84,6 +87,15 @@ function AccountDetailPage() {
           <Button variant="outline" size="icon" aria-label="Edit account" onClick={() => setEdit(true)}>
             <Pencil />
           </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            aria-label="Delete account"
+            className="text-destructive hover:text-destructive"
+            onClick={() => setDeleting(true)}
+          >
+            <Trash2 />
+          </Button>
           <Button variant="outline" className="flex-1 sm:flex-none" onClick={() => setTransfer(true)}>
             <ArrowLeftRight data-icon="inline-start" /> Transfer
           </Button>
@@ -111,6 +123,12 @@ function AccountDetailPage() {
       </Section>
       <AccountFormSheet open={edit} onOpenChange={setEdit} account={a} />
       <TransferDialog open={transfer} onOpenChange={setTransfer} fromAccountId={a.id} />
+      <DeleteAccountDialog
+        account={a}
+        open={deleting}
+        onOpenChange={setDeleting}
+        onDeleted={() => void navigate({ to: '/accounts' })}
+      />
     </div>
   )
 }
@@ -127,11 +145,8 @@ function Statement({ account: a }: { account: Account }) {
   const moneyOut = r ? r.expenses + r.transfers_out : null
   const line = 'flex items-baseline justify-between gap-4 py-2.5 text-sm'
   return (
-    <section
-      className="bg-card grid overflow-hidden rounded-lg border lg:grid-cols-12"
-      aria-label="Statement"
-    >
-      <div className="flex flex-col justify-between gap-4 p-5 sm:p-6 lg:col-span-5 lg:border-r">
+    <section className="bg-card grid overflow-hidden rounded-lg border" aria-label="Statement">
+      <div className="flex flex-col justify-between gap-4 p-5 sm:p-6">
         <div>
           <div className="eyebrow">Balance today</div>
           <div
@@ -148,7 +163,7 @@ function Statement({ account: a }: { account: Account }) {
           confirmed.
         </p>
       </div>
-      <div className="border-t px-5 py-3 sm:px-6 lg:col-span-7 lg:border-t-0 lg:py-4">
+      <div className="border-t px-5 py-3 sm:px-6">
         <div className="eyebrow pb-1">Statement · since the account was opened</div>
         <dl className="divide-rule divide-y">
           <div className={line}>

@@ -51,7 +51,7 @@ function Overview() {
   const expired = list.filter((u) => accessState(u) === 'expired').length
   const open = invites.data?.filter((i) => inviteStatus(i) === 'pending').length
   return (
-    <dl className="divide-ink-foreground/12 border-ink-foreground/12 [&>div]:border-ink-foreground/12 grid grid-cols-2 divide-x divide-y border-t sm:grid-cols-3 lg:grid-cols-6 lg:divide-y-0">
+    <dl className="divide-ink-foreground/12 border-ink-foreground/12 [&>div]:border-ink-foreground/12 grid grid-cols-2 divide-x divide-y border-t sm:grid-cols-3">
       <Gauge
         label="Users"
         value={n(list.length)}
@@ -103,9 +103,9 @@ function AdminPage() {
         <Overview />
       </header>
       <UsersSection id="users" />
-      <div className="grid items-start gap-6 lg:grid-cols-12">
-        <RegistrationSection className="lg:col-span-4" />
-        <InvitesSection className="lg:col-span-8" />
+      <div className="grid items-start gap-6">
+        <RegistrationSection />
+        <InvitesSection />
       </div>
     </div>
   )

@@ -23,6 +23,7 @@ func (h *TransactionHandler) Register(g *echo.Group) {
 	g.GET("/transactions/:id", h.Get)
 	g.PATCH("/transactions/:id", h.Update)
 	g.DELETE("/transactions/:id", h.Delete)
+	g.POST("/transactions/bulk-delete", h.BulkDelete)
 	g.POST("/transactions/:id/duplicate", h.Duplicate)
 	g.POST("/transactions/:id/attachment", h.Attach)
 	g.PUT("/transactions/:id/attachment", h.Attach)
@@ -241,6 +242,21 @@ func (h *TransactionHandler) Delete(c echo.Context) error {
 		return err
 	}
 	return c.NoContent(http.StatusNoContent)
+}
+
+// BulkDelete removes several transactions at once: {"ids": [...]} → {"deleted": n}.
+func (h *TransactionHandler) BulkDelete(c echo.Context) error {
+	var body struct {
+		IDs []string `json:"ids"`
+	}
+	if err := bind(c, &body); err != nil {
+		return err
+	}
+	n, err := h.Svc.DeleteMany(c.Request().Context(), body.IDs)
+	if err != nil {
+		return err
+	}
+	return JSON(c, http.StatusOK, map[string]int{"deleted": n})
 }
 
 func (h *TransactionHandler) Duplicate(c echo.Context) error {

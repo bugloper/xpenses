@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, toQuery } from '@/lib/api'
-import type { Category, CreateCategoryRequest, UpdateCategoryRequest } from '@/types/api'
+import type { Category, CategoryUsage, CreateCategoryRequest, UpdateCategoryRequest } from '@/types/api'
 import { keys } from './keys'
 
 export function useCategories(includeInactive = false) {
@@ -28,6 +28,31 @@ export function useUpdateCategory() {
       void qc.invalidateQueries({ queryKey: keys.categories.all })
       void qc.invalidateQueries({ queryKey: keys.reports.all })
       // Name/icon/colour are denormalised onto transaction rows.
+      void qc.invalidateQueries({ queryKey: keys.transactions.all })
+    },
+  })
+}
+
+/** What deleting a category (with its sub-categories) would touch. Fetched when `enabled`. */
+export function useCategoryUsage(id: string, enabled: boolean) {
+  return useQuery({
+    queryKey: [...keys.categories.all, 'usage', id],
+    queryFn: ({ signal }) => api.get<CategoryUsage>(`/categories/${id}/usage`, signal),
+    enabled: enabled && !!id,
+    staleTime: 0,
+  })
+}
+
+export function useDeleteCategory() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/categories/${id}`),
+    onSuccess: () => {
+      // Transactions lose the category, budgets on it go, reports regroup.
+      void qc.invalidateQueries({ queryKey: keys.categories.all })
+      void qc.invalidateQueries({ queryKey: keys.budgets.all })
+      void qc.invalidateQueries({ queryKey: keys.recurring.all })
+      void qc.invalidateQueries({ queryKey: keys.reports.all })
       void qc.invalidateQueries({ queryKey: keys.transactions.all })
     },
   })

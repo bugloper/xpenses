@@ -78,6 +78,27 @@ export function useDeleteTransaction() {
   })
 }
 
+/** Deletes several transactions in one go; resolves with how many went. */
+export function useBulkDeleteTransactions() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      // The server takes at most 500 per request.
+      let deleted = 0
+      for (let i = 0; i < ids.length; i += 500) {
+        const r = await api.post<{ deleted: number }>('/transactions/bulk-delete', {
+          ids: ids.slice(i, i + 500),
+        })
+        deleted += r.deleted
+      }
+      return { deleted }
+    },
+    onSuccess: () => {
+      for (const k of transactionDependentKeys) void qc.invalidateQueries({ queryKey: k })
+    },
+  })
+}
+
 export function useDuplicateTransaction() {
   const qc = useQueryClient()
   return useMutation({

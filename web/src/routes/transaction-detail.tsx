@@ -102,9 +102,9 @@ function TransactionDetailPage() {
         </Link>
       </Button>
 
-      <div className="grid items-start gap-5 lg:grid-cols-12 lg:gap-8">
+      <div className="grid items-start gap-5">
         {/* The record itself, set like a receipt. */}
-        <article className="bg-card rounded-lg border lg:col-span-7">
+        <article className="bg-card rounded-lg border">
           <header className="px-4 pt-5 pb-6 sm:px-6 sm:pt-6">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
               <span className="eyebrow">
@@ -194,9 +194,7 @@ function TransactionDetailPage() {
           </footer>
         </article>
 
-        <div className="lg:sticky lg:top-24 lg:col-span-5">
-          <AttachmentPanel tx={tx} />
-        </div>
+        <AttachmentPanel tx={tx} />
       </div>
 
       <ConfirmDialog

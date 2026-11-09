@@ -28,13 +28,18 @@ Status codes: 200 OK, 201 Created, 204 No Content, 400 bad_request, 404 not_foun
 | GET | /accounts?include_inactive=1 | Account includes `current_balance` (computed from ledger) |
 | POST | /accounts | `{name,type,currency?,opening_balance,opening_balance_date?,account_number?}` type ∈ bank,cash,mobile_wallet,credit_card,savings |
 | GET/PATCH | /accounts/:id | PATCH accepts any subset incl. `is_active` |
+| GET | /accounts/:id/usage | `{transactions, recurring}` — what still refers to the account (as source or transfer destination) |
+| DELETE | /accounts/:id | 204; 409 `conflict` while any transaction or recurring rule refers to it (deactivate instead) |
 | GET | /categories?include_inactive=1 | Flat list; `parent_id` null = main category, set = sub-category of that main category. Every new user gets the default two-level tree (see `internal/auth/defaults.go`); users from before the tree are upgraded once at startup (`auth.UpgradeCategoryTrees`). |
 | POST | /categories | `{name,icon,color,type('expense'|'income'),parent_id?}` — `parent_id` must be a category of the same type |
 | GET/PATCH | /categories/:id | |
+| GET | /categories/:id/usage | `{sub_categories, transactions, budgets, recurring}`; a main category's counts include its sub-categories |
+| DELETE | /categories/:id | 204; a main category goes with its sub-categories. Their transactions stay with `category_id` null (Uncategorised), recurring rules lose the category, budgets on them are deleted |
 | GET | /transactions | query: search,date_from,date_to,category_id (a main category includes its sub-categories),account_id,type,status,origin,unmatched=1,sort(date|amount|created_at|payee),order(asc|desc),page,per_page(≤200) |
 | GET | /transactions/export.csv | same filters, streams CSV |
 | POST | /transactions | see below. Returns 201, or 200 if `client_id` was already seen (idempotent replay) |
 | GET/PATCH/DELETE | /transactions/:id | PATCH is partial; `clear_category:true` / `clear_transfer_account:true` to null those. |
+| POST | /transactions/bulk-delete | body `{ids: [...]}` (1–500) → `{deleted: n}`; one database transaction; unknown or other users' ids are skipped; attachments go with their transactions |
 | POST | /transactions/:id/duplicate | body `{transaction_date?}` default today → 201 |
 | PUT/POST | /transactions/:id/attachment | multipart `file`: one JPEG/PNG/WebP image (sniffed, ≤ XPENSES_MAX_UPLOAD_BYTES) stored under `DATA_DIR/attachments/<user>/<id>`; replaces an earlier one → Transaction with `has_attachment: true` |
 | GET | /transactions/:id/attachment | the image bytes (`Cache-Control: private`) |

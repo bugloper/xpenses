@@ -16,6 +16,8 @@ func (h *AccountHandler) Register(g *echo.Group) {
 	g.POST("/accounts", h.Create)
 	g.GET("/accounts/:id", h.Get)
 	g.PATCH("/accounts/:id", h.Update)
+	g.DELETE("/accounts/:id", h.Delete)
+	g.GET("/accounts/:id/usage", h.Usage)
 }
 
 func (h *AccountHandler) List(c echo.Context) error {
@@ -56,4 +58,19 @@ func (h *AccountHandler) Update(c echo.Context) error {
 		return err
 	}
 	return JSON(c, http.StatusOK, a)
+}
+
+func (h *AccountHandler) Usage(c echo.Context) error {
+	u, err := h.Svc.Usage(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return err
+	}
+	return JSON(c, http.StatusOK, u)
+}
+
+func (h *AccountHandler) Delete(c echo.Context) error {
+	if err := h.Svc.Delete(c.Request().Context(), c.Param("id")); err != nil {
+		return err
+	}
+	return c.NoContent(http.StatusNoContent)
 }

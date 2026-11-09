@@ -348,3 +348,17 @@ export type Invite = {
   used_at: string | null
   used_by_email: string | null
 }
+
+/** GET /accounts/:id/usage — an account can be deleted only when both are 0. */
+export interface AccountUsage {
+  transactions: number
+  recurring: number
+}
+
+/** GET /categories/:id/usage — counts include the sub-categories of a main category. */
+export interface CategoryUsage {
+  sub_categories: number
+  transactions: number
+  budgets: number
+  recurring: number
+}

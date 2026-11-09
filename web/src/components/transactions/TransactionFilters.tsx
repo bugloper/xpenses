@@ -50,7 +50,7 @@ export function countActiveFilters(f: TxFilters): number {
 }
 
 /** The account filter as a select; used in the toolbar and in the sheet. */
-export function AccountFilter({
+function AccountFilter({
   value,
   onChange,
   className,
@@ -81,7 +81,7 @@ export function AccountFilter({
 }
 
 /** The category filter: main categories with their sub-categories beneath. */
-export function CategoryFilter({
+function CategoryFilter({
   value,
   onChange,
   className,
@@ -138,36 +138,32 @@ export function ActiveFilters({
   const { data: accounts = [] } = useAccounts(true)
   const { data: categories = [] } = useCategories(true)
   const set = (patch: Partial<TxFilters>) => onChange({ ...value, ...patch })
-  const tags: { key: string; label: string; clear: () => void; inToolbar?: boolean }[] = []
+  const tags: { key: string; label: string; clear: () => void }[] = []
   if (value.from && value.to)
     tags.push({
       key: 'date',
       label: rangeLabel({ from: value.from, to: value.to }),
       clear: () => set({ from: undefined, to: undefined }),
-      inToolbar: true,
     })
   if (value.account)
     tags.push({
       key: 'account',
       label: accounts.find((a) => a.id === value.account)?.name ?? 'Account',
       clear: () => set({ account: undefined }),
-      inToolbar: true,
     })
   if (value.category)
     tags.push({
       key: 'category',
       label: categoryLabel(categories, value.category) || 'Category',
       clear: () => set({ category: undefined }),
-      inToolbar: true,
     })
   if (value.type && !hideType)
     tags.push({ key: 'type', label: TYPE_LABEL[value.type], clear: () => set({ type: undefined }) })
   if (value.status)
     tags.push({ key: 'status', label: STATUS_LABEL[value.status], clear: () => set({ status: undefined }) })
   if (tags.length === 0) return null
-  const onlyToolbar = tags.every((t) => t.inToolbar)
   return (
-    <div className={cn('flex items-center gap-2', onlyToolbar && 'lg:hidden')}>
+    <div className="flex items-center gap-2">
       <span className="eyebrow shrink-0 max-sm:hidden">Showing</span>
       <div className="no-scrollbar -my-1 flex flex-1 gap-1.5 overflow-x-auto py-1">
         {tags.map((t) => (
@@ -176,10 +172,7 @@ export function ActiveFilters({
             type="button"
             onClick={t.clear}
             aria-label={`Remove filter: ${t.label}`}
-            className={cn(
-              'bg-card hover:border-foreground/30 flex h-7 shrink-0 items-center gap-1.5 rounded-md border pr-1.5 pl-2.5 text-xs font-medium transition-colors',
-              t.inToolbar && 'lg:hidden',
-            )}
+            className="bg-card hover:border-foreground/30 flex h-7 shrink-0 items-center gap-1.5 rounded-md border pr-1.5 pl-2.5 text-xs font-medium transition-colors"
           >
             {t.label}
             <X className="text-muted-foreground size-3.5" />

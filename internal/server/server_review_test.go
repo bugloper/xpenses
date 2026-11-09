@@ -22,7 +22,7 @@ func TestEchoErrorsUseContractCodes(t *testing.T) {
 	if st != 404 || code(body) != "not_found" {
 		t.Fatalf("unknown route: %d %v", st, body)
 	}
-	st, body = e.do("DELETE", "/accounts/x", nil)
+	st, body = e.do("PUT", "/accounts/x", nil)
 	if st != 405 || code(body) != "method_not_allowed" {
 		t.Fatalf("wrong method: %d %v", st, body)
 	}

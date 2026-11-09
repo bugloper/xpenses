@@ -1,8 +1,19 @@
 import { createRoute, Link } from '@tanstack/react-router'
-import { ArrowLeftRight, ChevronDown, Eye, EyeOff, MoreVertical, Pencil, Plus, Wallet } from 'lucide-react'
+import {
+  ArrowLeftRight,
+  ChevronDown,
+  Eye,
+  EyeOff,
+  MoreVertical,
+  Pencil,
+  Plus,
+  Trash2,
+  Wallet,
+} from 'lucide-react'
 import { useMemo, useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
 import { AccountFormSheet } from '@/components/accounts/AccountForm'
+import { DeleteAccountDialog } from '@/components/accounts/DeleteAccountDialog'
 import { TransferDialog } from '@/components/accounts/TransferDialog'
 import { AccountIcon, accountTypeLabel } from '@/components/common/AccountIcon'
 import { Money } from '@/components/common/Money'
@@ -13,6 +24,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -43,6 +55,7 @@ function AccountsPage() {
   const [editing, setEditing] = useState<Account | null | undefined>(undefined)
   const [transferFrom, setTransferFrom] = useState<string | null | undefined>(undefined)
   const [showInactive, setShowInactive] = useState(false)
+  const [deleting, setDeleting] = useState<Account | null>(null)
 
   const all = useMemo(() => data ?? [], [data])
   const active = useMemo(
@@ -80,6 +93,7 @@ function AccountsPage() {
       onEdit={() => setEditing(a)}
       onTransfer={() => setTransferFrom(a.id)}
       onToggleActive={() => toggleActive(a)}
+      onDelete={() => setDeleting(a)}
     />
   )
 
@@ -201,6 +215,11 @@ function AccountsPage() {
         onOpenChange={(o) => !o && setEditing(undefined)}
         account={editing ?? null}
       />
+      <DeleteAccountDialog
+        account={deleting}
+        open={deleting !== null}
+        onOpenChange={(o) => !o && setDeleting(null)}
+      />
       <TransferDialog
         open={transferFrom !== undefined}
         onOpenChange={(o) => !o && setTransferFrom(undefined)}
@@ -231,11 +250,8 @@ function NetWorth({
   const rest = held.slice(SERIES.length)
   const restTotal = rest.reduce((n, a) => n + a.current_balance, 0)
   return (
-    <section
-      className="bg-card grid overflow-hidden rounded-lg border lg:grid-cols-12"
-      aria-label="Net worth"
-    >
-      <div className="flex flex-col justify-between gap-5 p-5 sm:p-6 lg:col-span-5 lg:border-r">
+    <section className="bg-card grid overflow-hidden rounded-lg border" aria-label="Net worth">
+      <div className="flex flex-col justify-between gap-5 p-5 sm:p-6">
         <div>
           <div className="eyebrow">Net worth · active accounts</div>
           <div
@@ -260,7 +276,7 @@ function NetWorth({
           </div>
         </dl>
       </div>
-      <div className="flex flex-col gap-4 border-t p-5 sm:p-6 lg:col-span-7 lg:border-t-0">
+      <div className="flex flex-col gap-4 border-t p-5 sm:p-6">
         <div className="flex items-baseline justify-between gap-3">
           <div className="eyebrow">Where it is held</div>
           <div className="eyebrow">
@@ -356,6 +372,7 @@ function AccountRow({
   onEdit,
   onTransfer,
   onToggleActive,
+  onDelete,
 }: {
   account: Account
   share: number | null
@@ -364,6 +381,7 @@ function AccountRow({
   onEdit: () => void
   onTransfer: () => void
   onToggleActive: () => void
+  onDelete: () => void
 }) {
   return (
     <li
@@ -440,6 +458,10 @@ function AccountRow({
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={onToggleActive}>
               {a.is_active ? <EyeOff /> : <Eye />} {a.is_active ? 'Deactivate' : 'Activate'}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem variant="destructive" onSelect={onDelete}>
+              <Trash2 /> Delete
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

@@ -4,19 +4,14 @@ import { AccountIcon, accountTypeLabel } from '@/components/common/AccountIcon'
 import { Panel } from '@/components/common/kit'
 import { Money } from '@/components/common/Money'
 import { EmptyState, ErrorState, ListSkeleton } from '@/components/common/States'
-import { useIsDesktop } from '@/hooks/useMediaQuery'
 import type { DateRange } from '@/lib/dates'
 import { formatMoney } from '@/lib/money'
 import { useReportAccounts } from '@/lib/queries'
 import { cn } from '@/lib/utils'
 import type { ReportAccount } from '@/types/api'
 
-const TH = 'eyebrow px-3 py-2.5 text-right font-medium first:pl-5 first:text-left last:pr-5'
-const TD = 'px-3 py-3 text-right align-middle tabular first:pl-5 first:text-left last:pr-5'
-
 export function AccountsTab({ range }: { range: DateRange }) {
   const q = useReportAccounts(range.from, range.to)
-  const desktop = useIsDesktop()
   if (q.isPending)
     return (
       <Panel flush>
@@ -36,101 +31,6 @@ export function AccountsTab({ range }: { range: DateRange }) {
   const total = rows.every((a) => a.currency === currency) ? sum(rows) : null
   const title = 'Movement by account'
   const eyebrow = `${rows.length} account${rows.length === 1 ? '' : 's'} · balances as of today`
-
-  if (desktop)
-    return (
-      <Panel flush eyebrow={eyebrow} title={title}>
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-sm">
-            <thead>
-              <tr className="border-b">
-                <th scope="col" className={TH}>
-                  Account
-                </th>
-                <th scope="col" className={cn(TH, 'text-left')}>
-                  Type
-                </th>
-                <th scope="col" className={TH}>
-                  Opening
-                </th>
-                <th scope="col" className={TH}>
-                  In
-                </th>
-                <th scope="col" className={TH}>
-                  Out
-                </th>
-                <th scope="col" className={TH}>
-                  Transfers
-                </th>
-                <th scope="col" className={TH}>
-                  Balance now
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-rule divide-y">
-              {rows.map((a) => (
-                <tr key={a.account_id} className="hover:bg-muted/45 transition-colors">
-                  <td className={TD}>
-                    <Link
-                      to="/accounts/$id"
-                      params={{ id: a.account_id }}
-                      className="flex items-center gap-3 font-medium underline-offset-4 hover:underline"
-                    >
-                      <AccountIcon type={a.type} size="sm" />
-                      <span className="truncate">{a.name}</span>
-                    </Link>
-                  </td>
-                  <td className={cn(TD, 'text-muted-foreground text-left')}>{accountTypeLabel(a.type)}</td>
-                  <td className={cn(TD, 'text-muted-foreground')}>
-                    <Money minor={a.opening_balance} currency={a.currency} />
-                  </td>
-                  <td className={TD}>
-                    <Flow minor={a.income} currency={a.currency} tone="income" />
-                  </td>
-                  <td className={TD}>
-                    <Flow minor={-a.expenses} currency={a.currency} tone="expense" />
-                  </td>
-                  <td className={TD}>
-                    <Transfers a={a} />
-                  </td>
-                  <td className={cn(TD, 'font-semibold')}>
-                    <Money minor={a.balance} currency={a.currency} tone="auto" />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-            {total && (
-              <tfoot>
-                <tr className="bg-muted/50 border-foreground/70 border-t-2">
-                  <th scope="row" colSpan={2} className={cn(TD, 'eyebrow text-foreground text-left')}>
-                    Total
-                  </th>
-                  <td className={cn(TD, 'text-muted-foreground')}>
-                    <Money minor={total.opening_balance} currency={currency} />
-                  </td>
-                  <td className={TD}>
-                    <Flow minor={total.income} currency={currency} tone="income" />
-                  </td>
-                  <td className={TD}>
-                    <Flow minor={-total.expenses} currency={currency} tone="expense" />
-                  </td>
-                  <td className={TD}>
-                    <Money
-                      minor={total.transfers_in - total.transfers_out}
-                      currency={currency}
-                      sign="always"
-                    />
-                  </td>
-                  <td className={cn(TD, 'figure text-base')}>
-                    <Money minor={total.balance} currency={currency} tone="auto" />
-                  </td>
-                </tr>
-              </tfoot>
-            )}
-          </table>
-        </div>
-      </Panel>
-    )
 
   return (
     <Panel flush eyebrow={eyebrow} title={title}>

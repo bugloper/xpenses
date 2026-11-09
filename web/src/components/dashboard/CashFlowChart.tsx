@@ -73,7 +73,7 @@ export function CashFlowChart({
   currency: string
   running?: boolean
 }) {
-  if (loading && !data) return <Skeleton className="h-60 w-full rounded-md lg:h-80" />
+  if (loading && !data) return <Skeleton className="h-60 w-full rounded-md sm:h-64" />
   if (error && !data) return <ErrorState error={error} onRetry={onRetry} compact />
   const rows = data ?? []
   if (rows.length === 0 || rows.every((r) => r.income === 0 && r.expenses === 0))
@@ -92,7 +92,7 @@ export function CashFlowChart({
     const now = today()
     const points = runningTotals(rows.filter((r) => !isISODate(r.period) || r.period <= now))
     return (
-      <div className="h-60 w-full lg:h-80">
+      <div className="h-60 w-full sm:h-64">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={points} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
             <CartesianGrid vertical={false} stroke="var(--rule)" />
@@ -144,7 +144,7 @@ export function CashFlowChart({
   }
 
   return (
-    <div className="h-60 w-full lg:h-80">
+    <div className="h-60 w-full sm:h-64">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart
           data={rows}

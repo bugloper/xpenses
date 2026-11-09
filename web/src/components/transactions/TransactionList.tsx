@@ -7,12 +7,18 @@ import { formatDayHeading } from '@/lib/dates'
 import type { DayGroup } from '@/lib/transactions'
 import { uiStore } from '@/lib/ui-store'
 import { cn } from '@/lib/utils'
-import { LEDGER_COLUMNS, TransactionRow } from './TransactionRow'
+import { SelectBox, TransactionRow } from './TransactionRow'
+
+/** Selection mode for the ledger: which saved transactions are ticked. */
+export type ListSelection = {
+  ids: ReadonlySet<string>
+  toggle: (id: string) => void
+  setMany: (ids: string[], on: boolean) => void
+}
 
 /**
  * The ledger: one sheet, ruled into days. Each day opens with a band carrying
  * its date and net, which sticks under the top bar while its rows scroll by.
- * With `columns`, wide screens get a column header and rows set in columns.
  */
 export function TransactionList({
   groups,
@@ -26,8 +32,8 @@ export function TransactionList({
   currency = 'BTN',
   emptyTitle = 'No transactions',
   emptyDescription = 'Tap + to add your first expense.',
-  columns,
   className,
+  selection,
 }: {
   groups: DayGroup[]
   loading: boolean
@@ -40,9 +46,9 @@ export function TransactionList({
   currency?: string
   emptyTitle?: string
   emptyDescription?: string
-  /** Set the ledger in columns (date · payee · category · account · amount) on wide screens. */
-  columns?: boolean
   className?: string
+  /** When set, rows tick instead of opening, and each day can be ticked whole. */
+  selection?: ListSelection
 }) {
   const sentinel = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -85,26 +91,20 @@ export function TransactionList({
     )
   return (
     <div className={sheet}>
-      {columns && (
-        <div aria-hidden className={cn('eyebrow hidden border-b px-5 py-2.5', LEDGER_COLUMNS)}>
-          <span>Date</span>
-          <span>Payee / description</span>
-          <span>Category</span>
-          <span>Account</span>
-          <span className="text-right">Amount</span>
-        </div>
-      )}
       {groups.map((g, i) => (
         <section key={g.date} aria-label={formatDayHeading(g.date)}>
           <div
             className={cn(
-              'bg-muted sticky top-14 z-10 flex items-center justify-between gap-3 border-b px-4 py-1.5 sm:px-5 lg:top-16',
+              'bg-muted sticky top-14 z-10 flex items-center justify-between gap-3 border-b px-4 py-1.5 sm:px-5 lg:top-0',
               i > 0 && 'border-t',
-              i === 0 && !columns && 'rounded-t-[calc(var(--radius-lg)-1px)]',
-              i === 0 && columns && 'rounded-t-[calc(var(--radius-lg)-1px)] lg:rounded-none',
+              i === 0 && 'rounded-t-[calc(var(--radius-lg)-1px)]',
             )}
           >
-            <h3 className="eyebrow text-foreground/75">{formatDayHeading(g.date)}</h3>
+            {selection ? (
+              <DaySelect group={g} selection={selection} />
+            ) : (
+              <h3 className="eyebrow text-foreground/75">{formatDayHeading(g.date)}</h3>
+            )}
             {(g.income > 0 || g.expense > 0) && (
               <span className="flex items-baseline gap-2 text-xs">
                 <span className="eyebrow hidden sm:inline">Net</span>
@@ -122,9 +122,11 @@ export function TransactionList({
               <TransactionRow
                 key={row.tx.id}
                 row={row}
-                columns={columns}
                 perspectiveAccountId={perspectiveAccountId}
                 onClick={row.kind === 'pending' ? () => uiStore.setPending(true) : undefined}
+                selectable={!!selection}
+                selected={selection?.ids.has(row.tx.id)}
+                onToggle={() => selection?.toggle(row.tx.id)}
               />
             ))}
           </div>
@@ -138,5 +140,29 @@ export function TransactionList({
         </div>
       )}
     </div>
+  )
+}
+
+/** A day band's tick: selects or clears every saved transaction of that day. */
+function DaySelect({ group, selection }: { group: DayGroup; selection: ListSelection }) {
+  const ids = group.rows.filter((r) => r.kind === 'tx').map((r) => r.tx.id)
+  const n = ids.filter((id) => selection.ids.has(id)).length
+  const all = ids.length > 0 && n === ids.length
+  const label = formatDayHeading(group.date)
+  return (
+    <h3 className="flex items-center">
+      <button
+        type="button"
+        role="checkbox"
+        aria-checked={all ? true : n > 0 ? 'mixed' : false}
+        aria-label={`Select all on ${label}`}
+        disabled={ids.length === 0}
+        onClick={() => selection.setMany(ids, !all)}
+        className="eyebrow text-foreground/75 hover:text-foreground -my-1 flex items-center gap-2.5 rounded-sm py-1 disabled:opacity-50 [&_svg]:size-3 [&>span]:size-4.5 [&>span]:rounded-[3px]"
+      >
+        <SelectBox checked={all} mixed={n > 0 && !all} />
+        {label}
+      </button>
+    </h3>
   )
 }

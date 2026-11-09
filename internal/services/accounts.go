@@ -111,3 +111,61 @@ func (s *AccountService) Update(ctx context.Context, id string, req dto.UpdateAc
 	}
 	return s.Get(ctx, id)
 }
+
+// AccountUsage says what still refers to an account; it can be deleted only
+// when nothing does.
+type AccountUsage struct {
+	Transactions int `json:"transactions"`
+	Recurring    int `json:"recurring"`
+}
+
+func (s *AccountService) usage(ctx context.Context, db repositories.DBTX, uid, id string) (AccountUsage, error) {
+	var u AccountUsage
+	err := db.QueryRowContext(ctx, `SELECT
+		(SELECT COUNT(*) FROM transactions WHERE user_id = ? AND (account_id = ? OR transfer_account_id = ?)),
+		(SELECT COUNT(*) FROM recurring_transactions WHERE user_id = ? AND (account_id = ? OR transfer_account_id = ?))`,
+		uid, id, id, uid, id, id).Scan(&u.Transactions, &u.Recurring)
+	return u, err
+}
+
+// Usage counts the transactions and recurring rules that use the account.
+func (s *AccountService) Usage(ctx context.Context, id string) (*AccountUsage, error) {
+	if _, err := s.Get(ctx, id); err != nil {
+		return nil, err
+	}
+	u, err := s.usage(ctx, s.DB, auth.UserID(ctx), id)
+	if err != nil {
+		return nil, apperr.Internal(err)
+	}
+	return &u, nil
+}
+
+// Delete removes an account that nothing refers to. An account with history
+// is refused (409): its transactions carry the balance, so it can only be
+// deactivated.
+func (s *AccountService) Delete(ctx context.Context, id string) error {
+	if _, err := s.Get(ctx, id); err != nil {
+		return err
+	}
+	uid := auth.UserID(ctx)
+	var conflict *apperr.Error
+	err := repositories.WithTx(ctx, s.DB, func(tx *sql.Tx) error {
+		u, err := s.usage(ctx, tx, uid, id)
+		if err != nil {
+			return err
+		}
+		if u.Transactions > 0 || u.Recurring > 0 {
+			conflict = apperr.Conflict("this account has transactions or recurring rules; delete those first or deactivate the account")
+			return nil
+		}
+		_, err = tx.ExecContext(ctx, `DELETE FROM accounts WHERE id = ? AND user_id = ?`, id, uid)
+		return err
+	})
+	if err != nil {
+		return apperr.Internal(err)
+	}
+	if conflict != nil {
+		return conflict
+	}
+	return nil
+}

@@ -88,7 +88,7 @@ function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-4 border-b pb-5 lg:flex-row lg:items-end lg:justify-between">
+      <div className="flex flex-col gap-4 border-b pb-5">
         <PageHeader title="Dashboard" eyebrow={rangeLabel(range)} rule={false} />
         <div className="min-w-0">
           <PeriodSelector
@@ -117,9 +117,9 @@ function DashboardPage() {
         range={range}
       />
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-12">
+      <div className="grid gap-6 md:grid-cols-2">
         <Panel
-          className="md:col-span-2 lg:col-span-8"
+          className="md:col-span-2"
           eyebrow={running ? 'Running totals' : granularity === 'day' ? 'By day' : 'Last six months'}
           title={running ? 'Cash flow this period' : granularity === 'day' ? 'Cash flow' : 'Monthly trend'}
           action={
@@ -146,7 +146,6 @@ function DashboardPage() {
         </Panel>
 
         <Panel
-          className="lg:col-span-4"
           eyebrow={formatMonthLabel(month)}
           title="Budgets"
           action={<HeaderLink to="/budgets">Manage</HeaderLink>}
@@ -162,7 +161,7 @@ function DashboardPage() {
           />
         </Panel>
 
-        <Panel className="lg:col-span-5 lg:self-start" eyebrow="Ranked" title="Spending by category" flush>
+        <Panel className="md:self-start" eyebrow="Ranked" title="Spending by category" flush>
           <CategoryBreakdown
             data={categories.data}
             loading={categories.isPending}
@@ -175,7 +174,7 @@ function DashboardPage() {
 
         <Section
           title="Recent transactions"
-          className="md:col-span-2 lg:col-span-7"
+          className="md:col-span-2"
           action={<HeaderLink to="/transactions">See all</HeaderLink>}
         >
           <TransactionList

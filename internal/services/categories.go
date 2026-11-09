@@ -123,3 +123,112 @@ func (s *CategoryService) Update(ctx context.Context, id string, req dto.UpdateC
 	}
 	return c, nil
 }
+
+// CategoryUsage says what deleting a category takes with it: a main category
+// goes together with its sub-categories, and every count covers all of them.
+type CategoryUsage struct {
+	SubCategories int `json:"sub_categories"`
+	Transactions  int `json:"transactions"`
+	Budgets       int `json:"budgets"`
+	Recurring     int `json:"recurring"`
+}
+
+// family is the category's id followed by its sub-categories' ids.
+func (s *CategoryService) family(ctx context.Context, db repositories.DBTX, uid, id string) ([]string, error) {
+	rows, err := db.QueryContext(ctx, `SELECT id FROM categories WHERE user_id = ? AND parent_id = ?`, uid, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	ids := []string{id}
+	for rows.Next() {
+		var sub string
+		if err := rows.Scan(&sub); err != nil {
+			return nil, err
+		}
+		ids = append(ids, sub)
+	}
+	return ids, rows.Err()
+}
+
+func placeholders(n int) string { return strings.TrimSuffix(strings.Repeat("?,", n), ",") }
+
+func idArgs(uid string, ids []string) []any {
+	args := []any{uid}
+	for _, id := range ids {
+		args = append(args, id)
+	}
+	return args
+}
+
+func (s *CategoryService) usage(ctx context.Context, db repositories.DBTX, uid string, ids []string) (CategoryUsage, error) {
+	u := CategoryUsage{SubCategories: len(ids) - 1}
+	in := placeholders(len(ids))
+	for _, q := range []struct {
+		table string
+		dst   *int
+	}{{"transactions", &u.Transactions}, {"budgets", &u.Budgets}, {"recurring_transactions", &u.Recurring}} {
+		if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM `+q.table+` WHERE user_id = ? AND category_id IN (`+in+`)`,
+			idArgs(uid, ids)...).Scan(q.dst); err != nil {
+			return u, err
+		}
+	}
+	return u, nil
+}
+
+// Usage counts what deleting the category would affect.
+func (s *CategoryService) Usage(ctx context.Context, id string) (*CategoryUsage, error) {
+	if _, err := s.Get(ctx, id); err != nil {
+		return nil, err
+	}
+	uid := auth.UserID(ctx)
+	ids, err := s.family(ctx, s.DB, uid, id)
+	if err != nil {
+		return nil, apperr.Internal(err)
+	}
+	u, err := s.usage(ctx, s.DB, uid, ids)
+	if err != nil {
+		return nil, apperr.Internal(err)
+	}
+	return &u, nil
+}
+
+// Delete removes the category and, for a main category, its sub-categories.
+// Their transactions are kept and become uncategorised, recurring rules lose
+// the category, and budgets on them are removed.
+func (s *CategoryService) Delete(ctx context.Context, id string) error {
+	if _, err := s.Get(ctx, id); err != nil {
+		return err
+	}
+	uid := auth.UserID(ctx)
+	err := repositories.WithTx(ctx, s.DB, func(tx *sql.Tx) error {
+		ids, err := s.family(ctx, tx, uid, id)
+		if err != nil {
+			return err
+		}
+		in := placeholders(len(ids))
+		now := models.NowUTC()
+		if _, err := tx.ExecContext(ctx, `UPDATE transactions SET category_id = NULL, updated_at = ? WHERE user_id = ? AND category_id IN (`+in+`)`,
+			append([]any{now}, idArgs(uid, ids)...)...); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE recurring_transactions SET category_id = NULL, updated_at = ? WHERE user_id = ? AND category_id IN (`+in+`)`,
+			append([]any{now}, idArgs(uid, ids)...)...); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `DELETE FROM budgets WHERE user_id = ? AND category_id IN (`+in+`)`, idArgs(uid, ids)...); err != nil {
+			return err
+		}
+		// Sub-categories first, so the main row is deleted last.
+		for i := len(ids) - 1; i >= 0; i-- {
+			if _, err := tx.ExecContext(ctx, `DELETE FROM categories WHERE id = ? AND user_id = ?`, ids[i], uid); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return apperr.Internal(err)
+	}
+	return nil
+}

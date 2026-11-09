@@ -43,59 +43,69 @@ function ThemeButton() {
   )
 }
 
-/** Desktop: one ink bar across the top — the mark, the screens as typeset tabs, then the tools. */
-function Masthead() {
+/**
+ * Desktop: the phone's ink tab bar turned on its side. The mark, the saffron
+ * Record key, the screens with the same icons as the tabs (a saffron bar marks
+ * the current one), and at the foot the currency, theme and account.
+ */
+function Sidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname })
-  const tab = (item: NavItem) => {
-    const current = isActive(item, pathname)
+  const item = (it: NavItem) => {
+    const Icon = it.icon
+    const current = isActive(it, pathname)
     return (
       <Link
-        key={item.to}
-        to={item.to}
+        key={it.to}
+        to={it.to}
         aria-current={current ? 'page' : undefined}
         className={cn(
-          'relative flex h-full items-center px-3 text-[0.8125rem] font-medium tracking-wide transition-colors',
-          current ? 'text-ink-foreground' : 'text-ink-muted hover:text-ink-foreground',
+          'relative flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium transition-colors',
+          current
+            ? 'bg-ink-foreground/10 text-ink-foreground'
+            : 'text-ink-muted hover:bg-ink-foreground/5 hover:text-ink-foreground',
         )}
       >
-        {item.label}
         <span
           aria-hidden
           className={cn(
-            'bg-saffron absolute inset-x-3 bottom-0 h-[3px] rounded-t-sm transition-opacity',
+            'bg-saffron absolute inset-y-2 -left-3 w-[3px] rounded-r-sm',
             current ? 'opacity-100' : 'opacity-0',
           )}
         />
+        <Icon className="size-[1.125rem]" strokeWidth={current ? 2.25 : 1.75} />
+        {it.label}
       </Link>
     )
   }
   return (
-    <header className="bg-ink text-ink-foreground sticky top-0 z-30 hidden lg:block">
-      <div className="mx-auto flex h-16 max-w-7xl items-center gap-6 px-8">
-        <Link to="/" aria-label="Xpenses home" className="shrink-0">
-          <Logo inverted />
-        </Link>
-        <nav aria-label="Main" className="flex h-full min-w-0 flex-1 items-stretch">
-          {PRIMARY_NAV.map(tab)}
-          <span aria-hidden className="bg-ink-foreground/15 mx-2 my-5 w-px" />
-          {SETUP_NAV.map(tab)}
-        </nav>
-        <div className="flex shrink-0 items-center gap-1.5">
-          <CurrencyMenu />
-          <ThemeButton />
-          <button
-            type="button"
-            onClick={() => uiStore.openAdd()}
-            aria-label="Add transaction"
-            className="bg-saffron text-saffron-foreground ml-1.5 inline-flex h-9 items-center gap-1.5 rounded-md px-3.5 text-sm font-semibold transition-[filter] hover:brightness-95"
-          >
-            <Plus className="size-4" strokeWidth={2.75} /> Record
-          </button>
-          <span aria-hidden className="bg-ink-foreground/15 mx-1.5 h-6 w-px" />
-          <UserMenu />
-        </div>
+    <aside className="bg-ink text-ink-foreground fixed inset-y-0 left-0 z-30 hidden w-60 flex-col lg:flex">
+      <Link to="/" aria-label="Xpenses home" className="flex h-16 shrink-0 items-center px-5">
+        <Logo inverted />
+      </Link>
+      <div className="px-3 pb-3">
+        <button
+          type="button"
+          onClick={() => uiStore.openAdd()}
+          aria-label="Add transaction"
+          className="bg-saffron text-saffron-foreground flex h-11 w-full items-center justify-center gap-2 rounded-lg text-sm font-semibold shadow-[0_8px_20px_-8px_rgb(0_0_0/0.6)] transition-[filter] hover:brightness-95"
+        >
+          <Plus className="size-5" strokeWidth={2.75} /> Record
+        </button>
       </div>
-    </header>
+      <nav aria-label="Main" className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-2">
+        {PRIMARY_NAV.map(item)}
+        <div className="text-ink-muted/80 mt-5 mb-1.5 px-3 font-mono text-[0.625rem] tracking-[0.12em] uppercase">
+          Set up
+        </div>
+        {SETUP_NAV.map(item)}
+      </nav>
+      <div className="border-ink-foreground/10 flex items-center gap-1.5 border-t px-3 py-3">
+        <UserMenu />
+        <span className="flex-1" />
+        <CurrencyMenu />
+        <ThemeButton />
+      </div>
+    </aside>
   )
 }
 
@@ -235,14 +245,20 @@ export function AppShell() {
       >
         Skip to content
       </a>
-      <Masthead />
+      <Sidebar />
       <Topbar />
-      <main id="main" className="mx-auto w-full max-w-7xl px-4 pt-5 pb-28 sm:px-6 lg:px-8 lg:pt-10 lg:pb-16">
-        <div className="mb-5 grid gap-2 empty:hidden">
-          <AccessBanner />
-          <SyncPill />
+      <main
+        id="main"
+        className="w-full px-4 pt-5 pb-28 sm:px-6 lg:pt-10 lg:pr-8 lg:pb-16 lg:pl-[calc(15rem+2rem)]"
+      >
+        {/* Desktop keeps the phone's single column, just roomier. */}
+        <div className="mx-auto w-full max-w-3xl">
+          <div className="mb-5 grid gap-2 empty:hidden">
+            <AccessBanner />
+            <SyncPill />
+          </div>
+          <Outlet />
         </div>
-        <Outlet />
       </main>
       <Tabbar />
       <AddTransactionSheet />

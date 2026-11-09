@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"strings"
 
 	"github.com/bugloper/xpenses/internal/auth"
@@ -279,4 +280,56 @@ func (s *TransactionService) Duplicate(ctx context.Context, id string, date stri
 		Payee: src.Payee, TransactionDate: date, Notes: src.Notes, Tags: src.Tags, Status: models.StatusCleared,
 	})
 	return t, err
+}
+
+// MaxBulkDelete caps how many transactions one bulk delete may remove.
+const MaxBulkDelete = 500
+
+// DeleteMany removes the given transactions of the signed-in user in one
+// database transaction and returns how many were removed. Ids that do not
+// exist or belong to someone else are skipped, like a single delete's 404.
+func (s *TransactionService) DeleteMany(ctx context.Context, ids []string) (int, error) {
+	uniq := make([]string, 0, len(ids))
+	seen := map[string]bool{}
+	for _, id := range ids {
+		if id = strings.TrimSpace(id); id != "" && !seen[id] {
+			seen[id] = true
+			uniq = append(uniq, id)
+		}
+	}
+	if len(uniq) == 0 {
+		return 0, apperr.Validation("nothing to delete", map[string]string{"ids": "required"})
+	}
+	if len(uniq) > MaxBulkDelete {
+		return 0, apperr.Validation("too many transactions", map[string]string{"ids": fmt.Sprintf("at most %d at a time", MaxBulkDelete)})
+	}
+	uid := auth.UserID(ctx)
+	var withFile []string
+	deleted := 0
+	err := repositories.WithTx(ctx, s.DB, func(tx *sql.Tx) error {
+		for _, id := range uniq {
+			t, err := s.Repo.Get(ctx, tx, uid, id)
+			if err != nil {
+				return err
+			}
+			if t == nil {
+				continue
+			}
+			if err := s.Repo.Delete(ctx, tx, uid, id); err != nil {
+				return err
+			}
+			deleted++
+			if t.AttachmentMime != "" {
+				withFile = append(withFile, id)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return 0, apperr.Internal(err)
+	}
+	for _, id := range withFile {
+		s.removeAttachmentFile(uid, id)
+	}
+	return deleted, nil
 }

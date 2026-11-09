@@ -1,19 +1,10 @@
 import { Link, createRoute } from '@tanstack/react-router'
-import {
-  ChevronDown,
-  ChevronRight,
-  Eye,
-  EyeOff,
-  MoreVertical,
-  Pencil,
-  Plus,
-  Search,
-  Shapes,
-} from 'lucide-react'
+import { ChevronDown, Eye, EyeOff, MoreVertical, Pencil, Plus, Search, Shapes, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { CategoryFormSheet } from '@/components/categories/CategoryForm'
+import { DeleteCategoryDialog } from '@/components/categories/DeleteCategoryDialog'
 import { CategoryIcon } from '@/components/common/CategoryIcon'
 import { Money } from '@/components/common/Money'
 import { PageHeader } from '@/components/common/PageHeader'
@@ -25,11 +16,11 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
-import { useIsDesktop } from '@/hooks/useMediaQuery'
 import { errorMessage } from '@/lib/api'
 import { groupCategories, type CategoryGroup } from '@/lib/categories'
 import { useBudgets, useCategories, useDefaultCurrency, useUpdateCategory } from '@/lib/queries'
@@ -65,13 +56,13 @@ type Actions = {
   onEdit: (c: Category) => void
   onAddSub: (parentId: string) => void
   onToggleActive: (c: Category) => void
+  onDelete: (c: Category) => void
 }
 
 function CategoriesPage() {
   const search = categoriesRoute.useSearch()
   const navigate = categoriesRoute.useNavigate()
   const type: CategoryType = search.type ?? 'expense'
-  const desktop = useIsDesktop()
   const [showInactive, setShowInactive] = useState(false)
   const [query, setQuery] = useState('')
   const { data, isPending, error, refetch } = useCategories(showInactive)
@@ -79,7 +70,7 @@ function CategoriesPage() {
   const update = useUpdateCategory()
   const currency = useDefaultCurrency()
   const [editing, setEditing] = useState<Editing>(null)
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState<Category | null>(null)
 
   const groups = useMemo(
     () => groupCategories(data ?? [], type, { includeInactive: showInactive }),
@@ -105,6 +96,7 @@ function CategoriesPage() {
     onEdit: (c) => edit(c, null),
     onAddSub: (parentId) => edit(null, parentId),
     onToggleActive: toggleActive,
+    onDelete: setDeleting,
   }
   const props = { groups: shown, query, type, currency, budgets: budgetByCategory, actions }
 
@@ -141,7 +133,6 @@ function CategoriesPage() {
           aria-label="Category type"
           value={type}
           onChange={(v) => {
-            setSelectedId(null)
             void navigate({ search: v === 'expense' ? {} : { type: v }, replace: true })
           }}
           options={[
@@ -185,11 +176,14 @@ function CategoriesPage() {
             description="Try another word, or create it."
           />
         </div>
-      ) : desktop ? (
-        <TwoPane {...props} selectedId={selectedId} onSelect={setSelectedId} />
       ) : (
         <Accordion {...props} />
       )}
+      <DeleteCategoryDialog
+        category={deleting}
+        open={deleting !== null}
+        onOpenChange={(o) => !o && setDeleting(null)}
+      />
       <CategoryFormSheet
         open={editing !== null}
         onOpenChange={(o) => !o && setEditing(null)}
@@ -208,150 +202,6 @@ type ListProps = {
   currency: string
   budgets: Map<string, Budget>
   actions: Actions
-}
-
-/** Desktop: the main categories down the left, the chosen one's sub-categories on the right. */
-function TwoPane({
-  groups,
-  query,
-  type,
-  currency,
-  budgets,
-  actions,
-  selectedId,
-  onSelect,
-}: ListProps & { selectedId: string | null; onSelect: (id: string) => void }) {
-  const selected = groups.find((g) => g.parent.id === selectedId) ?? groups[0]!
-  return (
-    <div className="grid grid-cols-12 items-start gap-6">
-      <section className="bg-card col-span-5 overflow-hidden rounded-lg border xl:col-span-4">
-        <header className="flex items-baseline justify-between border-b px-4 py-3">
-          <h2 className="eyebrow text-foreground/80">Main categories</h2>
-          <span className="eyebrow">{groups.length}</span>
-        </header>
-        <ul className="divide-rule divide-y" aria-label={`${type} categories`}>
-          {groups.map((g) => {
-            const on = g.parent.id === selected.parent.id
-            const matches = childMatches(g, query)
-            return (
-              <li key={g.parent.id} className="relative">
-                <span
-                  aria-hidden
-                  className={cn(
-                    'bg-saffron absolute inset-y-0 left-0 w-[3px]',
-                    on ? 'opacity-100' : 'opacity-0',
-                  )}
-                />
-                <button
-                  type="button"
-                  onClick={() => onSelect(g.parent.id)}
-                  aria-label={g.parent.name}
-                  aria-current={on ? 'true' : undefined}
-                  className={cn(
-                    'flex w-full items-center gap-3 px-4 py-3 text-left transition-colors',
-                    on ? 'bg-accent/60' : 'hover:bg-muted/55',
-                    !g.parent.is_active && 'opacity-60',
-                  )}
-                >
-                  <CategoryIcon icon={g.parent.icon} color={g.parent.color} size="sm" />
-                  <span className="min-w-0 flex-1">
-                    <span className="flex items-center gap-2">
-                      <span className="truncate text-sm font-medium">{g.parent.name}</span>
-                      {!g.parent.is_active && <Badge variant="outline">Inactive</Badge>}
-                    </span>
-                    <span className="text-muted-foreground block truncate text-xs">
-                      {matches.length > 0
-                        ? `Has ${matches.map((m) => m.name).join(', ')}`
-                        : subLabel(g.children.length)}
-                    </span>
-                  </span>
-                  {type === 'expense' && budgets.get(g.parent.id) && (
-                    <span className="eyebrow text-[0.625rem]">Budget</span>
-                  )}
-                  <ChevronRight
-                    className={cn('size-4 shrink-0', on ? 'text-foreground' : 'text-muted-foreground/50')}
-                  />
-                </button>
-              </li>
-            )
-          })}
-        </ul>
-      </section>
-      <GroupDetail
-        className="sticky top-24 col-span-7 xl:col-span-8"
-        group={selected}
-        query={query}
-        type={type}
-        currency={currency}
-        budgets={budgets}
-        actions={actions}
-      />
-    </div>
-  )
-}
-
-/** One main category in full: its header, its budget, and every sub-category. */
-function GroupDetail({
-  group,
-  query,
-  type,
-  currency,
-  budgets,
-  actions,
-  className,
-}: {
-  group: CategoryGroup
-  query: string
-  type: CategoryType
-  currency: string
-  budgets: Map<string, Budget>
-  actions: Actions
-  className?: string
-}) {
-  const { parent, children } = group
-  const budget = type === 'expense' ? budgets.get(parent.id) : undefined
-  return (
-    <section className={cn('bg-card overflow-hidden rounded-lg border', className)} aria-label={parent.name}>
-      <header className="flex items-start gap-4 border-b px-5 py-4">
-        <CategoryIcon icon={parent.icon} color={parent.color} size="lg" />
-        <div className="min-w-0 flex-1">
-          <div className="eyebrow mb-1">Main category · {type}</div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="font-display truncate text-[1.625rem] leading-tight">{parent.name}</h2>
-            {!parent.is_active && <Badge variant="outline">Inactive</Badge>}
-          </div>
-          <p className="text-muted-foreground mt-1 text-[0.8125rem]">
-            {subLabel(children.length)}
-            {budget && (
-              <>
-                {' · '}
-                <BudgetLink amount={budget.amount} currency={currency} label="Budget for the whole group" />
-              </>
-            )}
-          </p>
-        </div>
-        <div className="flex shrink-0 items-center gap-1">
-          <Button variant="outline" size="sm" onClick={() => actions.onEdit(parent)}>
-            <Pencil data-icon="inline-start" /> Edit
-          </Button>
-          <RowMenu category={parent} onToggleActive={actions.onToggleActive} />
-        </div>
-      </header>
-      <SubList
-        group={group}
-        query={query}
-        type={type}
-        currency={currency}
-        budgets={budgets}
-        actions={actions}
-      />
-      <footer className="bg-muted/50 border-t px-5 py-3">
-        <Button variant="ghost" size="sm" className="-ml-2" onClick={() => actions.onAddSub(parent.id)}>
-          <Plus data-icon="inline-start" /> Add sub-category
-        </Button>
-      </footer>
-    </section>
-  )
 }
 
 function SubList({
@@ -406,7 +256,12 @@ function SubList({
               </div>
               {budget && <BudgetLink amount={budget.amount} currency={currency} />}
             </div>
-            <RowMenu category={c} onEdit={actions.onEdit} onToggleActive={actions.onToggleActive} />
+            <RowMenu
+              category={c}
+              onEdit={actions.onEdit}
+              onToggleActive={actions.onToggleActive}
+              onDelete={actions.onDelete}
+            />
           </li>
         )
       })}
@@ -470,6 +325,7 @@ function Accordion({ groups, query, type, currency, budgets, actions }: ListProp
                 onEdit={actions.onEdit}
                 onToggleActive={actions.onToggleActive}
                 onAddSub={() => actions.onAddSub(g.parent.id)}
+                onDelete={actions.onDelete}
               />
             </div>
             {expanded && (
@@ -527,21 +383,18 @@ function RowMenu({
   onEdit,
   onToggleActive,
   onAddSub,
+  onDelete,
 }: {
   category: Category
   onEdit?: (c: Category) => void
   onToggleActive: (c: Category) => void
   onAddSub?: () => void
+  onDelete: (c: Category) => void
 }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          className="size-10 lg:size-8"
-          aria-label={`Actions for ${c.name}`}
-        >
+        <Button variant="ghost" size="icon-sm" className="size-10" aria-label={`Actions for ${c.name}`}>
           <MoreVertical />
         </Button>
       </DropdownMenuTrigger>
@@ -558,6 +411,10 @@ function RowMenu({
         )}
         <DropdownMenuItem onSelect={() => onToggleActive(c)}>
           {c.is_active ? <EyeOff /> : <Eye />} {c.is_active ? 'Deactivate' : 'Activate'}
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem variant="destructive" onSelect={() => onDelete(c)}>
+          <Trash2 /> Delete
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

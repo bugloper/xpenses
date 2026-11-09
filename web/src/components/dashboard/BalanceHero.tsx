@@ -49,14 +49,11 @@ export function BalanceHero({
     : 'previous period'
 
   return (
-    <section
-      aria-label="Period summary"
-      className="bg-card grid overflow-hidden rounded-lg border lg:grid-cols-12"
-    >
-      <div className="flex flex-col justify-between gap-5 border-b p-5 sm:p-7 lg:col-span-5 lg:border-r lg:border-b-0">
+    <section aria-label="Period summary" className="bg-card grid overflow-hidden rounded-lg border">
+      <div className="flex flex-col justify-between gap-5 border-b p-5 sm:p-7">
         <div>
           <div className="eyebrow">{balanceLabel}</div>
-          <div className="figure mt-3 text-[2.75rem] leading-none sm:text-[3.5rem] xl:text-[4rem]">
+          <div className="figure mt-3 text-[2.75rem] leading-none sm:text-[3.5rem]">
             {busy ? (
               <Skeleton className="h-12 w-56" />
             ) : (
@@ -71,7 +68,7 @@ export function BalanceHero({
         </p>
       </div>
 
-      <div className="flex flex-col gap-5 p-5 sm:p-7 lg:col-span-7">
+      <div className="flex flex-col gap-5 p-5 sm:p-7">
         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
           <span className="eyebrow">Statement · {rangeLabel(range)}</span>
           {pct !== null && (

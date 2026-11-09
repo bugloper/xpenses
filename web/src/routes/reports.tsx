@@ -85,14 +85,13 @@ function ReportsPage() {
         onValueChange={(v) => patch({ tab: v === 'overview' ? undefined : (v as Tab) })}
         className="gap-6"
       >
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between lg:gap-6 lg:border-b">
+        <div className="flex flex-col gap-4">
           <ReportsPeriodSelector
             preset={preset}
             range={range}
             onChange={(p, r) => patch(periodSearch(p, r))}
-            className="lg:order-2 lg:pb-2"
           />
-          <div className="-mx-4 scrollbar-none overflow-x-auto border-b px-4 sm:mx-0 sm:px-0 lg:order-1 lg:border-b-0">
+          <div className="-mx-4 scrollbar-none overflow-x-auto border-b px-4 sm:mx-0 sm:px-0">
             <TabsList
               variant="line"
               aria-label="Report"

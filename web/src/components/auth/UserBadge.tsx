@@ -57,7 +57,7 @@ export function UserMenu() {
           <ChevronDown className="text-ink-muted size-4" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-64">
+      <DropdownMenuContent align="start" side="top" className="w-64">
         <DropdownMenuLabel className="flex flex-col gap-0.5 py-2">
           <span className="flex items-center gap-2">
             <span className="truncate text-sm font-medium">{user.name}</span>

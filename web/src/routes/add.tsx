@@ -73,18 +73,13 @@ function AddPage() {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader eyebrow="Record" title="Add transaction" description="Quick entry. Works offline." />
-      <div className="grid items-start gap-5 lg:grid-cols-12 lg:gap-8">
-        {/* The screenshot first on a phone (it fills the form); beside the form on a desk. */}
-        <aside className="flex flex-col gap-3 lg:order-last lg:col-span-5">
-          <div className="eyebrow hidden lg:block">Payment screenshot</div>
+      <div className="grid items-start gap-5">
+        {/* The screenshot first: it fills the form. */}
+        <aside className="flex flex-col gap-3">
           <AttachmentField file={attachment} onChange={setAttachment} />
           <ReceiptCard scan={scan} receipt={receipt} />
-          <p className="text-muted-foreground hidden text-sm leading-relaxed lg:block">
-            Share a success screen from your banking app straight into Xpenses, or pick it here. Saved entries
-            made offline sync when you are back online.
-          </p>
         </aside>
-        <div className="bg-card rounded-lg border px-4 pt-5 pb-4 lg:col-span-7 lg:px-5 max-lg:[&_[data-slot=form-actions]]:bottom-[calc(4rem+env(safe-area-inset-bottom))]">
+        <div className="bg-card rounded-lg border px-4 pt-5 pb-4 sm:px-5 max-lg:[&_[data-slot=form-actions]]:bottom-[calc(4rem+env(safe-area-inset-bottom))]">
           <TransactionForm
             initial={initial}
             mode="create"

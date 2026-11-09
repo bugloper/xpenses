@@ -71,9 +71,8 @@ export function OverviewTab({
         </>
       )}
 
-      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
+      <div className="grid grid-cols-1 items-start gap-6">
         <Panel
-          className="lg:col-span-8"
           eyebrow="Cash flow"
           title="Income and expenses"
           action={
@@ -116,7 +115,6 @@ export function OverviewTab({
         </Panel>
 
         <Panel
-          className="lg:col-span-4"
           eyebrow={
             s ? `Previous · ${rangeLabel({ from: s.previous.from, to: s.previous.to })}` : 'Previous period'
           }

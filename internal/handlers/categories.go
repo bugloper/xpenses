@@ -16,6 +16,8 @@ func (h *CategoryHandler) Register(g *echo.Group) {
 	g.POST("/categories", h.Create)
 	g.GET("/categories/:id", h.Get)
 	g.PATCH("/categories/:id", h.Update)
+	g.DELETE("/categories/:id", h.Delete)
+	g.GET("/categories/:id/usage", h.Usage)
 }
 
 func (h *CategoryHandler) List(c echo.Context) error {
@@ -56,4 +58,19 @@ func (h *CategoryHandler) Update(c echo.Context) error {
 		return err
 	}
 	return JSON(c, http.StatusOK, cat)
+}
+
+func (h *CategoryHandler) Usage(c echo.Context) error {
+	u, err := h.Svc.Usage(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return err
+	}
+	return JSON(c, http.StatusOK, u)
+}
+
+func (h *CategoryHandler) Delete(c echo.Context) error {
+	if err := h.Svc.Delete(c.Request().Context(), c.Param("id")); err != nil {
+		return err
+	}
+	return c.NoContent(http.StatusNoContent)
 }
