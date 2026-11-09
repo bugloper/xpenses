@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 
 	"github.com/bugloper/xpenses/internal/models"
 )
@@ -84,9 +85,17 @@ func (AccountRepo) Update(ctx context.Context, db DBTX, a *models.Account) error
 	return err
 }
 
-// TotalBalance sums the balance of every active account.
-func (AccountRepo) TotalBalance(ctx context.Context, db DBTX, userID string) (int64, error) {
+// balanceAtExpr is balanceExpr counting only transactions dated on or before
+// its two date placeholders (both bound to the same as-of date).
+var balanceAtExpr = strings.NewReplacer(
+	`t.status = 'cleared'), 0)`, `t.status = 'cleared' AND t.transaction_date <= ?), 0)`,
+).Replace(balanceExpr)
+
+// TotalBalanceAt sums the balance of every active account at the end of the
+// asOf calendar date: transactions dated later are left out.
+func (AccountRepo) TotalBalanceAt(ctx context.Context, db DBTX, userID, asOf string) (int64, error) {
 	var total sql.NullInt64
-	err := db.QueryRowContext(ctx, `SELECT SUM(`+balanceExpr+`) FROM accounts a WHERE a.is_active = 1 AND a.user_id = ?`, userID).Scan(&total)
+	err := db.QueryRowContext(ctx, `SELECT SUM(`+balanceAtExpr+`) FROM accounts a WHERE a.is_active = 1 AND a.user_id = ?`,
+		asOf, asOf, userID).Scan(&total)
 	return total.Int64, err
 }

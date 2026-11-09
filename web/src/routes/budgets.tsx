@@ -2,7 +2,6 @@ import { createRoute } from '@tanstack/react-router'
 import { ChevronDown, ChevronLeft, ChevronRight, Plus, Target } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { z } from 'zod'
-import { AttentionCard } from '@/components/budgets/AttentionCard'
 import { BudgetFormSheet, type BudgetDraft } from '@/components/budgets/BudgetFormSheet'
 import { BudgetRow } from '@/components/budgets/BudgetRow'
 import { Money } from '@/components/common/Money'
@@ -77,7 +76,6 @@ function BudgetsPage() {
         />
       ) : (
         <>
-          <AttentionCard over={groups.over} currency={currency} onEdit={edit} />
           <div className="bg-card border flex items-center justify-between gap-3 rounded-[1.25rem] px-4 py-3 text-sm">
             <span className="text-muted-foreground">Spent this month</span>
             <span className="tabular">

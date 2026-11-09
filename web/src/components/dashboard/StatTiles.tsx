@@ -3,7 +3,7 @@ import { Money } from '@/components/common/Money'
 import { BigAmount, Panel, Stat, StatGrid } from '@/components/common/kit'
 import { ErrorState } from '@/components/common/States'
 import { Skeleton } from '@/components/ui/skeleton'
-import { rangeLabel, type DateRange } from '@/lib/dates'
+import { formatShortDate, rangeLabel, today, type DateRange } from '@/lib/dates'
 import { formatPct } from '@/lib/money'
 import { cn } from '@/lib/utils'
 import type { ReportSummary } from '@/types/api'
@@ -33,10 +33,12 @@ export function BalanceHero({
     )
   }
   const busy = loading && !summary
+  // The balance is taken at the end of the period; a past period says which day.
+  const balanceLabel = range.to < today() ? `Balance on ${formatShortDate(range.to)}` : 'Total balance'
   return (
     <div className="grid gap-3">
       <Panel>
-        <BigAmount label="Total balance">
+        <BigAmount label={balanceLabel}>
           {busy ? <Skeleton className="h-10 w-48" /> : <Money minor={summary?.total_balance ?? 0} currency={currency} />}
         </BigAmount>
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-sm">

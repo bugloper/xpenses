@@ -181,7 +181,8 @@ func TestSummary(t *testing.T) {
 	if got.ExpenseChangePct == nil || *got.ExpenseChangePct != 12.5 {
 		t.Fatalf("change pct: %v", got.ExpenseChangePct)
 	}
-	if got.TotalBalance != 137400 {
+	// The balance is taken at the end of the period: tx14 (1 Dec, 300) is left out.
+	if got.TotalBalance != 137700 {
 		t.Fatalf("total balance: %d", got.TotalBalance)
 	}
 	if got.PendingCount != 1 {
@@ -206,6 +207,11 @@ func TestSummary(t *testing.T) {
 	}
 	if got.Expenses != 8000 || got.Previous.Expenses != 700 || got.ExpenseChangePct == nil || *got.ExpenseChangePct != 1042.9 {
 		t.Fatalf("october: expenses=%d previous=%+v change=%v", got.Expenses, got.Previous, got.ExpenseChangePct)
+	}
+	// Stepping back a month moves the balance back: October's closing balance
+	// is November's minus November's net (41500) and its adjustments (-300+200).
+	if got.TotalBalance != 137700-41500-(-100) {
+		t.Fatalf("october balance: %d", got.TotalBalance)
 	}
 	// A period with nothing before it has no change percentage.
 	got, err = f.svc.Summary(f.ctx, Period{From: "2026-09-01", To: "2026-09-30"})

@@ -39,6 +39,9 @@ type PeriodTotals struct {
 }
 
 type Summary struct {
+	// TotalBalance is the balance of every active account at the end of the
+	// period (transactions dated after p.To are left out), so stepping back a
+	// month shows what the accounts held then.
 	TotalBalance       int64                `json:"total_balance"`
 	Income             int64                `json:"income"`
 	Expenses           int64                `json:"expenses"`
@@ -161,7 +164,7 @@ func (s *Service) Summary(ctx context.Context, p Period) (*Summary, error) {
 	}
 	out := &Summary{Income: cur.Income, Expenses: cur.Expenses, Net: cur.Net, Previous: prev,
 		ExpenseChangePct: ExpenseChangePct(cur.Expenses, prev.Expenses)}
-	if out.TotalBalance, err = s.accounts.TotalBalance(ctx, s.db, auth.UserID(ctx)); err != nil {
+	if out.TotalBalance, err = s.accounts.TotalBalanceAt(ctx, s.db, auth.UserID(ctx), p.To); err != nil {
 		return nil, apperr.Internal(err)
 	}
 	uid := auth.UserID(ctx)
