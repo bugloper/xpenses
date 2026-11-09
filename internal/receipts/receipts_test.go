@@ -96,3 +96,31 @@ func TestParseMinor(t *testing.T) {
 		}
 	}
 }
+
+func TestParseOtherBanks(t *testing.T) {
+	cases := []struct {
+		name, text, bank, ref, date string
+		amount                      int64
+	}{
+		{"BNB", "Bhutan National Bank\nFund Transfer Successful\nAmount: Nu. 2,500.00\nReference No: BNB2611090001\nDate: 09 Nov 2026\nTime: 02:15:30 PM\nRemarks: House rent\n", "BNB", "BNB2611090001", "2026-11-09", 250000},
+		{"Druk PNB", "Druk PNB Bank Ltd\nTransaction Successful\nNu. 750\nTransaction ID: 98765432\n09-Nov-2026 10:05 AM\n", "Druk PNB", "98765432", "2026-11-09", 75000},
+		{"BDBL", "BDBL mBanking\nPayment completed\nAmount Nu.1,200.50\nTxn ID: TX55512345\nDate: 8 November 2026\n", "BDBL", "TX55512345", "2026-11-08", 120050},
+		{"T Bank", "T Bank\nTransfer successful\nBTN 300\nRef: TB7712345\n07 Nov 2026 18:22\n", "T Bank", "TB7712345", "2026-11-07", 30000},
+		{"DK Bank", "DK Bank\nPayment Successful\nNu. 99\nReference Number: DK123456789\n06 Nov 2026\n", "DK Bank", "DK123456789", "2026-11-06", 9900},
+		{"unnamed app", "Transaction Successful\nAmount: Nu. 1,000\nRef No: 445566778\nDate: 05 Nov 2026\n", "", "445566778", "2026-11-05", 100000},
+	}
+	for _, c := range cases {
+		r := Parse(c.text)
+		if !r.Recognised || r.Bank != c.bank || r.Amount != c.amount || r.JournalNo != c.ref || r.Date != c.date {
+			t.Errorf("%s: got %+v", c.name, r)
+		}
+	}
+	// The existing templates still win for their own screens.
+	if r := Parse(mpayText); r.Bank != "mPay" {
+		t.Errorf("mPay screen read as %q", r.Bank)
+	}
+	// A shop receipt with an amount but no bank and no success word is not a payment.
+	if r := Parse("City Mart\nTotal Nu. 450\nThank you"); r.Recognised {
+		t.Errorf("shop receipt recognised: %+v", r)
+	}
+}

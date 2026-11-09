@@ -46,11 +46,15 @@ test.describe('authentication', () => {
     }
     // Logging out lands on the public home page, not the sign-in form.
     await expect(page).toHaveURL(/\/$/)
-    await expect(page.getByRole('heading', { name: /expense book/ })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /Every ngultrum/ })).toBeVisible()
     await page.getByRole('link', { name: 'Sign in' }).first().click()
     await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
+    // The signed-in user's cached data is gone (the public page may persist an empty cache).
     const cached = await page.evaluate(() => localStorage.getItem('xpenses-query-cache'))
-    expect(cached).toBeNull()
+    const queries = cached
+      ? (JSON.parse(cached) as { clientState: { queries: { queryKey: unknown[] }[] } }).clientState.queries
+      : []
+    expect(queries.filter((q) => q.queryKey[0] !== 'auth')).toEqual([])
     const me = await page.request.get('/api/v1/auth/me')
     expect(me.status()).toBe(401)
   })

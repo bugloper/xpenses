@@ -1,6 +1,7 @@
 // Package receipts turns the OCR text of a payment-app success screen into
 // the fields worth keeping on a transaction. One template per app (mBoB and
-// mPay); a screen that matches none yields a Receipt with Recognised=false.
+// mPay), and a general reader for the other Bhutanese banks' apps; a screen
+// that is not a bank payment yields a Receipt with Recognised=false.
 package receipts
 
 import (
@@ -30,10 +31,13 @@ func Parse(text string) Receipt {
 	switch {
 	case isMPay(norm):
 		return parseMPay(norm)
+	// Another bank's name beats mBoB's broad "fund transfer" signal.
+	case namesOtherBank(norm):
+		return parseOtherBank(norm)
 	case isMBoB(norm):
 		return parseMBoB(norm)
 	default:
-		return Receipt{}
+		return parseOtherBank(norm)
 	}
 }
 
@@ -158,6 +162,86 @@ func parseMPay(text string) Receipt {
 	}
 	if m := reTime.FindStringSubmatch(text); m != nil {
 		r.Time = parseTime(fixDigits(m[1]))
+	}
+	return r
+}
+
+// ---- Other Bhutanese banks (BNB, Druk PNB, BDBL, T Bank, DK Bank, ...) ----
+
+// banks names the app from words on its screen. Order matters only where one
+// name contains another.
+var banks = []struct {
+	name string
+	re   *regexp.Regexp
+}{
+	{"BNB", regexp.MustCompile(`(?i)bhutan national bank|\bbnb\b`)},
+	{"Druk PNB", regexp.MustCompile(`(?i)druk\s*pnb|\bpnb\b`)},
+	{"BDBL", regexp.MustCompile(`(?i)bhutan development bank|\bbdbl\b`)},
+	{"T Bank", regexp.MustCompile(`(?i)\bt[\s-]?bank\b`)},
+	{"DK Bank", regexp.MustCompile(`(?i)\bdk\s*bank\b|digital\s*kidu|\bdk\b`)},
+	{"Bank of Bhutan", regexp.MustCompile(`(?i)bank of bhutan`)},
+}
+
+var (
+	// A payment screen says it succeeded, or shows a transfer; a shop
+	// receipt does neither.
+	reSuccess = regexp.MustCompile(`(?i)\b(success(ful)?|completed|transfer(red)?|paid|payment)\b`)
+	// "Amount: Nu. 1,250.00", "Nu.1,250", "BTN 1250".
+	reAnyAmount = regexp.MustCompile(`(?i)(?:amount\s*[:;]?\s*(?:nu\.?|btn)?\s*|\b(?:nu\.?|btn)\s*)([0-9OoIl][0-9OoIl,]*(?:\.[0-9OoIl]{1,2})?)\b`)
+	reReference = regexp.MustCompile(`(?i)(?:ref(?:erence)?\.?\s*(?:no\.?|number|id)?|transaction\s*(?:id|no\.?|ref)|txn\s*(?:id|no\.?)|jrn[li1]\.?\s*no|journal\s*no\.?|rr\s?no)\s*[:;#]?\s*([A-Za-z0-9][A-Za-z0-9-]{4,24})`)
+	reRemarks   = regexp.MustCompile(`(?i)(?:remarks?|purpose|narration|payment\s*type|description)\s*[:;]?\s*([A-Za-z][A-Za-z /&-]{2,40}?)\s*(?:\n|$)`)
+	// A date without its label, e.g. "05 Nov 2026" or "05-Nov-2026".
+	reBareDate = regexp.MustCompile(`(?i)\b([0-9OoIl]{1,2})[\s/-]+([A-Za-z]{3,9})[\s/,-]+([0-9OoIl]{4})\b`)
+	reBareTime = regexp.MustCompile(`(?i)\b([0-9]{1,2}:[0-9]{2}(?::[0-9]{2})?\s*(?:[AP]\.?M\.?)?)`)
+)
+
+// namesOtherBank reports whether the screen names a bank other than Bank of Bhutan.
+func namesOtherBank(text string) bool {
+	for _, b := range banks {
+		if b.name != "Bank of Bhutan" && b.re.MatchString(text) {
+			return true
+		}
+	}
+	return false
+}
+
+// parseOtherBank reads any other Bhutanese banking app's success screen. It
+// needs a bank's name, or a success word together with an amount in
+// ngultrum, so ordinary receipts and screenshots are not mistaken for one.
+func parseOtherBank(text string) Receipt {
+	bank := ""
+	for _, b := range banks {
+		if b.re.MatchString(text) {
+			bank = b.name
+			break
+		}
+	}
+	m := reAnyAmount.FindStringSubmatch(text)
+	if bank == "" && (m == nil || !reSuccess.MatchString(text)) {
+		return Receipt{}
+	}
+	r := Receipt{Recognised: true, Bank: bank}
+	if m != nil {
+		r.Amount = parseMinor(fixDigits(m[1]))
+	}
+	if ref := reReference.FindStringSubmatch(text); ref != nil {
+		r.JournalNo = ref[1]
+	}
+	if rem := reRemarks.FindStringSubmatch(text); rem != nil {
+		r.PaymentType = strings.TrimSpace(rem[1])
+	}
+	if d := reDate.FindStringSubmatch(text); d != nil {
+		r.Date = parseDate(fixDigitsInNumbers(strings.ReplaceAll(d[1], ",", "")))
+	}
+	if r.Date == "" {
+		if d := reBareDate.FindStringSubmatch(text); d != nil {
+			r.Date = parseDate(fixDigits(d[1]) + " " + d[2] + " " + fixDigits(d[3]))
+		}
+	}
+	if t := reTime.FindStringSubmatch(text); t != nil {
+		r.Time = parseTime(fixDigits(t[1]))
+	} else if t := reBareTime.FindStringSubmatch(text); t != nil {
+		r.Time = parseTime(t[1])
 	}
 	return r
 }

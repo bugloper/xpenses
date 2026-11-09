@@ -37,6 +37,14 @@ test.describe('accessibility', () => {
     })
   }
 
+  test('axe: public home page', async ({ page }) => {
+    await page.request.post('/api/v1/auth/logout', { headers: { 'X-Xpenses-Client': 'e2e' } })
+    await page.goto('/')
+    await expect(page.getByRole('heading', { name: /Every ngultrum/ })).toBeVisible()
+    const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze()
+    expect(results.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical')).toEqual([])
+  })
+
   test('axe: sign-in page', async ({ page }) => {
     await page.request.post('/api/v1/auth/logout', { headers: { 'X-Xpenses-Client': 'e2e' } })
     await page.goto('/login')

@@ -35,7 +35,7 @@ func (h *TransactionHandler) Register(g *echo.Group) {
 
 // ReceiptCapabilities tells the app whether this server can read screenshots.
 func (h *TransactionHandler) ReceiptCapabilities(c echo.Context) error {
-	return JSON(c, http.StatusOK, map[string]any{"ocr": h.Svc.OCRAvailable(), "banks": []string{"mBoB", "mPay"}})
+	return JSON(c, http.StatusOK, map[string]any{"ocr": h.Svc.OCRAvailable(), "banks": []string{"mBoB", "mPay", "BNB", "Druk PNB", "BDBL", "T Bank", "DK Bank"}})
 }
 
 // ScanReceipt reads an uploaded screenshot (multipart "file") and returns what

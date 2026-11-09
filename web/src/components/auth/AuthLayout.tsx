@@ -5,6 +5,7 @@ import { Logo } from '@/components/layout/Brand'
 /** What Xpenses offers, shown beside the sign-in form and on the home page. */
 export const POINTS = [
   'Free for your first year',
+  'Reads screenshots from every bank in Bhutan',
   'Every expense in seconds, even offline',
   'Budgets that follow your own categories',
   'Your data stays yours, on your own server',
