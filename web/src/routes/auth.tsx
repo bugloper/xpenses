@@ -30,12 +30,17 @@ function LoginPage() {
   return (
     <AuthLayout
       title="Sign in"
-      description="Welcome back. Enter your email and password."
+      eyebrow="Welcome back"
+      description="Enter your email and password."
       footer={
         registrationOpen ? (
           <>
             New here?{' '}
-            <Link to="/register" search={{}} className="text-primary font-medium hover:underline">
+            <Link
+              to="/register"
+              search={{}}
+              className="text-foreground decoration-saffron font-medium underline underline-offset-4"
+            >
               Create an account
             </Link>
           </>
@@ -64,6 +69,7 @@ function SetupPage() {
   return (
     <AuthLayout
       title="Set up Xpenses"
+      eyebrow="First run"
       description="Create the first account. It becomes the administrator of this instance."
     >
       <SetupForm
@@ -88,20 +94,30 @@ function RegisterPage() {
   return (
     <AuthLayout
       title="Create your account"
+      eyebrow={invite ? 'Invitation' : 'Free for your first year'}
       description={
-        invite ? 'You have been invited to Xpenses. Your first year is free.' : 'Your first year is free, and your data is private to you on this instance.'
+        invite
+          ? 'You have been invited to Xpenses. Your first year is free.'
+          : 'Your first year is free, and your data is private to you on this instance.'
       }
       footer={
         <>
           Already have an account?{' '}
-          <Link to="/login" search={{}} className="text-primary font-medium hover:underline">
+          <Link
+            to="/login"
+            search={{}}
+            className="text-foreground decoration-saffron font-medium underline underline-offset-4"
+          >
             Sign in
           </Link>
         </>
       }
     >
       {closed ? (
-        <p className="text-muted-foreground text-sm" role="status">
+        <p
+          className="bg-card border-l-saffron rounded-md border border-l-[3px] px-4 py-3.5 text-sm"
+          role="status"
+        >
           Registration is closed. Ask the administrator for an invite link.
         </p>
       ) : (
@@ -124,13 +140,18 @@ function ResetPasswordPage() {
   return (
     <AuthLayout
       title="Choose a new password"
+      eyebrow="Password reset"
       description={
         token
           ? 'This link came from your administrator. It works once.'
           : 'This reset link is incomplete. Ask your administrator for a new one.'
       }
       footer={
-        <Link to="/login" search={{}} className="text-primary font-medium hover:underline">
+        <Link
+          to="/login"
+          search={{}}
+          className="text-foreground decoration-saffron font-medium underline underline-offset-4"
+        >
           Back to sign in
         </Link>
       }
@@ -162,22 +183,49 @@ function ExpiredPage() {
   return (
     <AuthLayout
       title="Your free year has ended"
+      eyebrow="Access paused"
       description={
         user?.access_until
-          ? `Your access to Xpenses ran out on ${formatShortDate(user.access_until)}.`
-          : 'Your access to Xpenses has run out.'
+          ? `Your access to Xpenses ran out on ${formatShortDate(user.access_until)}. Nothing you recorded has been deleted.`
+          : 'Your access to Xpenses has run out. Nothing you recorded has been deleted.'
       }
     >
-      <div className="flex flex-col gap-4 text-sm">
-        <p className="text-muted-foreground">
-          Everything you recorded is safe. To keep using the app, ask the administrator of this Xpenses
-          instance to extend your access; the moment they do, sign in again and carry on where you left
-          off.
-        </p>
-        {user && <p className="text-muted-foreground">Signed in as {user.email}.</p>}
+      <div className="flex flex-col gap-6 text-sm">
+        <dl className="bg-card divide-rule divide-y rounded-lg border px-4">
+          {user && (
+            <div className="flex items-baseline justify-between gap-4 py-3">
+              <dt className="eyebrow">Signed in as</dt>
+              <dd className="min-w-0 truncate font-medium">{user.email}</dd>
+            </div>
+          )}
+          {user?.access_until && (
+            <div className="flex items-baseline justify-between gap-4 py-3">
+              <dt className="eyebrow">Access ended</dt>
+              <dd className="font-medium">{formatShortDate(user.access_until)}</dd>
+            </div>
+          )}
+          <div className="flex items-baseline justify-between gap-4 py-3">
+            <dt className="eyebrow">Your records</dt>
+            <dd className="font-medium">Kept safe</dd>
+          </div>
+        </dl>
+        <div>
+          <h2 className="eyebrow text-foreground/80">What to do</h2>
+          <ol className="border-foreground mt-3 border-t-2">
+            {[
+              'Ask the administrator of this Xpenses instance to extend your access.',
+              'The moment they do, sign in again and carry on where you left off.',
+            ].map((step, i) => (
+              <li key={step} className="border-rule flex gap-4 border-b py-3.5">
+                <span className="figure text-saffron w-4 shrink-0 text-xl leading-none">{i + 1}</span>
+                <span className="text-foreground/85">{step}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
         <Button
-          variant="outline"
-          className="self-start"
+          size="lg"
+          className="h-12 w-full"
           onClick={() =>
             void performLogout()
               .then(() => navigate({ to: '/', replace: true }))

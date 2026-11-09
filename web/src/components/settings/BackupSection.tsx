@@ -3,12 +3,13 @@ import { useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
+import { Panel } from '@/components/common/kit'
 import { Button } from '@/components/ui/button'
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { api, downloadFile, errorMessage } from '@/lib/api'
 
-export function BackupSection() {
+export function BackupSection({ id }: { id?: string }) {
   const qc = useQueryClient()
   const [passphrase, setPassphrase] = useState('')
   const [restorePass, setRestorePass] = useState('')
@@ -53,65 +54,73 @@ export function BackupSection() {
   }
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
-      <div className="bg-card border flex flex-col gap-3 rounded-[1.25rem] p-4">
-        <h3 className="font-medium">Download backup</h3>
-        <Field>
-          <FieldLabel htmlFor="backup-pass">Passphrase (optional)</FieldLabel>
-          <Input
-            id="backup-pass"
-            type="password"
-            autoComplete="new-password"
-            value={passphrase}
-            onChange={(e) => setPassphrase(e.target.value)}
-          />
-          <FieldDescription>With a passphrase the file is AES-256-GCM encrypted (.enc).</FieldDescription>
-        </Field>
-        <Button onClick={() => void download()} disabled={busy !== null} className="w-fit">
-          <Download data-icon="inline-start" /> {busy === 'download' ? 'Preparing…' : 'Download'}
-        </Button>
+    <Panel
+      id={id}
+      eyebrow="Administrator"
+      title="Backup & restore"
+      description="The whole instance in one file: every user, account and transaction."
+      flush
+    >
+      <div className="divide-rule grid max-md:divide-y md:grid-cols-2 md:divide-x">
+        <div className="flex flex-col gap-3 p-4 sm:p-5">
+          <h3 className="eyebrow text-foreground/80">Download backup</h3>
+          <Field>
+            <FieldLabel htmlFor="backup-pass">Passphrase (optional)</FieldLabel>
+            <Input
+              id="backup-pass"
+              type="password"
+              autoComplete="new-password"
+              value={passphrase}
+              onChange={(e) => setPassphrase(e.target.value)}
+            />
+            <FieldDescription>With a passphrase the file is AES-256-GCM encrypted (.enc).</FieldDescription>
+          </Field>
+          <Button onClick={() => void download()} disabled={busy !== null} className="w-fit">
+            <Download data-icon="inline-start" /> {busy === 'download' ? 'Preparing…' : 'Download'}
+          </Button>
+        </div>
+        <div className="flex flex-col gap-3 p-4 sm:p-5">
+          <h3 className="eyebrow text-foreground/80">Restore backup</h3>
+          <Field>
+            <FieldLabel htmlFor="restore-file">Backup file</FieldLabel>
+            <Input
+              id="restore-file"
+              ref={fileInput}
+              type="file"
+              accept=".db,.enc,.sqlite"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="restore-pass">Passphrase (if encrypted)</FieldLabel>
+            <Input
+              id="restore-pass"
+              type="password"
+              autoComplete="off"
+              value={restorePass}
+              onChange={(e) => setRestorePass(e.target.value)}
+            />
+          </Field>
+          <Button
+            variant="destructive"
+            onClick={() => setConfirm(true)}
+            disabled={!file || busy !== null}
+            className="w-fit"
+          >
+            <Upload data-icon="inline-start" /> {busy === 'restore' ? 'Restoring…' : 'Restore'}
+          </Button>
+        </div>
+        <ConfirmDialog
+          open={confirm}
+          onOpenChange={setConfirm}
+          title="Replace all data with this backup?"
+          description={`Everything currently in Xpenses will be overwritten by "${file?.name ?? ''}". This cannot be undone.`}
+          confirmLabel="Restore"
+          destructive
+          loading={busy === 'restore'}
+          onConfirm={restore}
+        />
       </div>
-      <div className="bg-card border flex flex-col gap-3 rounded-[1.25rem] p-4">
-        <h3 className="font-medium">Restore backup</h3>
-        <Field>
-          <FieldLabel htmlFor="restore-file">Backup file</FieldLabel>
-          <Input
-            id="restore-file"
-            ref={fileInput}
-            type="file"
-            accept=".db,.enc,.sqlite"
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-          />
-        </Field>
-        <Field>
-          <FieldLabel htmlFor="restore-pass">Passphrase (if encrypted)</FieldLabel>
-          <Input
-            id="restore-pass"
-            type="password"
-            autoComplete="off"
-            value={restorePass}
-            onChange={(e) => setRestorePass(e.target.value)}
-          />
-        </Field>
-        <Button
-          variant="destructive"
-          onClick={() => setConfirm(true)}
-          disabled={!file || busy !== null}
-          className="w-fit"
-        >
-          <Upload data-icon="inline-start" /> {busy === 'restore' ? 'Restoring…' : 'Restore'}
-        </Button>
-      </div>
-      <ConfirmDialog
-        open={confirm}
-        onOpenChange={setConfirm}
-        title="Replace all data with this backup?"
-        description={`Everything currently in Xpenses will be overwritten by "${file?.name ?? ''}". This cannot be undone.`}
-        confirmLabel="Restore"
-        destructive
-        loading={busy === 'restore'}
-        onConfirm={restore}
-      />
-    </div>
+    </Panel>
   )
 }

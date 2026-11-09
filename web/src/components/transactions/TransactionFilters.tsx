@@ -1,3 +1,4 @@
+import { X } from 'lucide-react'
 import { DateRangePicker } from '@/components/common/DateRangePicker'
 import { ResponsiveSheet } from '@/components/common/ResponsiveSheet'
 import { Button } from '@/components/ui/button'
@@ -11,8 +12,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { groupCategories } from '@/lib/categories'
+import { categoryLabel, groupCategories } from '@/lib/categories'
+import { rangeLabel } from '@/lib/dates'
 import { useAccounts, useCategories } from '@/lib/queries'
+import { cn } from '@/lib/utils'
 import type { TransactionSort, TransactionStatus, TransactionType } from '@/types/api'
 
 export type TxFilters = {
@@ -27,9 +30,171 @@ export type TxFilters = {
 }
 
 const ANY = '__any'
+const sel = (v: string | undefined) => v ?? ANY
+
+const TYPE_LABEL: Record<TransactionType, string> = {
+  expense: 'Expense',
+  income: 'Income',
+  transfer: 'Transfer',
+  refund: 'Refund',
+  adjustment: 'Adjustment',
+}
+const STATUS_LABEL: Record<TransactionStatus, string> = {
+  cleared: 'Cleared',
+  pending: 'Drafts',
+  void: 'Void',
+}
 
 export function countActiveFilters(f: TxFilters): number {
   return [f.from, f.account, f.category, f.type, f.status].filter(Boolean).length
+}
+
+/** The account filter as a select; used in the toolbar and in the sheet. */
+export function AccountFilter({
+  value,
+  onChange,
+  className,
+  id,
+}: {
+  value?: string
+  onChange: (id: string | undefined) => void
+  className?: string
+  id?: string
+}) {
+  const { data: accounts = [] } = useAccounts(true)
+  return (
+    <Select value={sel(value)} onValueChange={(v) => onChange(v === ANY ? undefined : v)}>
+      <SelectTrigger id={id} className={cn('w-full', className)} aria-label="Filter by account">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value={ANY}>All accounts</SelectItem>
+        {accounts.map((a) => (
+          <SelectItem key={a.id} value={a.id}>
+            {a.name}
+            {!a.is_active ? ' (inactive)' : ''}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )
+}
+
+/** The category filter: main categories with their sub-categories beneath. */
+export function CategoryFilter({
+  value,
+  onChange,
+  className,
+  id,
+}: {
+  value?: string
+  onChange: (id: string | undefined) => void
+  className?: string
+  id?: string
+}) {
+  const { data: categories = [] } = useCategories(true)
+  return (
+    <Select value={sel(value)} onValueChange={(v) => onChange(v === ANY ? undefined : v)}>
+      <SelectTrigger id={id} className={cn('w-full', className)} aria-label="Filter by category">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value={ANY}>All categories</SelectItem>
+        {(['expense', 'income'] as const).flatMap((t) =>
+          groupCategories(categories, t, { includeInactive: true }).map((g) => (
+            <SelectGroup key={g.parent.id}>
+              <SelectLabel>
+                {g.parent.name} · {t}
+              </SelectLabel>
+              <SelectItem value={g.parent.id}>
+                {g.children.length > 0 ? `All ${g.parent.name}` : g.parent.name}
+              </SelectItem>
+              {g.children.map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  {c.name}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          )),
+        )}
+      </SelectContent>
+    </Select>
+  )
+}
+
+/**
+ * The filters in force, as small removable tags. On wide screens the date,
+ * account and category already show in the toolbar, so only the rest appear.
+ */
+export function ActiveFilters({
+  value,
+  onChange,
+  hideType,
+}: {
+  value: TxFilters
+  onChange: (next: TxFilters) => void
+  hideType?: boolean
+}) {
+  const { data: accounts = [] } = useAccounts(true)
+  const { data: categories = [] } = useCategories(true)
+  const set = (patch: Partial<TxFilters>) => onChange({ ...value, ...patch })
+  const tags: { key: string; label: string; clear: () => void; inToolbar?: boolean }[] = []
+  if (value.from && value.to)
+    tags.push({
+      key: 'date',
+      label: rangeLabel({ from: value.from, to: value.to }),
+      clear: () => set({ from: undefined, to: undefined }),
+      inToolbar: true,
+    })
+  if (value.account)
+    tags.push({
+      key: 'account',
+      label: accounts.find((a) => a.id === value.account)?.name ?? 'Account',
+      clear: () => set({ account: undefined }),
+      inToolbar: true,
+    })
+  if (value.category)
+    tags.push({
+      key: 'category',
+      label: categoryLabel(categories, value.category) || 'Category',
+      clear: () => set({ category: undefined }),
+      inToolbar: true,
+    })
+  if (value.type && !hideType)
+    tags.push({ key: 'type', label: TYPE_LABEL[value.type], clear: () => set({ type: undefined }) })
+  if (value.status)
+    tags.push({ key: 'status', label: STATUS_LABEL[value.status], clear: () => set({ status: undefined }) })
+  if (tags.length === 0) return null
+  const onlyToolbar = tags.every((t) => t.inToolbar)
+  return (
+    <div className={cn('flex items-center gap-2', onlyToolbar && 'lg:hidden')}>
+      <span className="eyebrow shrink-0 max-sm:hidden">Showing</span>
+      <div className="no-scrollbar -my-1 flex flex-1 gap-1.5 overflow-x-auto py-1">
+        {tags.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            onClick={t.clear}
+            aria-label={`Remove filter: ${t.label}`}
+            className={cn(
+              'bg-card hover:border-foreground/30 flex h-7 shrink-0 items-center gap-1.5 rounded-md border pr-1.5 pl-2.5 text-xs font-medium transition-colors',
+              t.inToolbar && 'lg:hidden',
+            )}
+          >
+            {t.label}
+            <X className="text-muted-foreground size-3.5" />
+          </button>
+        ))}
+      </div>
+      <button
+        type="button"
+        onClick={() => onChange({ sort: value.sort, order: value.order })}
+        className="text-muted-foreground hover:text-foreground shrink-0 text-xs font-medium underline-offset-4 hover:underline"
+      >
+        Clear all
+      </button>
+    </div>
+  )
 }
 
 export function TransactionFiltersSheet({
@@ -45,10 +210,7 @@ export function TransactionFiltersSheet({
   onChange: (next: TxFilters) => void
   hideType?: boolean
 }) {
-  const { data: accounts = [] } = useAccounts(true)
-  const { data: categories = [] } = useCategories(true)
   const set = (patch: Partial<TxFilters>) => onChange({ ...value, ...patch })
-  const sel = (v: string | undefined) => v ?? ANY
 
   return (
     <ResponsiveSheet
@@ -70,59 +232,20 @@ export function TransactionFiltersSheet({
           <DateRangePicker
             value={value.from && value.to ? { from: value.from, to: value.to } : null}
             onChange={(r) => set({ from: r?.from, to: r?.to })}
-            className="w-full"
+            className="h-10 w-full"
           />
         </Field>
         <Field>
-          <FieldLabel>Account</FieldLabel>
-          <Select
-            value={sel(value.account)}
-            onValueChange={(v) => set({ account: v === ANY ? undefined : v })}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ANY}>All accounts</SelectItem>
-              {accounts.map((a) => (
-                <SelectItem key={a.id} value={a.id}>
-                  {a.name}
-                  {!a.is_active ? ' (inactive)' : ''}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <FieldLabel htmlFor="filter-account">Account</FieldLabel>
+          <AccountFilter id="filter-account" value={value.account} onChange={(account) => set({ account })} />
         </Field>
         <Field>
-          <FieldLabel>Category</FieldLabel>
-          <Select
-            value={sel(value.category)}
-            onValueChange={(v) => set({ category: v === ANY ? undefined : v })}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ANY}>All categories</SelectItem>
-              {(['expense', 'income'] as const).flatMap((t) =>
-                groupCategories(categories, t, { includeInactive: true }).map((g) => (
-                  <SelectGroup key={g.parent.id}>
-                    <SelectLabel>
-                      {g.parent.name} · {t}
-                    </SelectLabel>
-                    <SelectItem value={g.parent.id}>
-                      {g.children.length > 0 ? `All ${g.parent.name}` : g.parent.name}
-                    </SelectItem>
-                    {g.children.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                )),
-              )}
-            </SelectContent>
-          </Select>
+          <FieldLabel htmlFor="filter-category">Category</FieldLabel>
+          <CategoryFilter
+            id="filter-category"
+            value={value.category}
+            onChange={(category) => set({ category })}
+          />
         </Field>
         {!hideType && (
           <Field>
@@ -162,7 +285,7 @@ export function TransactionFiltersSheet({
             </SelectContent>
           </Select>
         </Field>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 border-t pt-5">
           <Field>
             <FieldLabel>Sort by</FieldLabel>
             <Select value={value.sort ?? 'date'} onValueChange={(v) => set({ sort: v as TransactionSort })}>

@@ -214,13 +214,13 @@ function SheetBody({ preset }: { preset: AddPreset | null }) {
   return (
     <>
       {mode === 'create' && !pendingItem && (
-        <div className="mb-4 flex flex-col gap-3">
+        <div className="mb-5 flex flex-col gap-3">
           <AttachmentField file={attachment} onChange={setAttachment} compact />
           <ReceiptCard scan={scan} receipt={receipt} />
         </div>
       )}
       {mode === 'edit' && editing && !editing.has_attachment && (
-        <div className="mb-4">
+        <div className="mb-5">
           <AttachmentField file={attachment} onChange={setAttachment} compact />
         </div>
       )}

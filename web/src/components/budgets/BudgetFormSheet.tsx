@@ -2,6 +2,7 @@ import { Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { CategoryField } from '@/components/categories/CategoryField'
+import { Note } from '@/components/common/kit'
 import { ResponsiveSheet } from '@/components/common/ResponsiveSheet'
 import { AmountInput } from '@/components/transactions/AmountInput'
 import { Button } from '@/components/ui/button'
@@ -92,7 +93,7 @@ export function BudgetFormSheet({
             <Button
               type="button"
               variant="ghost"
-              className="text-expense"
+              className="text-destructive hover:text-destructive"
               onClick={() => void remove()}
               disabled={busy}
             >
@@ -127,7 +128,7 @@ export function BudgetFormSheet({
             invalid={!!errors.amount}
             autoFocus
           />
-          <p className="text-muted-foreground text-center text-xs">per month</p>
+          <p className="eyebrow text-center">Per month · repeats every month</p>
           <FieldError errors={[errors.amount ? { message: errors.amount } : undefined]} />
         </Field>
         <Field data-invalid={!!errors.category}>
@@ -147,9 +148,9 @@ export function BudgetFormSheet({
             showRecent={false}
           />
           {existing && !editing && categoryId && (
-            <p className="text-muted-foreground text-xs">
+            <Note tone="warn" className="text-[0.8125rem]">
               {categoryLabel(categories, categoryId)} already has a budget; saving replaces it.
-            </p>
+            </Note>
           )}
           <FieldError errors={[errors.category ? { message: errors.category } : undefined]} />
         </Field>

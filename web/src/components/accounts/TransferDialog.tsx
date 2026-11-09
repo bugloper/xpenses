@@ -1,5 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useEffect } from 'react'
+import { ArrowRight } from 'lucide-react'
 import { Controller, useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { DateField } from '@/components/common/DateField'
@@ -98,7 +99,7 @@ export function TransferDialog({
               </Field>
             )}
           />
-          <div className="grid grid-cols-2 gap-3">
+          <div className="bg-muted/40 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-2 rounded-md border p-3">
             <Controller
               control={control}
               name="from"
@@ -106,7 +107,7 @@ export function TransferDialog({
                 <Field data-invalid={!!err.from}>
                   <FieldLabel>From</FieldLabel>
                   <Select value={field.value || undefined} onValueChange={field.onChange}>
-                    <SelectTrigger className="w-full">
+                    <SelectTrigger className="bg-card w-full">
                       <SelectValue placeholder="Source" />
                     </SelectTrigger>
                     <SelectContent>
@@ -121,6 +122,7 @@ export function TransferDialog({
                 </Field>
               )}
             />
+            <ArrowRight aria-hidden className="text-muted-foreground mt-9 size-4" />
             <Controller
               control={control}
               name="to"
@@ -128,7 +130,7 @@ export function TransferDialog({
                 <Field data-invalid={!!err.to}>
                   <FieldLabel>To</FieldLabel>
                   <Select value={field.value || undefined} onValueChange={field.onChange}>
-                    <SelectTrigger className="w-full">
+                    <SelectTrigger className="bg-card w-full">
                       <SelectValue placeholder="Destination" />
                     </SelectTrigger>
                     <SelectContent>

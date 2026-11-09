@@ -1,7 +1,9 @@
 import { createRoute } from '@tanstack/react-router'
-import { CloudUpload, Download as InstallIcon } from 'lucide-react'
+import { CloudOff, CloudUpload, Download as InstallIcon } from 'lucide-react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
-import { PageHeader, Section } from '@/components/common/PageHeader'
+import { Panel } from '@/components/common/kit'
+import { PageHeader } from '@/components/common/PageHeader'
 import { Segmented } from '@/components/common/Segmented'
 import { useTheme } from '@/components/layout/ThemeProvider'
 import { PasswordSection, ProfileSection } from '@/components/settings/AccountSection'
@@ -10,170 +12,252 @@ import { RecurringSection } from '@/components/settings/RecurringSection'
 import { SessionsSection } from '@/components/settings/SessionsSection'
 import { Button } from '@/components/ui/button'
 import { accessDaysLeft, useAuth } from '@/lib/auth'
-import { formatShortDate } from '@/lib/dates'
-import { relativeTime } from '@/lib/dates'
+import { formatShortDate, relativeTime } from '@/lib/dates'
 import { syncManager, useSyncState } from '@/lib/offline'
 import { usePwaInstall } from '@/lib/pwa-install'
 import { uiStore } from '@/lib/ui-store'
+import { cn } from '@/lib/utils'
 import { appRoute } from './__root'
 
+/** A label and its explanation on the left, the control on the right. */
 function SettingRow({
   label,
   description,
   children,
 }: {
   label: string
-  description?: string
-  children: React.ReactNode
+  description?: ReactNode
+  children?: ReactNode
 }) {
   return (
-    <div className="flex flex-col gap-2 py-4 sm:flex-row sm:items-center sm:justify-between">
-      <div>
+    <div className="grid gap-3 px-4 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-6 sm:px-5">
+      <div className="min-w-0">
         <p className="text-sm font-medium">{label}</p>
-        {description && <p className="text-muted-foreground text-xs">{description}</p>}
+        {description && <p className="text-muted-foreground mt-0.5 text-xs">{description}</p>}
       </div>
-      <div className="sm:w-56">{children}</div>
-    </div>
-  )
-}
-
-function OfflineRow() {
-  const s = useSyncState()
-  return (
-    <div className="bg-card border flex flex-col gap-3 rounded-[1.25rem] p-4 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex items-center gap-3">
-        <span className="bg-muted text-muted-foreground flex size-10 items-center justify-center rounded-xl">
-          <CloudUpload className="size-5" />
-        </span>
-        <div>
-          <p className="text-sm font-medium">
-            {s.online ? 'Online' : 'Offline'}
-            {s.syncing ? ' · syncing…' : ''}
-          </p>
-          <p className="text-muted-foreground text-xs">
-            {s.pending} pending · {s.failed} failed
-            {s.lastSyncAt ? ` · last attempt ${relativeTime(new Date(s.lastSyncAt).toISOString())}` : ''}
-          </p>
-        </div>
-      </div>
-      <div className="flex gap-2">
-        <Button variant="outline" size="sm" onClick={() => uiStore.setPending(true)}>
-          View queue
-        </Button>
-        <Button size="sm" disabled={s.syncing} onClick={() => void syncManager.syncNow({ force: true })}>
-          Retry sync
-        </Button>
-      </div>
-    </div>
-  )
-}
-
-function InstallRow() {
-  const pwa = usePwaInstall()
-  if (pwa.standalone || pwa.installed)
-    return <p className="text-muted-foreground text-sm">Xpenses is installed on this device.</p>
-  return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <p className="text-muted-foreground text-sm">
-        {pwa.canInstall
-          ? 'Add Xpenses to your home screen for quick access.'
-          : 'Use your browser menu → "Add to Home Screen" to install.'}
-      </p>
-      {pwa.canInstall && (
-        <Button
-          size="sm"
-          onClick={() =>
-            void pwa.install().then((r) => {
-              if (r === 'accepted') toast.success('Installed')
-            })
-          }
-        >
-          <InstallIcon data-icon="inline-start" /> Install app
-        </Button>
-      )}
+      {children && <div className="flex flex-wrap gap-2">{children}</div>}
     </div>
   )
 }
 
 /** How long the user may keep using the app. */
-function AccessRow() {
+function AccessSection({ id }: { id: string }) {
   const { user } = useAuth()
   if (!user) return null
   const left = accessDaysLeft(user)
   return (
-    <div className="bg-card border rounded-[1.25rem] px-4">
-      <SettingRow
-        label={left === null ? 'Administrator' : 'Free year'}
-        description={
-          left === null
-            ? 'No end date.'
+    <Panel id={id} title="Access" flush>
+      <div className="grid gap-4 px-4 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end sm:px-5">
+        <div>
+          <div className="eyebrow">{left === null ? 'Administrator' : 'Free year'}</div>
+          <p className="figure mt-2 text-[1.75rem] leading-none">
+            {left === null ? 'No end date' : formatShortDate(user.access_until)}
+          </p>
+        </div>
+        <p
+          className={cn(
+            'text-muted-foreground text-sm sm:max-w-xs sm:text-right',
+            left !== null && left < 0 && 'text-destructive',
+            left !== null && left >= 0 && left <= 30 && 'text-warn',
+          )}
+        >
+          {left === null
+            ? 'Administrators are exempt from the free year.'
             : left < 0
               ? `Ended on ${formatShortDate(user.access_until)}.`
-              : `Until ${formatShortDate(user.access_until)} · ${left === 0 ? 'last day' : `${left} day${left === 1 ? '' : 's'} left`}. The administrator can extend it.`
-        }
-      >
-        <span />
-      </SettingRow>
-    </div>
+              : `Until ${formatShortDate(user.access_until)} · ${left === 0 ? 'last day' : `${left} day${left === 1 ? '' : 's'} left`}. The administrator can extend it.`}
+        </p>
+      </div>
+    </Panel>
   )
 }
 
-function SettingsPage() {
+function AppearanceSection({ id }: { id: string }) {
   const { theme, setTheme } = useTheme()
+  return (
+    <Panel id={id} title="Appearance" flush>
+      <SettingRow label="Theme" description="Also on the moon and sun button in the top bar.">
+        <Segmented
+          aria-label="Theme"
+          value={theme}
+          onChange={setTheme}
+          options={[
+            { value: 'light', label: 'Light' },
+            { value: 'dark', label: 'Dark' },
+          ]}
+        />
+      </SettingRow>
+    </Panel>
+  )
+}
+
+/** Offline queue and the installed app, both about this device rather than the account. */
+function DeviceSection({ id }: { id: string }) {
+  const s = useSyncState()
+  const pwa = usePwaInstall()
+  const installed = pwa.standalone || pwa.installed
+  return (
+    <Panel
+      id={id}
+      title="This device"
+      description="Saved entries waiting to sync, and the app on this device."
+      flush
+    >
+      <div className="divide-rule divide-y">
+        <SettingRow
+          label={`${s.online ? 'Online' : 'Offline'}${s.syncing ? ' · syncing…' : ''}`}
+          description={
+            <>
+              {s.pending} pending · {s.failed} failed
+              {s.lastSyncAt ? ` · last attempt ${relativeTime(new Date(s.lastSyncAt).toISOString())}` : ''}
+            </>
+          }
+        >
+          <Button variant="outline" size="sm" onClick={() => uiStore.setPending(true)}>
+            View queue
+          </Button>
+          <Button size="sm" disabled={s.syncing} onClick={() => void syncManager.syncNow({ force: true })}>
+            {s.online ? <CloudUpload data-icon="inline-start" /> : <CloudOff data-icon="inline-start" />}{' '}
+            Retry sync
+          </Button>
+        </SettingRow>
+        <SettingRow
+          label="App"
+          description={
+            installed
+              ? 'Xpenses is installed on this device.'
+              : pwa.canInstall
+                ? 'Add Xpenses to your home screen for quick access.'
+                : 'Use your browser menu → "Add to Home Screen" to install.'
+          }
+        >
+          {!installed && pwa.canInstall && (
+            <Button
+              size="sm"
+              onClick={() =>
+                void pwa.install().then((r) => {
+                  if (r === 'accepted') toast.success('Installed')
+                })
+              }
+            >
+              <InstallIcon data-icon="inline-start" /> Install app
+            </Button>
+          )}
+        </SettingRow>
+      </div>
+    </Panel>
+  )
+}
+
+type IndexItem = { id: string; label: string }
+
+/** Highlights the section nearest the top of the screen. */
+function useCurrentSection(ids: string[]) {
+  const [current, setCurrent] = useState(ids[0])
+  const key = ids.join(',')
+  useEffect(() => {
+    const els = key
+      .split(',')
+      .map((id) => document.getElementById(id))
+      .filter((el): el is HTMLElement => !!el)
+    if (els.length === 0 || typeof IntersectionObserver === 'undefined') return
+    const io = new IntersectionObserver(
+      (entries) => {
+        const top = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0]
+        if (top) setCurrent(top.target.id)
+      },
+      { rootMargin: '-96px 0px -60% 0px' },
+    )
+    els.forEach((el) => io.observe(el))
+    return () => io.disconnect()
+  }, [key])
+  return current
+}
+
+function SettingsPage() {
   const { isAdmin } = useAuth()
   const version = __APP_VERSION__
+  const index: IndexItem[] = [
+    { id: 'profile', label: 'Profile' },
+    { id: 'password', label: 'Password' },
+    { id: 'devices', label: 'Devices signed in' },
+    { id: 'access', label: 'Access' },
+    { id: 'appearance', label: 'Appearance' },
+    { id: 'this-device', label: 'This device' },
+    { id: 'recurring', label: 'Recurring' },
+    ...(isAdmin ? [{ id: 'backup', label: 'Backup & restore' }] : []),
+  ]
+  const current = useCurrentSection(index.map((i) => i.id))
+  const jump = (id: string) =>
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
+        eyebrow="Your account"
         title="Settings"
         description="Your profile, security and how the app behaves. The default currency is in the top bar."
       />
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Section title="Profile">
-          <ProfileSection />
-        </Section>
-        <Section title="Password">
-          <PasswordSection />
-        </Section>
-        <Section title="Devices signed in">
-          <SessionsSection />
-        </Section>
-        <div className="flex flex-col gap-6">
-          <Section title="Access">
-            <AccessRow />
-          </Section>
-          <Section title="Appearance">
-            <div className="bg-card border rounded-[1.25rem] px-4">
-              <SettingRow label="Theme">
-                <Segmented
-                  value={theme}
-                  onChange={setTheme}
-                  options={[
-                    { value: 'dark', label: 'Dark' },
-                    { value: 'light', label: 'Light' },
-                  ]}
-                />
-              </SettingRow>
-            </div>
-          </Section>
-          <Section title="Offline">
-            <OfflineRow />
-          </Section>
-          <Section title="App">
-            <div className="bg-card border flex flex-col gap-3 rounded-[1.25rem] p-4">
-              <InstallRow />
-              <p className="text-muted-foreground text-xs">Xpenses web {version}</p>
-            </div>
-          </Section>
+      <nav
+        aria-label="Settings sections"
+        className="no-scrollbar -mx-4 flex gap-1.5 overflow-x-auto px-4 lg:hidden"
+      >
+        {index.map((i) => (
+          <button
+            key={i.id}
+            type="button"
+            onClick={() => jump(i.id)}
+            className="bg-card text-muted-foreground hover:text-foreground h-9 shrink-0 rounded-md border px-3 text-[0.8125rem] font-medium whitespace-nowrap"
+          >
+            {i.label}
+          </button>
+        ))}
+      </nav>
+      <div className="grid gap-8 lg:grid-cols-12">
+        <aside className="hidden lg:col-span-3 lg:block">
+          <nav aria-label="Settings sections" className="sticky top-24">
+            <p className="eyebrow mb-3">On this page</p>
+            <ul className="border-l">
+              {index.map((i) => {
+                const on = current === i.id
+                return (
+                  <li key={i.id}>
+                    <a
+                      href={`#${i.id}`}
+                      onClick={(e) => {
+                        e.preventDefault()
+                        jump(i.id)
+                      }}
+                      aria-current={on ? 'location' : undefined}
+                      className={cn(
+                        '-ml-px block border-l-[3px] py-1.5 pl-4 text-sm transition-colors',
+                        on
+                          ? 'border-saffron text-foreground font-medium'
+                          : 'text-muted-foreground hover:text-foreground border-transparent',
+                      )}
+                    >
+                      {i.label}
+                    </a>
+                  </li>
+                )
+              })}
+            </ul>
+            <p className="text-muted-foreground mt-6 font-mono text-[0.6875rem]">Xpenses web {version}</p>
+          </nav>
+        </aside>
+        <div className="flex min-w-0 flex-col gap-6 lg:col-span-9 [&>section]:scroll-mt-24">
+          <ProfileSection id="profile" />
+          <PasswordSection id="password" />
+          <SessionsSection id="devices" />
+          <AccessSection id="access" />
+          <AppearanceSection id="appearance" />
+          <DeviceSection id="this-device" />
+          <RecurringSection id="recurring" />
+          {isAdmin && <BackupSection id="backup" />}
+          <p className="text-muted-foreground font-mono text-[0.6875rem] lg:hidden">Xpenses web {version}</p>
         </div>
-        <Section title="Recurring" className="lg:col-span-2">
-          <RecurringSection />
-        </Section>
-        {isAdmin && (
-          <Section title="Backup & restore" className="lg:col-span-2">
-            <BackupSection />
-          </Section>
-        )}
       </div>
     </div>
   )

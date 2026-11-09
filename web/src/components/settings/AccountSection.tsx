@@ -2,6 +2,7 @@ import { Camera, Trash2 } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Avatar, RoleBadge } from '@/components/auth/UserBadge'
+import { Panel } from '@/components/common/kit'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { errorMessage } from '@/lib/api'
@@ -21,12 +22,12 @@ function Row({
   children: React.ReactNode
 }) {
   return (
-    <div className="flex flex-col gap-2 py-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="grid gap-2 px-4 py-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] sm:items-center sm:gap-6 sm:px-5">
       <div>
         <p className="text-sm font-medium">{label}</p>
-        {description && <p className="text-muted-foreground text-xs">{description}</p>}
+        {description && <p className="text-muted-foreground mt-0.5 text-xs">{description}</p>}
       </div>
-      <div className="sm:w-72">{children}</div>
+      <div>{children}</div>
     </div>
   )
 }
@@ -88,11 +89,11 @@ function PhotoRow({ user }: { user: User }) {
     })
   }
   return (
-    <div className="flex items-center gap-4 py-4">
+    <div className="flex items-center gap-4 px-4 py-5 sm:px-5">
       <Avatar user={user} className="size-16 text-lg" />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <p className="text-sm font-medium">Signed in as {user.name}</p>
+          <p className="font-display text-xl leading-tight">{user.name}</p>
           <RoleBadge user={user} />
         </div>
         <div className="mt-2 flex flex-wrap gap-2">
@@ -107,8 +108,15 @@ function PhotoRow({ user }: { user: User }) {
               e.target.value = ''
             }}
           />
-          <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => input.current?.click()}>
-            <Camera data-icon="inline-start" /> {upload.isPending ? 'Uploading…' : user.avatar_updated_at ? 'Change photo' : 'Add photo'}
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={busy}
+            onClick={() => input.current?.click()}
+          >
+            <Camera data-icon="inline-start" />{' '}
+            {upload.isPending ? 'Uploading…' : user.avatar_updated_at ? 'Change photo' : 'Add photo'}
           </Button>
           {user.avatar_updated_at && (
             <Button
@@ -133,23 +141,32 @@ function PhotoRow({ user }: { user: User }) {
 }
 
 /** Who is signed in, with the picture and the editable name. */
-export function ProfileSection() {
+export function ProfileSection({ id }: { id?: string }) {
   const { user } = useAuth()
   if (!user) return null
   return (
-    <div className="bg-card border divide-y rounded-[1.25rem] px-4">
-      <PhotoRow user={user} />
-      {/* Keyed on the server value so an external rename resets the draft. */}
-      <ProfileRows key={user.name} name={user.name} email={user.email} />
-    </div>
+    <Panel
+      id={id}
+      title="Profile"
+      description="Your picture and name, as the app and the administrator see them."
+      flush
+    >
+      <div className="divide-rule divide-y">
+        <PhotoRow user={user} />
+        {/* Keyed on the server value so an external rename resets the draft. */}
+        <ProfileRows key={user.name} name={user.name} email={user.email} />
+      </div>
+    </Panel>
   )
 }
 
 /** The change-password form in its own panel. */
-export function PasswordSection() {
+export function PasswordSection({ id }: { id?: string }) {
   return (
-    <div className="bg-card border rounded-[1.25rem] p-4">
-      <ChangePasswordForm />
-    </div>
+    <Panel id={id} title="Password" description="Changing it signs out every other device.">
+      <div className="max-w-md">
+        <ChangePasswordForm />
+      </div>
+    </Panel>
   )
 }

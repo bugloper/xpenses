@@ -1,30 +1,35 @@
-// Recharts-backed pieces for the Reports screen. Loaded lazily so the chart
-// library only ships when a chart is on screen.
+// Recharts-backed pieces for the Reports screen, all drawn in one style: ink
+// on paper, hairline gridlines, mono ticks, received in pine and spent in
+// vermilion. Loaded lazily so the chart library only ships when a chart is on
+// screen.
 import {
   Bar,
   BarChart,
   CartesianGrid,
   Cell,
-  Pie,
-  PieChart,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts'
-import { Money } from '@/components/common/Money'
 import { formatPeriodTick } from '@/lib/dates'
 import { formatMoney } from '@/lib/money'
-import type { ReportCashFlow, ReportCategory } from '@/types/api'
+import type { ReportCashFlow } from '@/types/api'
+import { periodLong } from './format'
 
-const TOOLTIP_STYLE = {
-  background: 'var(--popover)',
-  border: '1px solid var(--border)',
-  borderRadius: 12,
-  fontSize: 12,
-  color: 'var(--popover-foreground)',
-}
+/** The report palette: CSS variables, so both themes follow the tokens. */
+export const SERIES = {
+  income: 'var(--paid)',
+  expense: 'var(--owed)',
+  grid: 'var(--rule)',
+  axis: 'var(--border)',
+  tick: 'var(--muted-foreground)',
+  cursor: 'var(--muted)',
+} as const
+
+const TICK = { fill: SERIES.tick, fontSize: 10.5, fontFamily: 'var(--font-mono)' }
+const MARGIN = { top: 12, right: 4, left: 0, bottom: 0 }
 
 function compact(minor: number): string {
   const whole = Math.trunc(Math.abs(minor) / 100)
@@ -33,99 +38,168 @@ function compact(minor: number): string {
   return String(whole)
 }
 
-export function CategoryDonutChart({
+type TipRow = { key: string; label: string; value: number; color: string }
+
+/** The tooltip card: a dated slip with one ruled line per series. */
+function Slip({
+  title,
   rows,
-  total,
   currency,
-  label,
-  activeId,
+  foot,
 }: {
-  rows: ReportCategory[]
-  total: number
+  title: string
+  rows: TipRow[]
   currency: string
-  label: string
-  activeId?: string | null
+  foot?: string
 }) {
   return (
-    <div className="relative mx-auto h-52 w-52 shrink-0">
-      <ResponsiveContainer width="100%" height="100%">
-        <PieChart>
-          <Pie
-            data={rows}
-            dataKey="amount"
-            nameKey="name"
-            innerRadius={62}
-            outerRadius={92}
-            paddingAngle={2}
-            stroke="none"
-          >
-            {rows.map((r, i) => (
-              <Cell
-                key={`${r.category_id ?? 'none'}-${i}`}
-                fill={r.color || '#64748b'}
-                opacity={activeId && (r.category_id ?? 'none') !== activeId ? 0.35 : 1}
-              />
-            ))}
-          </Pie>
-          <Tooltip
-            contentStyle={TOOLTIP_STYLE}
-            formatter={(value, name) => [formatMoney(Number(value), currency), String(name)]}
-          />
-        </PieChart>
-      </ResponsiveContainer>
-      <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-muted-foreground text-[11px]">{label}</span>
-        <Money minor={total} currency={currency} className="text-sm font-semibold" />
+    <div className="bg-popover text-popover-foreground min-w-44 rounded-md border px-3 py-2.5 shadow-[0_6px_20px_-8px_rgb(0_0_0/0.25)]">
+      <div className="eyebrow text-foreground/70 mb-1.5">{title}</div>
+      <div className="divide-rule divide-y">
+        {rows.map((r) => (
+          <div key={r.key} className="flex items-center justify-between gap-4 py-1 text-[0.8125rem]">
+            <span className="text-muted-foreground flex items-center gap-1.5">
+              <span aria-hidden className="size-2 rounded-[2px]" style={{ background: r.color }} />
+              {r.label}
+            </span>
+            <span className="tabular font-medium">{formatMoney(r.value, currency)}</span>
+          </div>
+        ))}
       </div>
+      {foot && <div className="text-muted-foreground mt-1.5 text-[0.75rem]">{foot}</div>}
     </div>
   )
 }
 
-/** Expenses-only bars (daily / weekly spending) with an average line. */
-export function SpendingBars({
+type TipProps = { active?: boolean; payload?: ReadonlyArray<{ payload?: unknown }>; label?: string | number }
+
+function rowOf(p: TipProps): ReportCashFlow | null {
+  if (!p.active || !p.payload?.length) return null
+  return (p.payload[0]?.payload as ReportCashFlow | undefined) ?? null
+}
+
+/** Income and expenses side by side for each period. */
+export function CashFlowBars({
   rows,
-  average,
   currency,
+  height = 260,
 }: {
   rows: ReportCashFlow[]
-  average: number
   currency: string
+  height?: number
 }) {
   return (
-    <div className="h-56 w-full">
+    <div className="w-full" style={{ height }}>
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={rows} margin={{ top: 8, right: 4, left: 0, bottom: 0 }} barCategoryGap="25%">
-          <CartesianGrid vertical={false} stroke="var(--border)" />
+        <BarChart data={rows} margin={MARGIN} barGap={1} barCategoryGap="22%">
+          <CartesianGrid vertical={false} stroke={SERIES.grid} />
           <XAxis
             dataKey="period"
             tickFormatter={formatPeriodTick}
             tickLine={false}
-            axisLine={false}
-            tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }}
+            axisLine={{ stroke: SERIES.axis }}
+            tick={TICK}
+            tickMargin={6}
             interval="preserveStartEnd"
+            minTickGap={8}
           />
-          <YAxis
-            tickFormatter={compact}
-            tickLine={false}
-            axisLine={false}
-            width={40}
-            tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }}
-          />
+          <YAxis tickFormatter={compact} tickLine={false} axisLine={false} width={40} tick={TICK} />
           <Tooltip
-            cursor={{ fill: 'var(--muted)', opacity: 0.5 }}
-            contentStyle={TOOLTIP_STYLE}
-            formatter={(value) => [formatMoney(Number(value), currency), 'Spent']}
-            labelFormatter={(label) => String(label)}
+            cursor={{ fill: SERIES.cursor, opacity: 0.6 }}
+            content={(p: TipProps) => {
+              const r = rowOf(p)
+              if (!r) return null
+              return (
+                <Slip
+                  title={periodLong(r.period)}
+                  currency={currency}
+                  rows={[
+                    { key: 'in', label: 'Income', value: r.income, color: SERIES.income },
+                    { key: 'out', label: 'Expenses', value: r.expenses, color: SERIES.expense },
+                    { key: 'net', label: 'Net', value: r.income - r.expenses, color: 'transparent' },
+                  ]}
+                />
+              )
+            }}
+          />
+          <Bar dataKey="income" name="Income" fill={SERIES.income} radius={[2, 2, 0, 0]} maxBarSize={22} />
+          <Bar
+            dataKey="expenses"
+            name="Expenses"
+            fill={SERIES.expense}
+            radius={[2, 2, 0, 0]}
+            maxBarSize={22}
+          />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
+/** Expenses-only bars (daily / weekly spending) against the period's average. */
+export function SpendingBars({
+  rows,
+  average,
+  currency,
+  unit,
+  height = 260,
+}: {
+  rows: ReportCashFlow[]
+  average: number
+  currency: string
+  unit: string
+  height?: number
+}) {
+  return (
+    <div className="w-full" style={{ height }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={rows} margin={MARGIN} barCategoryGap="22%">
+          <CartesianGrid vertical={false} stroke={SERIES.grid} />
+          <XAxis
+            dataKey="period"
+            tickFormatter={formatPeriodTick}
+            tickLine={false}
+            axisLine={{ stroke: SERIES.axis }}
+            tick={TICK}
+            tickMargin={6}
+            interval="preserveStartEnd"
+            minTickGap={8}
+          />
+          <YAxis tickFormatter={compact} tickLine={false} axisLine={false} width={40} tick={TICK} />
+          <Tooltip
+            cursor={{ fill: SERIES.cursor, opacity: 0.6 }}
+            content={(p: TipProps) => {
+              const r = rowOf(p)
+              if (!r) return null
+              const diff = r.expenses - average
+              return (
+                <Slip
+                  title={periodLong(r.period)}
+                  currency={currency}
+                  rows={[{ key: 'out', label: 'Spent', value: r.expenses, color: SERIES.expense }]}
+                  foot={
+                    average > 0 && r.expenses > 0
+                      ? `${formatMoney(Math.abs(diff), currency)} ${diff >= 0 ? 'above' : 'below'} the ${unit} average`
+                      : undefined
+                  }
+                />
+              )
+            }}
           />
           {average > 0 && (
-            <ReferenceLine y={average} stroke="var(--muted-foreground)" strokeDasharray="4 4" />
+            <ReferenceLine
+              y={average}
+              stroke="var(--foreground)"
+              strokeOpacity={0.55}
+              strokeDasharray="3 3"
+            />
           )}
-          <Bar dataKey="expenses" name="expenses" radius={[6, 6, 0, 0]} maxBarSize={32}>
+          <Bar dataKey="expenses" name="Spent" radius={[2, 2, 0, 0]} maxBarSize={28}>
             {rows.map((r) => (
               <Cell
                 key={r.period}
-                fill={r.expenses > average && average > 0 ? 'var(--expense)' : 'var(--chart-1)'}
-                opacity={r.expenses === 0 ? 0.3 : 1}
+                fill={SERIES.expense}
+                fillOpacity={average > 0 && r.expenses > average ? 1 : 0.38}
               />
             ))}
           </Bar>

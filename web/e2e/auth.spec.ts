@@ -36,7 +36,7 @@ test.describe('authentication', () => {
   test('log out clears the session and cached data', async ({ page, isMobile }) => {
     await loginAs(page)
     await page.goto('/accounts')
-    await expect(page.getByRole('heading', { name: 'Accounts' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Accounts', exact: true })).toBeVisible()
     if (isMobile) {
       await page.getByRole('button', { name: 'More' }).click()
       await page.getByRole('button', { name: 'Log out' }).click()
@@ -68,7 +68,7 @@ test.describe('authentication', () => {
     await otherPage.goto('/')
     const user = await loginAsNewUser(otherPage, 'Second user')
     await otherPage.goto('/accounts')
-    await expect(otherPage.getByRole('heading', { name: 'Accounts' })).toBeVisible()
+    await expect(otherPage.getByRole('heading', { name: 'Accounts', exact: true })).toBeVisible()
     await expect(otherPage.getByText('Owner secret account')).toHaveCount(0)
     const direct = await otherPage.request.get(`/api/v1/accounts/${ownerAcct}`)
     expect(direct.status()).toBe(404)

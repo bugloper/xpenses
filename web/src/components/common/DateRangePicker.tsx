@@ -39,7 +39,7 @@ export function DateRangePicker({
         <Button
           type="button"
           variant={variant}
-          className={cn('h-9 justify-start rounded-xl font-normal', className)}
+          className={cn('h-9 justify-start rounded-md font-normal', className)}
         >
           <CalendarIcon data-icon="inline-start" className="text-muted-foreground" />
           {value ? rangeLabel(value) : placeholder}

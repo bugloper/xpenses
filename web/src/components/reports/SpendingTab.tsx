@@ -1,14 +1,21 @@
 import { lazy, Suspense, useMemo } from 'react'
-import { Money } from '@/components/common/Money'
+import { Meter, Panel } from '@/components/common/kit'
 import { Segmented } from '@/components/common/Segmented'
 import { EmptyState, ErrorState } from '@/components/common/States'
 import { Skeleton } from '@/components/ui/skeleton'
-import { formatPeriodTick, type DateRange } from '@/lib/dates'
+import type { DateRange } from '@/lib/dates'
+import { formatMoney } from '@/lib/money'
 import { useReportCashFlow } from '@/lib/queries'
+import { pct1, pctOf } from '@/lib/reports'
+import { periodLong } from './format'
+import { ChartKey, LedgerFigures } from './ledger'
 
 const SpendingBars = lazy(() => import('./charts').then((m) => ({ default: m.SpendingBars })))
 
 export type SpendingGranularity = 'day' | 'week'
+
+/** How many of the biggest days / weeks the ranked list shows. */
+const TOP = 6
 
 export function SpendingTab({
   range,
@@ -30,78 +37,127 @@ export function SpendingTab({
     let highest = rows[0] ?? null
     for (const r of rows) if (highest === null || r.expenses > highest.expenses) highest = r
     const active = rows.filter((r) => r.expenses > 0).length
-    return { total, average, highest, active }
+    const ranked = rows
+      .filter((r) => r.expenses > 0)
+      .sort((a, b) => b.expenses - a.expenses)
+      .slice(0, TOP)
+    return { total, average, highest, active, ranked }
   }, [rows])
   const unit = granularity === 'day' ? 'day' : 'week'
+  const m = (minor: number) => formatMoney(minor, currency)
+
   return (
-    <div className="flex flex-col gap-4">
-      <Segmented
-        aria-label="Spending granularity"
-        value={granularity}
-        onChange={onGranularity}
-        options={[
-          { value: 'day', label: 'Daily' },
-          { value: 'week', label: 'Weekly' },
+    <div className="flex flex-col gap-6">
+      <LedgerFigures
+        loading={q.isPending}
+        items={[
+          { label: 'Total spent', value: m(stats.total), tone: 'expense' },
+          { label: `Average per ${unit}`, value: m(stats.average) },
+          {
+            label: `Highest ${unit}`,
+            value: stats.highest && stats.highest.expenses > 0 ? m(stats.highest.expenses) : '—',
+            tone: stats.highest && stats.highest.expenses > 0 ? undefined : 'muted',
+            hint: stats.highest && stats.highest.expenses > 0 ? periodLong(stats.highest.period) : undefined,
+          },
         ]}
       />
-      <div className="grid grid-cols-3 gap-3">
-        <Stat
-          label="Total spent"
-          value={<Money minor={stats.total} currency={currency} tone="expense" className="font-semibold" />}
-          loading={q.isPending}
-        />
-        <Stat
-          label={`Average per ${unit}`}
-          value={<Money minor={stats.average} currency={currency} className="font-semibold" />}
-          loading={q.isPending}
-        />
-        <Stat
-          label={`Highest ${unit}`}
-          value={
-            stats.highest && stats.highest.expenses > 0 ? (
-              <>
-                <Money minor={stats.highest.expenses} currency={currency} className="font-semibold" />
-                <span className="text-muted-foreground block text-[11px]">
-                  {formatPeriodTick(stats.highest.period)} · {stats.highest.period}
-                </span>
-              </>
-            ) : (
-              '—'
-            )
-          }
-          loading={q.isPending}
-        />
-      </div>
-      <section className="bg-card border flex flex-col gap-3 rounded-[1.25rem] p-4">
-        <h2 className="text-sm font-medium">
-          {granularity === 'day' ? 'Daily spending' : 'Weekly spending'}
-        </h2>
-        {q.isPending ? (
-          <Skeleton className="h-56 w-full rounded-xl" />
-        ) : q.error ? (
-          <ErrorState error={q.error} onRetry={() => void q.refetch()} compact />
-        ) : stats.total === 0 ? (
-          <EmptyState title="No spending in this period" className="py-8" />
-        ) : (
-          <Suspense fallback={<Skeleton className="h-56 w-full rounded-xl" />}>
-            <SpendingBars rows={rows} average={stats.average} currency={currency} />
-          </Suspense>
-        )}
-        {stats.total > 0 && (
-          <p className="text-muted-foreground text-xs">
-            {stats.active} of {rows.length} {unit}s had spending. Bars above the dashed average line are red.
-          </p>
-        )}
-      </section>
-    </div>
-  )
-}
 
-function Stat({ label, value, loading }: { label: string; value: React.ReactNode; loading: boolean }) {
-  return (
-    <div className="bg-card border flex flex-col rounded-[1.25rem] px-3 py-2.5">
-      <span className="text-muted-foreground text-[11px]">{label}</span>
-      {loading ? <Skeleton className="mt-1 h-5 w-20" /> : <span className="tabular text-sm">{value}</span>}
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
+        <Panel
+          className="lg:col-span-8"
+          eyebrow="Expenses only"
+          title={granularity === 'day' ? 'Daily spending' : 'Weekly spending'}
+          action={
+            <Segmented
+              aria-label="Spending granularity"
+              size="sm"
+              className="w-auto"
+              value={granularity}
+              onChange={onGranularity}
+              options={[
+                { value: 'day', label: 'Daily' },
+                { value: 'week', label: 'Weekly' },
+              ]}
+            />
+          }
+          footer={
+            stats.total > 0 ? (
+              <span className="text-muted-foreground">
+                {stats.active} of {rows.length} {unit}s had spending. Bars above the dashed average line are
+                drawn in full colour.
+              </span>
+            ) : undefined
+          }
+        >
+          {q.isPending ? (
+            <Skeleton className="h-[284px] w-full rounded-md" />
+          ) : q.error ? (
+            <ErrorState error={q.error} onRetry={() => void q.refetch()} compact />
+          ) : stats.total === 0 ? (
+            <EmptyState title="No spending in this period" className="py-10" />
+          ) : (
+            <>
+              <ChartKey
+                className="mb-2"
+                items={[
+                  { label: 'Above average', color: 'var(--owed)' },
+                  { label: 'At or below', color: 'color-mix(in oklch, var(--owed) 38%, transparent)' },
+                  { label: `Average ${m(stats.average)}`, color: 'var(--foreground)', dashed: true },
+                ]}
+              />
+              <Suspense fallback={<Skeleton className="h-[260px] w-full rounded-md" />}>
+                <SpendingBars rows={rows} average={stats.average} currency={currency} unit={unit} />
+              </Suspense>
+            </>
+          )}
+        </Panel>
+
+        <Panel
+          className="lg:col-span-4"
+          eyebrow="Ranked"
+          title={granularity === 'day' ? 'Biggest days' : 'Biggest weeks'}
+          flush
+        >
+          {q.isPending ? (
+            <div className="flex flex-col gap-3 p-5">
+              {Array.from({ length: 4 }, (_, i) => (
+                <Skeleton key={i} className="h-9 w-full" />
+              ))}
+            </div>
+          ) : stats.ranked.length === 0 ? (
+            <p className="text-muted-foreground px-5 py-6 text-sm">Nothing spent yet.</p>
+          ) : (
+            <ol
+              className="divide-rule divide-y"
+              aria-label={granularity === 'day' ? 'Biggest days' : 'Biggest weeks'}
+            >
+              {stats.ranked.map((r, i) => (
+                <li key={r.period} className="flex items-center gap-3 px-4 py-3 sm:px-5">
+                  <span className="text-muted-foreground w-4 shrink-0 text-right font-mono text-xs tabular-nums">
+                    {i + 1}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="truncate text-sm font-medium">{periodLong(r.period)}</span>
+                      <span className="tabular shrink-0 text-sm font-medium">{m(r.expenses)}</span>
+                    </div>
+                    <div className="mt-1.5 flex items-center gap-2">
+                      <Meter
+                        value={pctOf(r.expenses, stats.highest?.expenses ?? 0)}
+                        tone="expense"
+                        className="h-1"
+                      />
+                      <span className="text-muted-foreground w-11 shrink-0 text-right font-mono text-[0.6875rem] tabular-nums">
+                        {pct1(r.expenses, stats.total)}%
+                      </span>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          )}
+        </Panel>
+      </div>
     </div>
   )
 }

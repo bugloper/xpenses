@@ -6,8 +6,14 @@ import { Button } from '@/components/ui/button'
 import { formatDayHeading } from '@/lib/dates'
 import type { DayGroup } from '@/lib/transactions'
 import { uiStore } from '@/lib/ui-store'
-import { TransactionRow } from './TransactionRow'
+import { cn } from '@/lib/utils'
+import { LEDGER_COLUMNS, TransactionRow } from './TransactionRow'
 
+/**
+ * The ledger: one sheet, ruled into days. Each day opens with a band carrying
+ * its date and net, which sticks under the top bar while its rows scroll by.
+ * With `columns`, wide screens get a column header and rows set in columns.
+ */
 export function TransactionList({
   groups,
   loading,
@@ -20,6 +26,8 @@ export function TransactionList({
   currency = 'BTN',
   emptyTitle = 'No transactions',
   emptyDescription = 'Tap + to add your first expense.',
+  columns,
+  className,
 }: {
   groups: DayGroup[]
   loading: boolean
@@ -32,6 +40,9 @@ export function TransactionList({
   currency?: string
   emptyTitle?: string
   emptyDescription?: string
+  /** Set the ledger in columns (date · payee · category · account · amount) on wide screens. */
+  columns?: boolean
+  className?: string
 }) {
   const sentinel = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -43,37 +54,75 @@ export function TransactionList({
     return () => io.disconnect()
   }, [hasMore, onLoadMore, loadingMore])
 
-  if (loading && groups.length === 0) return <ListSkeleton rows={8} />
-  if (error && groups.length === 0) return <ErrorState error={error} onRetry={onRetry} />
+  const sheet = cn('bg-card rounded-lg border', className)
+
+  if (loading && groups.length === 0)
+    return (
+      <div className={cn(sheet, 'p-4')}>
+        <ListSkeleton rows={8} />
+      </div>
+    )
+  if (error && groups.length === 0)
+    return (
+      <div className={sheet}>
+        <ErrorState error={error} onRetry={onRetry} />
+      </div>
+    )
   if (groups.length === 0)
     return (
-      <EmptyState
-        icon={ArrowLeftRight}
-        title={emptyTitle}
-        description={emptyDescription}
-        action={
-          <Button size="sm" onClick={() => uiStore.openAdd()}>
-            Add transaction
-          </Button>
-        }
-      />
+      <div className={sheet}>
+        <EmptyState
+          icon={ArrowLeftRight}
+          title={emptyTitle}
+          description={emptyDescription}
+          action={
+            <Button size="sm" onClick={() => uiStore.openAdd()}>
+              Add transaction
+            </Button>
+          }
+        />
+      </div>
     )
   return (
-    <div className="flex flex-col gap-5">
-      {groups.map((g) => (
-        <section key={g.date} className="flex flex-col gap-1">
-          <div className="text-muted-foreground flex items-center justify-between px-2 text-xs">
-            <span className="font-semibold tracking-wide uppercase">{formatDayHeading(g.date)}</span>
-            <span className="tabular flex items-center gap-2">
-              {g.income > 0 && <Money minor={g.income} currency={currency} tone="income" sign="always" />}
-              {g.expense > 0 && <Money minor={-g.expense} currency={currency} tone="expense" />}
-            </span>
+    <div className={sheet}>
+      {columns && (
+        <div aria-hidden className={cn('eyebrow hidden border-b px-5 py-2.5', LEDGER_COLUMNS)}>
+          <span>Date</span>
+          <span>Payee / description</span>
+          <span>Category</span>
+          <span>Account</span>
+          <span className="text-right">Amount</span>
+        </div>
+      )}
+      {groups.map((g, i) => (
+        <section key={g.date} aria-label={formatDayHeading(g.date)}>
+          <div
+            className={cn(
+              'bg-muted sticky top-14 z-10 flex items-center justify-between gap-3 border-b px-4 py-1.5 sm:px-5 lg:top-16',
+              i > 0 && 'border-t',
+              i === 0 && !columns && 'rounded-t-[calc(var(--radius-lg)-1px)]',
+              i === 0 && columns && 'rounded-t-[calc(var(--radius-lg)-1px)] lg:rounded-none',
+            )}
+          >
+            <h3 className="eyebrow text-foreground/75">{formatDayHeading(g.date)}</h3>
+            {(g.income > 0 || g.expense > 0) && (
+              <span className="flex items-baseline gap-2 text-xs">
+                <span className="eyebrow hidden sm:inline">Net</span>
+                <Money
+                  minor={g.net}
+                  currency={currency}
+                  sign="always"
+                  className="text-foreground font-medium"
+                />
+              </span>
+            )}
           </div>
-          <div className="bg-card divide-y overflow-hidden rounded-[1.25rem] border">
+          <div className="divide-rule divide-y">
             {g.rows.map((row) => (
               <TransactionRow
                 key={row.tx.id}
                 row={row}
+                columns={columns}
                 perspectiveAccountId={perspectiveAccountId}
                 onClick={row.kind === 'pending' ? () => uiStore.setPending(true) : undefined}
               />
@@ -82,7 +131,7 @@ export function TransactionList({
         </section>
       ))}
       {hasMore && (
-        <div ref={sentinel} className="flex justify-center py-2">
+        <div ref={sentinel} className="flex justify-center border-t py-2">
           <Button variant="ghost" size="sm" onClick={onLoadMore} disabled={loadingMore}>
             {loadingMore ? 'Loading…' : 'Load more'}
           </Button>

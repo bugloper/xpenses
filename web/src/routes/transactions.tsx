@@ -4,14 +4,17 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { PageHeader } from '@/components/common/PageHeader'
 import { Segmented } from '@/components/common/Segmented'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
+  AccountFilter,
+  ActiveFilters,
+  CategoryFilter,
   TransactionFiltersSheet,
   countActiveFilters,
   type TxFilters,
 } from '@/components/transactions/TransactionFilters'
+import { DateRangePicker } from '@/components/common/DateRangePicker'
 import { TransactionList } from '@/components/transactions/TransactionList'
 import { useDebouncedValue } from '@/hooks/useDebounce'
 import { downloadFile, errorMessage, toQuery } from '@/lib/api'
@@ -133,60 +136,102 @@ function TransactionsPage() {
     }
   }, [apiFilter])
 
+  const searchBox = (
+    <div className="relative min-w-0 flex-1 basis-48">
+      <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+      <Input
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        placeholder="Search payee, description, reference"
+        className="h-10 pr-9 pl-9"
+        aria-label="Search transactions"
+      />
+      {q && (
+        <button
+          type="button"
+          aria-label="Clear search"
+          onClick={() => setQ('')}
+          className="text-muted-foreground hover:text-foreground absolute top-1/2 right-2 -translate-y-1/2 rounded-sm p-1"
+        >
+          <X className="size-4" />
+        </button>
+      )}
+    </div>
+  )
+
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-5">
       <PageHeader
+        eyebrow="Ledger"
         title="Transactions"
-        description={total ? `${total.toLocaleString()} total` : undefined}
+        description={
+          total
+            ? `${total.toLocaleString()} ${total === 1 ? 'entry' : 'entries'}${activeCount || search.q ? ' match' : ''}`
+            : undefined
+        }
         actions={
           <Button variant="outline" size="sm" onClick={() => void exportCsv()} aria-label="Export CSV">
             <Download data-icon="inline-start" /> <span className="hidden sm:inline">Export CSV</span>
           </Button>
         }
       />
-      <Segmented
-        aria-label="Type"
-        value={tab}
-        onChange={(v) =>
-          void navigate({ search: (s) => ({ ...s, tab: v === 'all' ? undefined : v }), replace: true })
-        }
-        options={[
-          { value: 'all', label: 'All' },
-          { value: 'income', label: 'Income', tone: 'income' },
-          { value: 'expense', label: 'Expense', tone: 'expense' },
-        ]}
-      />
-      <div className="flex items-center gap-2">
-        <div className="relative flex-1">
-          <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
-          <Input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search transactions"
-            className="h-10 rounded-xl pl-9"
-            aria-label="Search transactions"
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          {searchBox}
+          <Button
+            variant="outline"
+            className="relative h-10 shrink-0 lg:order-last"
+            onClick={() => setFiltersOpen(true)}
+            aria-label={activeCount ? `Filters, ${activeCount} on` : 'Filters'}
+          >
+            <SlidersHorizontal data-icon="inline-start" />{' '}
+            <span className="max-sm:sr-only lg:sr-only xl:not-sr-only">Filters</span>
+            {activeCount > 0 && (
+              <span className="bg-saffron text-saffron-foreground flex h-4.5 min-w-4.5 items-center justify-center rounded-sm px-1 font-mono text-[0.625rem] font-semibold">
+                {activeCount}
+              </span>
+            )}
+          </Button>
+          <Segmented
+            aria-label="Type"
+            value={tab}
+            size="lg"
+            className="max-lg:w-full"
+            onChange={(v) =>
+              void navigate({ search: (s) => ({ ...s, tab: v === 'all' ? undefined : v }), replace: true })
+            }
+            options={[
+              { value: 'all', label: 'All' },
+              { value: 'income', label: 'Income', tone: 'income' },
+              { value: 'expense', label: 'Expense', tone: 'expense' },
+            ]}
           />
-          {q && (
-            <button
-              type="button"
-              aria-label="Clear search"
-              onClick={() => setQ('')}
-              className="text-muted-foreground hover:bg-muted absolute top-1/2 right-2 -translate-y-1/2 rounded-full p-1"
-            >
-              <X className="size-4" />
-            </button>
-          )}
+          {/* Wide screens keep the common filters in the toolbar; the sheet holds the rest. */}
+          <DateRangePicker
+            value={filters.from && filters.to ? { from: filters.from, to: filters.to } : null}
+            onChange={(r) => setFilters({ ...filters, from: r?.from, to: r?.to })}
+            placeholder="Any date"
+            className="hidden h-10 w-44 lg:inline-flex"
+          />
+          <div className="hidden lg:block">
+            <AccountFilter
+              value={filters.account}
+              onChange={(account) => setFilters({ ...filters, account })}
+              className="h-10! w-40"
+            />
+          </div>
+          <div className="hidden lg:block">
+            <CategoryFilter
+              value={filters.category}
+              onChange={(category) => setFilters({ ...filters, category })}
+              className="h-10! w-44"
+            />
+          </div>
         </div>
-        <Button variant="outline" className="relative h-10 rounded-xl" onClick={() => setFiltersOpen(true)}>
-          <SlidersHorizontal data-icon="inline-start" /> Filters
-          {activeCount > 0 && (
-            <Badge className="absolute -top-2 -right-2 h-5 min-w-5 justify-center px-1 text-[10px]">
-              {activeCount}
-            </Badge>
-          )}
-        </Button>
+        <ActiveFilters value={filters} onChange={setFilters} hideType={tab !== 'all'} />
       </div>
       <TransactionList
+        columns
         groups={groups}
         loading={query.isPending}
         error={query.error}

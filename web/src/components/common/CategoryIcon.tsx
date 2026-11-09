@@ -18,12 +18,12 @@ export function CategoryIcon({ icon, color, size = 'md', className, kind }: Prop
   const c = kind ? '#64748b' : color || '#64748b'
   return (
     <span
-      className={cn('inline-flex shrink-0 items-center justify-center rounded-full', SIZES[size], className)}
-      style={{ backgroundColor: `${c}22`, color: c }}
+      className={cn('inline-flex shrink-0 items-center justify-center rounded-md', SIZES[size], className)}
+      style={{ backgroundColor: `${c}1f`, color: c, boxShadow: `inset 0 0 0 1px ${c}2e` }}
       aria-hidden
     >
       {createElement(kind === 'transfer' ? ArrowLeftRight : kind === 'adjustment' ? Scale : iconFor(icon), {
-        strokeWidth: 2.2,
+        strokeWidth: 2,
       })}
     </span>
   )

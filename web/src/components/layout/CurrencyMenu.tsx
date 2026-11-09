@@ -29,11 +29,11 @@ export function CurrencyMenu({ className }: { className?: string }) {
           type="button"
           aria-label={`Default currency ${current}. Change`}
           className={cn(
-            'bg-card hover:bg-muted inline-flex h-11 items-center gap-1.5 rounded-full border px-3.5 text-sm font-semibold tracking-wide transition-colors',
+            'text-ink-foreground/85 hover:bg-ink-foreground/10 hover:text-ink-foreground border-ink-foreground/20 inline-flex h-9 items-center gap-1.5 rounded-md border px-2.5 font-mono text-xs font-medium tracking-wider transition-colors',
             className,
           )}
         >
-          <Coins className="text-muted-foreground size-4" />
+          <Coins className="size-3.5 opacity-70" />
           {current}
         </button>
       </PopoverTrigger>

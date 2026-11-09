@@ -11,7 +11,13 @@ import { SpendingTab } from '@/components/reports/SpendingTab'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { rangeLabel } from '@/lib/dates'
 import { useDefaultCurrency } from '@/lib/queries'
-import { defaultGranularity, periodSearch, resolveReportRange, type ExportParams } from '@/lib/reports'
+import {
+  defaultGranularity,
+  periodSearch,
+  REPORT_PRESETS,
+  resolveReportRange,
+  type ExportParams,
+} from '@/lib/reports'
 import type { ExportReport } from '@/types/api'
 import { appRoute } from './__root'
 
@@ -63,25 +69,48 @@ function ReportsPage() {
     type,
   }
 
+  const presetLabel = REPORT_PRESETS.find((p) => p.value === preset)?.label ?? 'Custom range'
+
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-6">
       <PageHeader
+        eyebrow={`Statement · ${presetLabel}`}
         title="Reports"
-        description={rangeLabel(range)}
+        description={<span className="font-display text-foreground/80 text-lg">{rangeLabel(range)}</span>}
         actions={<ExportButtons report={TAB_REPORT[tab]} params={exportParams} />}
+        rule={false}
       />
-      <ReportsPeriodSelector preset={preset} range={range} onChange={(p, r) => patch(periodSearch(p, r))} />
-      <Tabs value={tab} onValueChange={(v) => patch({ tab: v === 'overview' ? undefined : (v as Tab) })}>
-        <div className="-mx-4 scrollbar-none overflow-x-auto px-4 lg:mx-0 lg:px-0">
-          <TabsList aria-label="Report" className="w-max min-w-full lg:w-fit lg:min-w-0">
-            {TABS.map((t) => (
-              <TabsTrigger key={t} value={t} className="px-3">
-                {TAB_LABELS[t]}
-              </TabsTrigger>
-            ))}
-          </TabsList>
+      <Tabs
+        value={tab}
+        onValueChange={(v) => patch({ tab: v === 'overview' ? undefined : (v as Tab) })}
+        className="gap-6"
+      >
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between lg:gap-6 lg:border-b">
+          <ReportsPeriodSelector
+            preset={preset}
+            range={range}
+            onChange={(p, r) => patch(periodSearch(p, r))}
+            className="lg:order-2 lg:pb-2"
+          />
+          <div className="-mx-4 scrollbar-none overflow-x-auto border-b px-4 sm:mx-0 sm:px-0 lg:order-1 lg:border-b-0">
+            <TabsList
+              variant="line"
+              aria-label="Report"
+              className="h-auto gap-6 rounded-none p-0 group-data-horizontal/tabs:h-auto sm:gap-8"
+            >
+              {TABS.map((t) => (
+                <TabsTrigger
+                  key={t}
+                  value={t}
+                  className="font-display after:bg-saffron text-muted-foreground data-active:text-foreground h-11 flex-none rounded-none px-0 text-[1.0625rem] font-normal tracking-normal group-data-horizontal/tabs:after:bottom-[-1px] group-data-horizontal/tabs:after:h-[3px] focus-visible:underline focus-visible:ring-0 focus-visible:outline-none data-active:font-medium"
+                >
+                  {TAB_LABELS[t]}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </div>
         </div>
-        <TabsContent value="overview" className="mt-2">
+        <TabsContent value="overview">
           {tab === 'overview' && (
             <OverviewTab
               range={range}
@@ -91,7 +120,7 @@ function ReportsPage() {
             />
           )}
         </TabsContent>
-        <TabsContent value="categories" className="mt-2">
+        <TabsContent value="categories">
           {tab === 'categories' && (
             <CategoriesTab
               range={range}
@@ -101,7 +130,7 @@ function ReportsPage() {
             />
           )}
         </TabsContent>
-        <TabsContent value="spending" className="mt-2">
+        <TabsContent value="spending">
           {tab === 'spending' && (
             <SpendingTab
               range={range}
@@ -111,9 +140,7 @@ function ReportsPage() {
             />
           )}
         </TabsContent>
-        <TabsContent value="accounts" className="mt-2">
-          {tab === 'accounts' && <AccountsTab range={range} />}
-        </TabsContent>
+        <TabsContent value="accounts">{tab === 'accounts' && <AccountsTab range={range} />}</TabsContent>
       </Tabs>
     </div>
   )

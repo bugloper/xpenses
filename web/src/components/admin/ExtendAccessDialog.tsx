@@ -67,7 +67,11 @@ export function ExtendAccessDialog({ user, onClose }: { user: AdminUser | null; 
             <FieldLabel htmlFor="access-until">Access until</FieldLabel>
             <div className="flex gap-2">
               <Input id="access-until" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-              <Button type="button" variant="outline" onClick={() => setDate(plusOneYear(user?.access_until ?? ''))}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setDate(plusOneYear(user?.access_until ?? ''))}
+              >
                 +1 year
               </Button>
             </div>

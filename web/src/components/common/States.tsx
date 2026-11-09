@@ -19,11 +19,11 @@ export function EmptyState({
   className?: string
 }) {
   return (
-    <div className={cn('flex flex-col items-center justify-center px-6 py-10 text-center', className)}>
-      <span className="bg-muted text-muted-foreground mb-3 flex size-11 items-center justify-center rounded-xl">
+    <div className={cn('flex flex-col items-center justify-center px-6 py-12 text-center', className)}>
+      <span className="text-muted-foreground mb-4 flex size-12 items-center justify-center rounded-md border border-dashed">
         <Icon className="size-5" />
       </span>
-      <p className="text-sm font-semibold">{title}</p>
+      <p className="font-display text-xl">{title}</p>
       {description && <p className="text-muted-foreground mt-1 max-w-sm text-sm">{description}</p>}
       {action && <div className="mt-4">{action}</div>}
     </div>
@@ -62,10 +62,10 @@ export function ErrorState({
         className,
       )}
     >
-      <span className="bg-destructive/10 text-destructive flex size-10 items-center justify-center rounded-xl">
+      <span className="border-destructive/40 text-destructive flex size-10 items-center justify-center rounded-md border">
         <Icon className="size-5" />
       </span>
-      <p className="font-medium">{heading}</p>
+      <p className="font-display text-lg">{heading}</p>
       <p className="text-muted-foreground max-w-xs text-sm">{desc}</p>
       {onRetry && (
         <Button variant="outline" size="sm" className="mt-1" onClick={onRetry}>
@@ -81,7 +81,7 @@ export function ListSkeleton({ rows = 6, className }: { rows?: number; className
     <div className={cn('flex flex-col gap-3', className)} aria-busy>
       {Array.from({ length: rows }).map((_, i) => (
         <div key={i} className="flex items-center gap-3">
-          <Skeleton className="size-10 rounded-full" />
+          <Skeleton className="size-9 rounded-md" />
           <div className="flex flex-1 flex-col gap-2">
             <Skeleton className="h-3.5 w-2/5" />
             <Skeleton className="h-3 w-1/4" />

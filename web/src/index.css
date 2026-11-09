@@ -1,17 +1,27 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
+/* Self-hosted: the server's CSP allows fonts from 'self' only. */
+@import '@fontsource-variable/geist';
+@import '@fontsource-variable/geist-mono';
+@import '@fontsource-variable/newsreader/opsz.css';
 
 @custom-variant dark (&:is(.dark *));
 
-/* Xpenses's design system, shared with Bangkee: shadcn's theme variables, a
-   light grey base with white cards, and one vivid indigo accent. Money carries
-   meaning in colour — spent, received, over budget — and only as text or a
-   faint tint, never as big blocks. */
+/* Xpenses design system — "the ledger".
+   Warm paper, dark ink, hairline rules. Headlines and the big figures are set
+   in a serif (Newsreader); everything people read and type is Geist; small
+   labels, dates and references are Geist Mono in capitals, like the printed
+   columns of a ledger. One signature colour, saffron, marks the thing to do
+   next (record a payment, the current tab); money carries meaning in colour
+   only as text or a thin bar: received is pine, spent is vermilion. Corners
+   are tight (6–10px), surfaces are separated by rules, not shadows. */
 
 @theme inline {
-  --font-heading: var(--font-sans);
-  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-sans: 'Geist Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-heading: var(--font-display);
+  --font-display: 'Newsreader Variable', 'Iowan Old Style', Georgia, serif;
+  --font-mono: 'Geist Mono Variable', ui-monospace, 'SF Mono', Menlo, monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -28,8 +38,16 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-border: var(--border);
+  --color-rule: var(--rule);
+  --color-bar: var(--bar);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-ink: var(--ink);
+  --color-ink-foreground: var(--ink-foreground);
+  --color-ink-muted: var(--ink-muted);
+  --color-saffron: var(--saffron);
+  --color-saffron-foreground: var(--saffron-foreground);
+  --color-saffron-soft: var(--saffron-soft);
   --color-income: var(--paid);
   --color-expense: var(--owed);
   --color-warning: var(--warn);
@@ -37,8 +55,8 @@
   --color-owed: var(--owed);
   --color-warn: var(--warn);
   --color-surface: var(--muted);
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--foreground);
+  --color-sidebar: var(--ink);
+  --color-sidebar-foreground: var(--ink-foreground);
   --color-sidebar-accent: var(--muted);
   --color-sidebar-accent-foreground: var(--foreground);
   --color-sidebar-border: var(--border);
@@ -47,78 +65,93 @@
   --color-chart-3: var(--series-3);
   --color-chart-4: var(--series-4);
   --color-chart-5: var(--series-5);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 3px);
+  --radius-md: calc(var(--radius) - 1px);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --radius-2xl: calc(var(--radius) + 8px);
-  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-xl: calc(var(--radius) + 2px);
+  --radius-2xl: calc(var(--radius) + 4px);
+  --radius-3xl: calc(var(--radius) + 8px);
 }
 
 :root {
-  --radius: 0.875rem;
-  --background: oklch(0.973 0.002 270);
-  --foreground: oklch(0.19 0.006 270);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.19 0.006 270);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.19 0.006 270);
-  --primary: oklch(0.51 0.26 277);
-  --primary-foreground: oklch(0.99 0 0);
-  --secondary: oklch(0.955 0.02 277);
-  --secondary-foreground: oklch(0.4 0.2 277);
-  --muted: oklch(0.955 0.003 270);
-  --muted-foreground: oklch(0.54 0.01 270);
-  --accent: oklch(0.95 0.03 277);
-  --accent-foreground: oklch(0.42 0.22 277);
-  --destructive: oklch(0.55 0.21 25);
-  --border: oklch(0.925 0.004 270);
-  --input: oklch(0.9 0.005 270);
-  --ring: oklch(0.6 0.2 277);
-  --sidebar: oklch(0.985 0.002 270);
-  --owed: oklch(0.58 0.2 27);
-  --paid: oklch(0.52 0.13 158);
-  --warn: oklch(0.58 0.14 65);
-  /* Chart slices, in this fixed order (CVD-safe, light and dark). */
-  --series-1: #4f46e5;
-  --series-2: #eb6834;
-  --series-3: #1baf7a;
-  --series-4: #eda100;
-  --series-5: #e87ba4;
-  --series-other: #cfd1d8;
-  --bar: oklch(0.91 0.004 270);
+  --radius: 0.5rem;
+  /* Paper, a sheet laid on it, and the ink they are written in. */
+  --background: oklch(0.966 0.008 85);
+  --foreground: oklch(0.21 0.012 165);
+  --card: oklch(0.988 0.004 85);
+  --card-foreground: oklch(0.21 0.012 165);
+  --popover: oklch(0.992 0.003 85);
+  --popover-foreground: oklch(0.21 0.012 165);
+  /* Primary actions are written in ink. */
+  --primary: oklch(0.24 0.018 165);
+  --primary-foreground: oklch(0.975 0.006 85);
+  --secondary: oklch(0.93 0.012 85);
+  --secondary-foreground: oklch(0.24 0.018 165);
+  --muted: oklch(0.938 0.01 85);
+  --muted-foreground: oklch(0.5 0.014 165);
+  --accent: oklch(0.93 0.035 75);
+  --accent-foreground: oklch(0.38 0.08 60);
+  --destructive: oklch(0.55 0.19 30);
+  --border: oklch(0.87 0.012 85);
+  --rule: oklch(0.9 0.01 85);
+  --input: oklch(0.84 0.014 85);
+  --ring: oklch(0.7 0.15 65);
+  /* The navigation bar and other inverted surfaces. */
+  --ink: oklch(0.22 0.016 165);
+  --ink-foreground: oklch(0.95 0.008 85);
+  --ink-muted: oklch(0.7 0.015 140);
+  --saffron: oklch(0.79 0.155 70);
+  --saffron-foreground: oklch(0.22 0.03 60);
+  --saffron-soft: oklch(0.93 0.05 80);
+  --owed: oklch(0.55 0.18 32);
+  --paid: oklch(0.5 0.1 165);
+  --warn: oklch(0.6 0.14 62);
+  /* Chart series, in this fixed order. */
+  --series-1: #c8761a;
+  --series-2: #2f6f5e;
+  --series-3: #b4473a;
+  --series-4: #6b6fa8;
+  --series-5: #9a8a3c;
+  --series-other: #cdc7b8;
+  --bar: oklch(0.9 0.012 85);
 }
 
 .dark {
-  --background: oklch(0.15 0.006 270);
-  --foreground: oklch(0.96 0.003 270);
-  --card: oklch(0.2 0.008 270);
-  --card-foreground: oklch(0.96 0.003 270);
-  --popover: oklch(0.22 0.008 270);
-  --popover-foreground: oklch(0.96 0.003 270);
-  --primary: oklch(0.65 0.2 277);
-  --primary-foreground: oklch(0.99 0 0);
-  --secondary: oklch(0.27 0.05 277);
-  --secondary-foreground: oklch(0.88 0.06 277);
-  --muted: oklch(0.25 0.008 270);
-  --muted-foreground: oklch(0.7 0.01 270);
-  --accent: oklch(0.28 0.06 277);
-  --accent-foreground: oklch(0.86 0.08 277);
-  --destructive: oklch(0.68 0.18 25);
-  --border: oklch(1 0 0 / 8%);
-  --input: oklch(1 0 0 / 13%);
-  --ring: oklch(0.62 0.17 277);
-  --sidebar: oklch(0.175 0.007 270);
-  --owed: oklch(0.72 0.16 27);
-  --paid: oklch(0.74 0.13 158);
+  --background: oklch(0.175 0.012 165);
+  --foreground: oklch(0.93 0.01 85);
+  --card: oklch(0.205 0.013 165);
+  --card-foreground: oklch(0.93 0.01 85);
+  --popover: oklch(0.225 0.014 165);
+  --popover-foreground: oklch(0.93 0.01 85);
+  --primary: oklch(0.93 0.012 85);
+  --primary-foreground: oklch(0.2 0.014 165);
+  --secondary: oklch(0.26 0.014 165);
+  --secondary-foreground: oklch(0.93 0.01 85);
+  --muted: oklch(0.245 0.013 165);
+  --muted-foreground: oklch(0.68 0.014 120);
+  --accent: oklch(0.3 0.05 70);
+  --accent-foreground: oklch(0.88 0.09 78);
+  --destructive: oklch(0.68 0.17 30);
+  --border: oklch(1 0 0 / 11%);
+  --rule: oklch(1 0 0 / 7%);
+  --input: oklch(1 0 0 / 16%);
+  --ring: oklch(0.75 0.14 70);
+  --ink: oklch(0.13 0.012 165);
+  --ink-foreground: oklch(0.93 0.01 85);
+  --ink-muted: oklch(0.66 0.014 140);
+  --saffron: oklch(0.8 0.15 72);
+  --saffron-foreground: oklch(0.2 0.03 60);
+  --saffron-soft: oklch(0.32 0.06 72);
+  --owed: oklch(0.72 0.15 32);
+  --paid: oklch(0.76 0.11 165);
   --warn: oklch(0.8 0.13 75);
-  --series-1: #7b74f0;
-  --series-2: #d95926;
-  --series-3: #199e70;
-  --series-4: #c98500;
-  --series-5: #d55181;
-  --series-other: #55565c;
-  --bar: oklch(0.32 0.008 270);
+  --series-1: #e0973c;
+  --series-2: #5fae97;
+  --series-3: #dd7062;
+  --series-4: #9a9ee0;
+  --series-5: #c7b660;
+  --series-other: #4a4f4c;
+  --bar: oklch(0.3 0.012 165);
 }
 
 @layer base {
@@ -138,12 +171,14 @@
     @apply bg-background text-foreground antialiased;
     min-height: 100dvh;
     overscroll-behavior-y: none;
-    font-feature-settings: 'cv11', 'ss01', 'ss03';
   }
   h1,
   h2,
   h3 {
     @apply tracking-tight;
+  }
+  ::selection {
+    background: var(--saffron-soft);
   }
   button:not(:disabled),
   [role='button']:not(:disabled) {
@@ -159,6 +194,44 @@
 /* Money and anything people compare column by column. */
 @utility tabular {
   font-variant-numeric: tabular-nums;
+}
+
+/* A money figure set large: the serif with lining, tabular numerals. */
+@utility figure {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+  font-variant-numeric: lining-nums tabular-nums;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+/* The serif used for headlines and the big figures. */
+@utility font-display {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+  letter-spacing: -0.015em;
+}
+
+/* Ledger-column labels: tiny mono capitals. */
+@utility eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  line-height: 1rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+/* Faint ruled-paper lines, for hero surfaces. */
+@utility ruled {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 31px,
+    color-mix(in oklch, var(--rule) 70%, transparent) 31px,
+    color-mix(in oklch, var(--rule) 70%, transparent) 32px
+  );
 }
 
 /* Room for the phone's home indicator under the tab bar. */

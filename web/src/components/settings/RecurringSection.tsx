@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { z } from 'zod'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { DateField } from '@/components/common/DateField'
+import { Panel } from '@/components/common/kit'
 import { Money } from '@/components/common/Money'
 import { ResponsiveSheet } from '@/components/common/ResponsiveSheet'
 import { EmptyState, ErrorState, ListSkeleton } from '@/components/common/States'
@@ -34,8 +35,8 @@ import {
   useRunRecurring,
   useUpdateRecurring,
 } from '@/lib/queries'
+import { cn } from '@/lib/utils'
 import type { RecurringTransaction } from '@/types/api'
-
 
 const schema = z
   .object({
@@ -392,7 +393,7 @@ function RecurringFormSheet({
   )
 }
 
-export function RecurringSection() {
+export function RecurringSection({ id }: { id?: string }) {
   const { data, isPending, error, refetch } = useRecurring()
   const { data: accounts = [] } = useAccounts(true)
   const update = useUpdateRecurring()
@@ -404,13 +405,12 @@ export function RecurringSection() {
   const list = data ?? []
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-between gap-2">
-        <div>
-          <h2 className="font-medium">Recurring transactions</h2>
-          <p className="text-muted-foreground text-xs">Generated automatically at startup and once a day.</p>
-        </div>
-        <div className="flex gap-2">
+    <Panel
+      id={id}
+      title="Recurring transactions"
+      description="Rent, salary, subscriptions. Generated automatically at startup and once a day."
+      action={
+        <>
           <Button
             size="sm"
             variant="outline"
@@ -427,10 +427,12 @@ export function RecurringSection() {
           <Button size="sm" onClick={() => setEditing(null)}>
             <Plus data-icon="inline-start" /> New
           </Button>
-        </div>
-      </div>
+        </>
+      }
+      flush
+    >
       {isPending ? (
-        <ListSkeleton rows={3} />
+        <ListSkeleton rows={3} className="p-5" />
       ) : error ? (
         <ErrorState error={error} onRetry={() => void refetch()} compact />
       ) : list.length === 0 ? (
@@ -438,25 +440,23 @@ export function RecurringSection() {
           icon={Repeat}
           title="No recurring transactions"
           description="Rent, salary, subscriptions…"
-          className="py-6"
+          className="py-8"
         />
       ) : (
-        <ul className="bg-card border divide-y rounded-[1.25rem]">
+        <ul className="divide-rule divide-y">
           {list.map((r) => (
-            <li key={r.id} className="flex items-center gap-3 px-4 py-3">
-              <div className="min-w-0 flex-1">
+            <li key={r.id} className="flex min-h-14 items-center gap-3 px-4 py-3 sm:px-5">
+              <span
+                aria-hidden
+                className="bg-muted text-muted-foreground flex size-9 shrink-0 items-center justify-center rounded-md border"
+              >
+                <Repeat className="size-4" />
+              </span>
+              <div className={cn('min-w-0 flex-1', !r.is_active && 'opacity-60')}>
                 <div className="flex items-center gap-2">
                   <p className="truncate text-sm font-medium">{r.name}</p>
-                  {!r.is_active && (
-                    <Badge variant="outline" className="h-5 text-[10px]">
-                      Paused
-                    </Badge>
-                  )}
-                  {r.generate_as === 'pending' && (
-                    <Badge variant="secondary" className="h-5 text-[10px]">
-                      Draft
-                    </Badge>
-                  )}
+                  {!r.is_active && <Badge variant="outline">Paused</Badge>}
+                  {r.generate_as === 'pending' && <Badge variant="secondary">Draft</Badge>}
                 </div>
                 <p className="text-muted-foreground text-xs">
                   Every {r.interval > 1 ? `${r.interval} ` : ''}
@@ -533,6 +533,6 @@ export function RecurringSection() {
           }
         }}
       />
-    </div>
+    </Panel>
   )
 }

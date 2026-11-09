@@ -11,6 +11,7 @@ import { formatShortDate, relativeTime } from '@/lib/dates'
 import { signedAmount } from '@/lib/money'
 import { removePending, retryPending, syncManager, usePendingTransactions, useSyncState } from '@/lib/offline'
 import { uiStore, useUIStore } from '@/lib/ui-store'
+import { cn } from '@/lib/utils'
 
 export function PendingSheet() {
   const { pendingOpen } = useUIStore()
@@ -30,7 +31,7 @@ export function PendingSheet() {
       }
       footer={
         <div className="flex items-center justify-between gap-2">
-          <span className="text-muted-foreground text-xs">
+          <span className="eyebrow">
             {s.lastSyncAt
               ? `Last attempt ${relativeTime(new Date(s.lastSyncAt).toISOString())}`
               : 'No sync attempted yet'}
@@ -51,37 +52,46 @@ export function PendingSheet() {
       {items.length === 0 ? (
         <EmptyState title="Nothing pending" description="Every transaction has been saved to the server." />
       ) : (
-        <ul className="flex flex-col divide-y">
+        <ul className="divide-rule -mx-4 -mb-4 divide-y border-t lg:-mx-5">
           {items.map((item) => {
             const p = item.payload
+            const failed = item.status === 'failed'
             return (
-              <li key={item.client_id} className="flex flex-col gap-2 py-3">
-                <div className="flex items-center justify-between gap-3">
+              <li
+                key={item.client_id}
+                className={cn('flex flex-col gap-2.5 px-4 py-3.5 lg:px-5', failed && 'bg-destructive/[0.04]')}
+              >
+                <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{p.payee || p.description || p.type}</p>
-                    <p className="text-muted-foreground text-xs">
-                      {formatShortDate(p.transaction_date)} · {item.attempts} attempt
-                      {item.attempts === 1 ? '' : 's'}
+                    <div className="flex items-center gap-2">
+                      <Badge variant={failed ? 'destructive' : 'secondary'}>
+                        {failed ? 'Failed' : item.status === 'syncing' ? 'Syncing' : 'Pending'}
+                      </Badge>
+                      <span className="eyebrow">
+                        {formatShortDate(p.transaction_date)} · {item.attempts} attempt
+                        {item.attempts === 1 ? '' : 's'}
+                      </span>
+                    </div>
+                    <p className="mt-1.5 truncate text-sm font-medium first-letter:uppercase">
+                      {p.payee || p.description || p.type}
                     </p>
                   </div>
                   <Money
                     minor={signedAmount(p.type, p.amount)}
                     currency={p.currency}
                     tone="auto"
-                    className="text-sm font-semibold"
+                    className="pt-0.5 text-[0.9375rem] font-medium"
                   />
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant={item.status === 'failed' ? 'destructive' : 'secondary'}>
-                    {item.status === 'failed' ? 'Failed' : item.status === 'syncing' ? 'Syncing' : 'Pending'}
-                  </Badge>
-                  {item.last_error && <span className="text-destructive text-xs">{item.last_error}</span>}
-                </div>
-                <div className="flex gap-2">
-                  {item.status === 'failed' && (
+                {item.last_error && (
+                  <p className="text-destructive border-destructive/60 border-l-2 pl-2.5 text-xs leading-relaxed">
+                    {item.last_error}
+                  </p>
+                )}
+                <div className="flex flex-wrap gap-2">
+                  {failed && (
                     <Button
                       size="sm"
-                      variant="outline"
                       onClick={() => {
                         uiStore.setPending(false)
                         uiStore.openAdd({ pendingClientId: item.client_id })
@@ -102,7 +112,7 @@ export function PendingSheet() {
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="text-destructive"
+                    className="text-destructive hover:bg-destructive/10 hover:text-destructive ml-auto"
                     onClick={() => setDiscard(item.client_id)}
                   >
                     <Trash2 data-icon="inline-start" /> Discard

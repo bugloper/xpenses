@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, Plus, Search, X } from 'lucide-react'
+import { Check, ChevronDown, ChevronRight, Plus, Search, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { CategoryFormSheet } from '@/components/categories/CategoryForm'
 import { CategoryIcon } from '@/components/common/CategoryIcon'
@@ -43,7 +43,7 @@ export function CategoryPicker({
         open={open}
         onOpenChange={onOpenChange}
         title="Choose a category"
-        className="sm:max-w-lg"
+        className="sm:max-w-lg data-[side=right]:sm:max-w-lg"
         footer={
           allowCreate ? (
             <Button variant="outline" className="w-full" onClick={() => setCreate({ parentId: null })}>
@@ -130,7 +130,11 @@ function PickerBody({
             No category matches “{query.trim()}”.
           </p>
         ) : (
-          <div role="radiogroup" aria-label="Matching categories" className="flex flex-col gap-1">
+          <div
+            role="radiogroup"
+            aria-label="Matching categories"
+            className="divide-rule divide-y rounded-md border"
+          >
             {matches.map((m) => (
               <button
                 key={m.category.id}
@@ -139,8 +143,8 @@ function PickerBody({
                 aria-checked={m.category.id === value}
                 onClick={() => choose(m.category.id)}
                 className={cn(
-                  'flex items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors',
-                  m.category.id === value ? 'bg-primary/10' : 'hover:bg-muted/60',
+                  'flex min-h-12 items-center gap-3 px-3 py-2 text-left transition-colors first:rounded-t-[5px] last:rounded-b-[5px]',
+                  m.category.id === value ? 'bg-saffron-soft/50' : 'hover:bg-muted/60',
                 )}
               >
                 <CategoryIcon icon={m.category.icon} color={m.category.color} size="sm" />
@@ -150,6 +154,7 @@ function PickerBody({
                     <span className="text-muted-foreground block truncate text-xs">{m.parent.name}</span>
                   )}
                 </span>
+                {m.category.id === value && <Check className="text-accent-foreground size-4 shrink-0" />}
               </button>
             ))}
           </div>
@@ -157,7 +162,7 @@ function PickerBody({
       ) : groups.length === 0 ? (
         <p className="text-muted-foreground py-6 text-center text-sm">No {type} categories yet.</p>
       ) : (
-        <ul className="flex flex-col gap-1" aria-label="Main categories">
+        <ul className="divide-rule divide-y rounded-md border" aria-label="Main categories">
           {groups.map((g) => (
             <GroupRow
               key={g.parent.id}
@@ -202,12 +207,13 @@ function GroupRow({
           aria-checked={value === parent.id}
           onClick={() => onChoose(parent.id)}
           className={cn(
-            'flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors',
-            value === parent.id ? 'bg-primary/10' : 'hover:bg-muted/60',
+            'flex min-h-12 w-full items-center gap-3 px-3 py-2 text-left transition-colors',
+            value === parent.id ? 'bg-saffron-soft/50' : 'hover:bg-muted/60',
           )}
         >
           <CategoryIcon icon={parent.icon} color={parent.color} size="sm" />
           <span className="flex-1 truncate text-sm font-medium">{parent.name}</span>
+          {value === parent.id && <Check className="text-accent-foreground size-4 shrink-0" />}
           {onAdd && (
             <span
               role="button"
@@ -224,7 +230,7 @@ function GroupRow({
                   onAdd()
                 }
               }}
-              className="text-muted-foreground hover:text-foreground rounded-md p-1"
+              className="text-muted-foreground hover:text-foreground hover:bg-muted flex size-8 items-center justify-center rounded-md"
             >
               <Plus className="size-4" />
             </span>
@@ -234,18 +240,23 @@ function GroupRow({
     )
   }
   return (
-    <li className={cn('rounded-xl', expanded && 'bg-muted/40')}>
+    <li className={cn(expanded && 'bg-muted/45')}>
       <button
         type="button"
         aria-expanded={expanded}
         onClick={onToggle}
-        className="hover:bg-muted/60 flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors"
+        className="hover:bg-muted/60 flex min-h-12 w-full items-center gap-3 px-3 py-2 text-left transition-colors"
       >
         <CategoryIcon icon={parent.icon} color={parent.color} size="sm" />
-        <span className={cn('flex-1 truncate text-sm font-medium', selectedInside && 'text-primary')}>
-          {parent.name}
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-medium">{parent.name}</span>
+          {selectedInside && !expanded && (
+            <span className="text-accent-foreground block truncate text-xs">
+              {children.find((c) => c.id === value)?.name ?? 'General'}
+            </span>
+          )}
         </span>
-        <span className="text-muted-foreground text-xs" aria-hidden>
+        <span className="text-muted-foreground font-mono text-[0.6875rem]" aria-hidden>
           {children.length}
         </span>
         {expanded ? (
@@ -258,7 +269,7 @@ function GroupRow({
         <div
           role="radiogroup"
           aria-label={`${parent.name} sub-categories`}
-          className="grid grid-cols-3 gap-2 px-2 pt-1 pb-3 sm:grid-cols-4"
+          className="grid grid-cols-3 gap-1.5 px-3 pt-0.5 pb-3 sm:grid-cols-4"
         >
           <Chip
             icon={parent.icon}
@@ -283,7 +294,7 @@ function GroupRow({
               type="button"
               onClick={onAdd}
               aria-label={`Add sub-category to ${parent.name}`}
-              className="bg-background/60 hover:bg-background text-muted-foreground flex flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed p-2 text-center text-[11px] font-medium"
+              className="hover:bg-card text-muted-foreground hover:text-foreground flex min-h-[4.75rem] flex-col items-center justify-center gap-1.5 rounded-md border border-dashed p-2 text-center text-[11px] font-medium transition-colors"
             >
               <Plus className="size-5" />
               Add
@@ -318,8 +329,8 @@ function Chip({
       aria-label={ariaLabel}
       onClick={onClick}
       className={cn(
-        'flex flex-col items-center gap-1.5 rounded-xl border p-2 text-center transition-colors',
-        active ? 'border-primary bg-primary/10' : 'bg-background/60 hover:bg-background border-transparent',
+        'bg-card flex min-h-[4.75rem] flex-col items-center gap-1.5 rounded-md border p-2 text-center transition-colors',
+        active ? 'border-saffron ring-saffron/40 ring-1' : 'hover:border-foreground/30',
       )}
     >
       <CategoryIcon icon={icon} color={color} size="sm" />

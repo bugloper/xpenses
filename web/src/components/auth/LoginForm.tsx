@@ -50,7 +50,7 @@ export function LoginForm({
 
   const throttled = secondsLeft > 0
   return (
-    <form onSubmit={(e) => void submit(e)} className="flex flex-col gap-4" noValidate>
+    <form onSubmit={(e) => void submit(e)} className="flex flex-col gap-5" noValidate>
       <FormAlert>
         {formError &&
           (throttled && formError.retryAfter
@@ -60,6 +60,7 @@ export function LoginForm({
       <Field data-invalid={!!form.formState.errors.email || undefined}>
         <FieldLabel htmlFor="login-email">Email</FieldLabel>
         <Input
+          className="h-11"
           id="login-email"
           type="email"
           autoComplete="username"
@@ -73,6 +74,7 @@ export function LoginForm({
       <Field data-invalid={!!form.formState.errors.password || undefined}>
         <FieldLabel htmlFor="login-password">Password</FieldLabel>
         <Input
+          className="h-11"
           id="login-password"
           type="password"
           autoComplete="current-password"
@@ -81,19 +83,21 @@ export function LoginForm({
         />
         <FieldError errors={[form.formState.errors.password]} />
         {onForgotPassword && (
-          <button
-            type="button"
-            onClick={onForgotPassword}
-            className="text-primary self-end text-xs font-medium hover:underline"
-          >
-            Forgot password?
-          </button>
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={onForgotPassword}
+              className="text-muted-foreground hover:text-foreground decoration-saffron text-[0.8125rem] font-medium underline underline-offset-4 transition-colors"
+            >
+              Forgot password?
+            </button>
+          </div>
         )}
       </Field>
       <Button
         type="submit"
         size="lg"
-        className="mt-2 h-11 rounded-xl"
+        className="mt-3 h-12 w-full text-[0.9375rem]"
         disabled={login.isPending || throttled}
       >
         {login.isPending ? 'Signing in…' : 'Sign in'}

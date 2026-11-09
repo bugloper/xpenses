@@ -2,6 +2,7 @@ import { Link2, Plus, X } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
+import { Panel } from '@/components/common/kit'
 import { EmptyState, ErrorState } from '@/components/common/States'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -18,8 +19,9 @@ import { LinkDialog } from './LinkDialog'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { errorMessage } from '@/lib/api'
-import { relativeTime } from '@/lib/dates'
+import { formatDateTime, relativeTime } from '@/lib/dates'
 import { useCreateInvite, useInvites, useRevokeInvite } from '@/lib/queries/auth'
+import { cn } from '@/lib/utils'
 import type { CreatedInvite, Invite } from '@/types/api'
 
 export type InviteStatus = 'pending' | 'used' | 'expired'
@@ -111,7 +113,6 @@ function CreateInviteDialog({
   )
 }
 
-
 const STATUS_BADGE: Record<
   InviteStatus,
   { label: string; variant: 'secondary' | 'outline' | 'destructive' }
@@ -121,65 +122,115 @@ const STATUS_BADGE: Record<
   expired: { label: 'Expired', variant: 'destructive' },
 }
 
-export function InvitesSection() {
+function inviteNote(i: Invite, status: InviteStatus) {
+  if (status === 'used')
+    return `Used${i.used_by_email ? ` by ${i.used_by_email}` : ''} ${i.used_at ? relativeTime(i.used_at) : ''}`
+  if (status === 'expired') return `Expired ${formatDateTime(i.expires_at)}`
+  return `Expires ${formatDateTime(i.expires_at)}`
+}
+
+const TH = 'eyebrow px-3 py-2.5 text-left font-normal'
+
+export function InvitesSection({ id, className }: { id?: string; className?: string }) {
   const { data, isPending, error, refetch } = useInvites()
   const revoke = useRevokeInvite()
   const [createOpen, setCreateOpen] = useState(false)
   const [created, setCreated] = useState<CreatedInvite | null>(null)
   const [doomed, setDoomed] = useState<Invite | null>(null)
+  const pending = data?.filter((i) => inviteStatus(i) === 'pending').length ?? 0
+  const revokeButton = (i: Invite) => (
+    <Button
+      size="sm"
+      variant="ghost"
+      className="text-destructive"
+      aria-label={`Revoke invite${i.email ? ` for ${i.email}` : ''}`}
+      onClick={() => setDoomed(i)}
+    >
+      <X data-icon="inline-start" /> Revoke
+    </Button>
+  )
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex justify-end">
+    <Panel
+      id={id}
+      className={className}
+      title="Invites"
+      description={data ? `${pending} waiting to be used · ${data.length} in all` : undefined}
+      action={
         <Button size="sm" onClick={() => setCreateOpen(true)}>
           <Plus data-icon="inline-start" /> New invite
         </Button>
-      </div>
+      }
+      flush
+    >
       {isPending ? (
-        <Skeleton className="h-24 w-full rounded-[1.25rem]" />
+        <div className="p-5">
+          <Skeleton className="h-24 w-full rounded-md" />
+        </div>
       ) : error ? (
         <ErrorState error={error} onRetry={() => void refetch()} compact />
       ) : data.length === 0 ? (
-        <div className="bg-card border rounded-[1.25rem]">
-          <EmptyState icon={Link2} title="No invites" description="Create one to let someone register." />
-        </div>
+        <EmptyState icon={Link2} title="No invites" description="Create one to let someone register." />
       ) : (
-        <div className="bg-card border rounded-[1.25rem] px-4">
-          <ul className="divide-y">
+        <>
+          <table className="hidden w-full table-fixed text-sm md:table">
+            <thead>
+              <tr className="border-b">
+                <th className={cn(TH, 'w-[32%] pl-5')}>For</th>
+                <th className={cn(TH, 'w-24')}>Status</th>
+                <th className={cn(TH, 'w-24')}>Created</th>
+                <th className={TH}>Outcome</th>
+                <th className="w-28 pr-3">
+                  <span className="sr-only">Actions</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-rule divide-y">
+              {data.map((i) => {
+                const status = inviteStatus(i)
+                const badge = STATUS_BADGE[status]
+                return (
+                  <tr key={i.id} className={cn(status !== 'pending' && 'text-muted-foreground')}>
+                    <td className="max-w-0 py-3 pr-3 pl-5">
+                      <p className={cn('truncate', status === 'pending' && 'text-foreground font-medium')}>
+                        {i.email || 'Anyone with the link'}
+                      </p>
+                    </td>
+                    <td className="px-3 py-3">
+                      <Badge variant={badge.variant}>{badge.label}</Badge>
+                    </td>
+                    <td className="text-muted-foreground px-3 py-3 text-xs whitespace-nowrap">
+                      {relativeTime(i.created_at)}
+                    </td>
+                    <td className="text-muted-foreground max-w-0 truncate px-3 py-3 text-xs">
+                      {inviteNote(i, status)}
+                    </td>
+                    <td className="py-2 pr-3 text-right">{status === 'pending' && revokeButton(i)}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+          <ul className="divide-rule divide-y md:hidden">
             {data.map((i) => {
               const status = inviteStatus(i)
               const badge = STATUS_BADGE[status]
               return (
-                <li key={i.id} className="flex items-center gap-3 py-3">
+                <li key={i.id} className="flex items-center gap-3 py-3 pr-2 pl-4">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <p className="truncate text-sm font-medium">{i.email || 'Anyone with the link'}</p>
                       <Badge variant={badge.variant}>{badge.label}</Badge>
                     </div>
-                    <p className="text-muted-foreground text-xs">
-                      Created {relativeTime(i.created_at)}
-                      {status === 'used'
-                        ? ` · used${i.used_by_email ? ` by ${i.used_by_email}` : ''} ${i.used_at ? relativeTime(i.used_at) : ''}`
-                        : status === 'expired'
-                          ? ` · expired ${relativeTime(i.expires_at)}`
-                          : ` · expires ${relativeTime(i.expires_at)}`}
+                    <p className="text-muted-foreground truncate text-xs">
+                      Created {relativeTime(i.created_at)} · {inviteNote(i, status)}
                     </p>
                   </div>
-                  {status === 'pending' && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="text-destructive"
-                      aria-label={`Revoke invite${i.email ? ` for ${i.email}` : ''}`}
-                      onClick={() => setDoomed(i)}
-                    >
-                      <X data-icon="inline-start" /> Revoke
-                    </Button>
-                  )}
+                  {status === 'pending' && revokeButton(i)}
                 </li>
               )
             })}
           </ul>
-        </div>
+        </>
       )}
       <CreateInviteDialog
         open={createOpen}
@@ -197,7 +248,7 @@ export function InvitesSection() {
         url={created ? inviteUrl(created) : ''}
         note={
           created
-            ? `${created.email ? `For ${created.email} · ` : ''}expires ${relativeTime(created.expires_at)}`
+            ? `${created.email ? `For ${created.email} · ` : ''}expires ${formatDateTime(created.expires_at)}`
             : undefined
         }
       />
@@ -219,6 +270,6 @@ export function InvitesSection() {
           }
         }}
       />
-    </div>
+    </Panel>
   )
 }

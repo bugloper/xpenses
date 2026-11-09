@@ -1,5 +1,5 @@
-// Generates the PWA icons (PNG) without any image library: draws a rounded
-// green square with a white "X" glyph into an RGBA buffer and encodes it as PNG
+// Generates the PWA icons (PNG) without any image library: draws the ledger
+// mark (ink square, paper X, saffron corner tick) into an RGBA buffer and encodes it as PNG
 // using node:zlib. Run with `bun run scripts/gen-icons.ts`.
 import { deflateSync } from 'node:zlib'
 import { writeFileSync, mkdirSync } from 'node:fs'
@@ -62,47 +62,49 @@ function encodePNG(size: number, rgba: Uint8Array): Uint8Array {
   return out
 }
 
-const BG = [11, 15, 14] // #0b0f0e
-const GREEN = [34, 197, 94] // #22c55e
-const WHITE = [255, 255, 255]
+// The ledger mark: an ink square, a paper X, and a saffron tick in the corner.
+const INK = [30, 41, 37] // #1e2925
+const PAPER = [244, 240, 232] // #f4f0e8
+const SAFFRON = [242, 169, 59] // #f2a93b
 
 function draw(size: number, maskable: boolean): Uint8Array {
   const px = new Uint8Array(size * size * 4)
-  // Maskable icons need the safe zone: fill the whole canvas with the brand green.
-  const pad = maskable ? 0 : Math.round(size * 0.08)
-  const radius = maskable ? 0 : Math.round(size * 0.22)
+  // Maskable icons fill the canvas and keep the glyph inside the safe zone.
+  const pad = maskable ? 0 : Math.round(size * 0.06)
+  const radius = maskable ? 0 : Math.round(size * 0.2)
   const inner = size - pad * 2
   const cx = size / 2
   const cy = size / 2
-  const stroke = Math.max(2, Math.round(size * 0.085))
-  const half = size * (maskable ? 0.2 : 0.24)
+  const k = maskable ? 0.78 : 1 // glyph scale
+  const stroke = Math.max(2, Math.round(size * 0.075 * k))
+  const half = size * 0.2 * k
+  const tick = Math.max(2, Math.round(size * 0.065 * k))
+  const t0 = size * 0.2 * k // where the tick's arms start, from the centre
+  const t1 = size * 0.32 * k // the tick's corner
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const i = (y * size + x) * 4
-      let color = maskable ? GREEN : [0, 0, 0]
+      let color = maskable ? INK : [0, 0, 0]
       let alpha = maskable ? 255 : 0
-      // rounded square
       const lx = x - pad
       const ly = y - pad
       if (!maskable && lx >= 0 && ly >= 0 && lx < inner && ly < inner) {
         const dx = Math.max(radius - lx, 0, lx - (inner - 1 - radius))
         const dy = Math.max(radius - ly, 0, ly - (inner - 1 - radius))
         if (dx * dx + dy * dy <= radius * radius) {
-          color = GREEN
+          color = INK
           alpha = 255
         }
       }
-      // "X" glyph: two diagonal bars, plus a small dark dot at the centre-right (a hint of "expense")
       if (alpha === 255) {
-        const rx = x - cx
-        const ry = y - cy
-        const onDiag1 = Math.abs(rx - ry) <= stroke / 2 && Math.abs(rx) <= half && Math.abs(ry) <= half
-        const onDiag2 = Math.abs(rx + ry) <= stroke / 2 && Math.abs(rx) <= half && Math.abs(ry) <= half
-        if (onDiag1 || onDiag2) color = WHITE
-        const dotR = size * 0.045
-        const ddx = rx - half * 1.15
-        const ddy = ry - half * 1.15
-        if (ddx * ddx + ddy * ddy <= dotR * dotR) color = BG
+        const rx = x - cx + 0.5
+        const ry = y - cy + 0.5
+        const onDiag1 = Math.abs(rx - ry) <= stroke / 1.414 && Math.abs(rx) <= half && Math.abs(ry) <= half
+        const onDiag2 = Math.abs(rx + ry) <= stroke / 1.414 && Math.abs(rx) <= half && Math.abs(ry) <= half
+        if (onDiag1 || onDiag2) color = PAPER
+        const horiz = Math.abs(ry - t1) <= tick / 2 && rx >= t0 && rx <= t1 + tick / 2
+        const vert = Math.abs(rx - t1) <= tick / 2 && ry >= t0 && ry <= t1 + tick / 2
+        if (horiz || vert) color = SAFFRON
       }
       px[i] = color[0]!
       px[i + 1] = color[1]!

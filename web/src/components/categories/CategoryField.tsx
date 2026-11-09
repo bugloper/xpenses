@@ -50,9 +50,9 @@ export function CategoryField({
         aria-invalid={invalid}
         onClick={() => setOpen(true)}
         className={cn(
-          'bg-muted/50 hover:bg-muted flex h-12 w-full items-center gap-3 rounded-xl border px-3 text-left transition-colors',
-          invalid ? 'border-destructive' : 'border-transparent',
-          path ? 'border-primary/40' : '',
+          'bg-card hover:border-foreground/30 flex h-12 w-full items-center gap-3 rounded-md border px-2.5 text-left transition-colors',
+          'focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-3 focus-visible:outline-none',
+          invalid ? 'border-destructive' : 'border-input',
         )}
       >
         {path ? (
@@ -66,35 +66,45 @@ export function CategoryField({
             </span>
           </>
         ) : (
-          <span className="text-muted-foreground flex-1 text-sm">Choose a category</span>
+          <span className="text-muted-foreground flex-1 px-0.5 text-sm">Choose a category</span>
         )}
         <ChevronsUpDown className="text-muted-foreground size-4 shrink-0" />
       </button>
       {recent.length > 0 && (
-        <div
-          role="radiogroup"
-          aria-label="Recent categories"
-          className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-0.5"
-        >
-          {recent.map((c) => {
-            const active = c.id === value
-            return (
-              <button
-                key={c.id}
-                type="button"
-                role="radio"
-                aria-checked={active}
-                onClick={() => onChange(active ? undefined : c.id)}
-                className={cn(
-                  'flex shrink-0 items-center gap-1.5 rounded-full border py-1 pr-3 pl-1 text-xs font-medium transition-colors',
-                  active ? 'border-foreground bg-foreground text-background' : 'border-border text-muted-foreground hover:text-foreground',
-                )}
-              >
-                <CategoryIcon icon={c.icon} color={c.color} size="sm" className="size-6 [&>svg]:size-3.5" />
-                {c.name}
-              </button>
-            )
-          })}
+        <div className="flex items-center gap-2">
+          <span className="eyebrow shrink-0">Recent</span>
+          <div
+            role="radiogroup"
+            aria-label="Recent categories"
+            className="no-scrollbar -mr-1 flex min-w-0 flex-1 gap-1.5 overflow-x-auto py-0.5 pr-1"
+          >
+            {recent.map((c) => {
+              const active = c.id === value
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  onClick={() => onChange(active ? undefined : c.id)}
+                  className={cn(
+                    'flex h-8 shrink-0 items-center gap-1.5 rounded-md border pr-2.5 pl-1 text-xs font-medium transition-colors',
+                    active
+                      ? 'border-foreground bg-foreground text-background'
+                      : 'bg-card text-muted-foreground hover:text-foreground hover:border-foreground/30',
+                  )}
+                >
+                  <CategoryIcon
+                    icon={c.icon}
+                    color={c.color}
+                    size="sm"
+                    className="size-6 rounded-sm [&>svg]:size-3.5"
+                  />
+                  {c.name}
+                </button>
+              )
+            })}
+          </div>
         </div>
       )}
       <CategoryPicker

@@ -46,8 +46,10 @@ export function DateField({
             variant="outline"
             aria-invalid={invalid}
             className={cn(
-              'h-9 justify-start rounded-xl font-normal',
-              value !== t && value !== y && 'border-foreground bg-foreground text-background hover:bg-foreground/90',
+              'h-9 justify-start rounded-md font-normal',
+              value !== t &&
+                value !== y &&
+                'border-foreground bg-foreground text-background hover:bg-foreground/90',
             )}
           >
             <CalendarIcon data-icon="inline-start" className="text-muted-foreground" />
@@ -67,7 +69,7 @@ export function DateField({
               onChange={(e) => {
                 if (isISODate(e.target.value)) onChange(e.target.value)
               }}
-              className="bg-background h-8 flex-1 rounded-lg border px-2 text-sm"
+              className="bg-background h-8 flex-1 rounded-md border px-2 text-sm"
             />
           </div>
           <Calendar
@@ -105,7 +107,7 @@ export function Chip({
       onClick={onClick}
       aria-pressed={active}
       className={cn(
-        'h-9 rounded-xl border px-3 text-sm font-medium transition-colors',
+        'h-9 rounded-md border px-3 text-sm font-medium transition-colors',
         active
           ? 'border-foreground bg-foreground text-background'
           : 'border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground',

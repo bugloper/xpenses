@@ -35,11 +35,12 @@ export function ResetPasswordForm({ token, onSuccess }: { token: string; onSucce
   })
 
   return (
-    <form onSubmit={(e) => void submit(e)} className="flex flex-col gap-4" noValidate>
+    <form onSubmit={(e) => void submit(e)} className="flex flex-col gap-5" noValidate>
       <FormAlert>{formError}</FormAlert>
       <Field data-invalid={!!errors.new_password || undefined}>
         <FieldLabel htmlFor="reset-new">New password</FieldLabel>
         <Input
+          className="h-11"
           id="reset-new"
           type="password"
           autoComplete="new-password"
@@ -53,6 +54,7 @@ export function ResetPasswordForm({ token, onSuccess }: { token: string; onSucce
       <Field data-invalid={!!errors.confirm_password || undefined}>
         <FieldLabel htmlFor="reset-confirm">Confirm new password</FieldLabel>
         <Input
+          className="h-11"
           id="reset-confirm"
           type="password"
           autoComplete="new-password"
@@ -61,7 +63,12 @@ export function ResetPasswordForm({ token, onSuccess }: { token: string; onSucce
         />
         <FieldError errors={[errors.confirm_password]} />
       </Field>
-      <Button type="submit" size="lg" className="mt-2 h-11 rounded-xl" disabled={reset.isPending}>
+      <Button
+        type="submit"
+        size="lg"
+        className="mt-3 h-12 w-full text-[0.9375rem]"
+        disabled={reset.isPending}
+      >
         {reset.isPending ? 'Saving…' : 'Set new password'}
       </Button>
     </form>

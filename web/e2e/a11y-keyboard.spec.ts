@@ -67,7 +67,7 @@ test.describe('accessibility', () => {
 
   test('keyboard: dialogs trap focus and Tab cycles inside them', async ({ page }) => {
     await page.goto('/accounts')
-    await page.getByRole('button', { name: /^New$/ }).click()
+    await page.getByRole('button', { name: /^New account$/ }).click()
     const dialog = page.getByRole('dialog')
     await expect(dialog).toBeVisible()
     for (let i = 0; i < 12; i++) await page.keyboard.press('Tab')

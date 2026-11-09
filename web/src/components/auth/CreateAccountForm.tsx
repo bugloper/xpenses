@@ -62,11 +62,12 @@ export function CreateAccountForm({
   const errors = form.formState.errors
   const throttled = secondsLeft > 0
   return (
-    <form onSubmit={(e) => void submit(e)} className="flex flex-col gap-4" noValidate>
+    <form onSubmit={(e) => void submit(e)} className="flex flex-col gap-5" noValidate>
       <FormAlert>{formError?.message}</FormAlert>
       <Field data-invalid={!!errors.name || undefined}>
         <FieldLabel htmlFor={`${idPrefix}-name`}>Name</FieldLabel>
         <Input
+          className="h-11"
           id={`${idPrefix}-name`}
           autoComplete="name"
           autoFocus
@@ -78,6 +79,7 @@ export function CreateAccountForm({
       <Field data-invalid={!!errors.email || undefined}>
         <FieldLabel htmlFor={`${idPrefix}-email`}>Email</FieldLabel>
         <Input
+          className="h-11"
           id={`${idPrefix}-email`}
           type="email"
           inputMode="email"
@@ -90,6 +92,7 @@ export function CreateAccountForm({
       <Field data-invalid={!!errors.password || undefined}>
         <FieldLabel htmlFor={`${idPrefix}-password`}>Password</FieldLabel>
         <Input
+          className="h-11"
           id={`${idPrefix}-password`}
           type="password"
           autoComplete="new-password"
@@ -102,6 +105,7 @@ export function CreateAccountForm({
       <Field data-invalid={!!errors.confirm_password || undefined}>
         <FieldLabel htmlFor={`${idPrefix}-confirm`}>Confirm password</FieldLabel>
         <Input
+          className="h-11"
           id={`${idPrefix}-confirm`}
           type="password"
           autoComplete="new-password"
@@ -110,7 +114,12 @@ export function CreateAccountForm({
         />
         <FieldError errors={[errors.confirm_password]} />
       </Field>
-      <Button type="submit" size="lg" className="mt-2 h-11 rounded-xl" disabled={pending || throttled}>
+      <Button
+        type="submit"
+        size="lg"
+        className="mt-3 h-12 w-full text-[0.9375rem]"
+        disabled={pending || throttled}
+      >
         {pending ? pendingLabel : submitLabel}
       </Button>
     </form>

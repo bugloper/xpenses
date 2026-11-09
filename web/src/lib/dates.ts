@@ -131,11 +131,12 @@ export function relativeTime(iso: string): string {
   const d = new Date(iso)
   if (!isValid(d)) return ''
   const diff = Date.now() - d.getTime()
-  const m = Math.round(diff / 60_000)
-  if (m < 1) return 'just now'
-  if (m < 60) return `${m}m ago`
+  const future = diff < 0
+  const m = Math.round(Math.abs(diff) / 60_000)
+  if (m < 1) return future ? 'in a moment' : 'just now'
+  if (m < 60) return future ? `in ${m}m` : `${m}m ago`
   const h = Math.round(m / 60)
-  if (h < 24) return `${h}h ago`
+  if (h < 24) return future ? `in ${h}h` : `${h}h ago`
   return format(d, 'd MMM, HH:mm')
 }
 

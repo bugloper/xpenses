@@ -4,17 +4,25 @@ import { useMemo, useState } from 'react'
 import { AccountFormSheet } from '@/components/accounts/AccountForm'
 import { TransferDialog } from '@/components/accounts/TransferDialog'
 import { AccountIcon, accountTypeLabel } from '@/components/common/AccountIcon'
+import { Section } from '@/components/common/PageHeader'
 import { Money } from '@/components/common/Money'
 import { ErrorState, ListSkeleton } from '@/components/common/States'
 import { TransactionList } from '@/components/transactions/TransactionList'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { formatShortDate } from '@/lib/dates'
+import { formatMoney } from '@/lib/money'
 import { usePendingTransactions } from '@/lib/offline'
-import { useAccount, useInfiniteTransactions } from '@/lib/queries'
+import { useAccount, useInfiniteTransactions, useReportAccounts } from '@/lib/queries'
 import { groupByDay } from '@/lib/transactions'
 import { uiStore } from '@/lib/ui-store'
+import { cn } from '@/lib/utils'
+import type { Account } from '@/types/api'
 import { appRoute } from './__root'
+
+// The statement covers every cleared transaction the account has ever had.
+const ALL_TIME = { from: '1970-01-01', to: '9999-12-31' }
 
 function AccountDetailPage() {
   const { id } = accountDetailRoute.useParams()
@@ -33,7 +41,13 @@ function AccountDetailPage() {
     [rows, pending, id],
   )
 
-  if (account.isPending) return <ListSkeleton rows={5} />
+  if (account.isPending)
+    return (
+      <div className="flex flex-col gap-6">
+        <Skeleton className="h-56 w-full rounded-lg" />
+        <ListSkeleton rows={5} />
+      </div>
+    )
   if (account.error || !account.data)
     return (
       <ErrorState error={account.error ?? new Error('Not found')} onRetry={() => void account.refetch()} />
@@ -41,62 +55,159 @@ function AccountDetailPage() {
   const a = account.data
 
   return (
-    <div className="flex flex-col gap-5">
-      <Button variant="ghost" size="sm" className="-ml-2 w-fit" asChild>
-        <Link to="/accounts">
-          <ArrowLeft data-icon="inline-start" /> Accounts
-        </Link>
-      </Button>
-      <div className="bg-card border flex flex-col gap-4 rounded-[1.25rem] p-5">
-        <div className="flex items-center gap-3">
-          <AccountIcon type={a.type} />
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <h1 className="truncate text-lg font-semibold">{a.name}</h1>
+    <div className="flex flex-col gap-6">
+      <Link
+        to="/accounts"
+        className="text-muted-foreground hover:text-foreground eyebrow hidden w-fit items-center gap-1.5 transition-colors lg:inline-flex"
+      >
+        <ArrowLeft className="size-3.5" /> Accounts
+      </Link>
+
+      <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4 border-b pb-5">
+        <div className="flex min-w-0 items-center gap-4">
+          <AccountIcon type={a.type} className="size-12 [&>svg]:size-6" />
+          <div className="min-w-0">
+            <div className="eyebrow mb-1.5 flex flex-wrap items-center gap-x-2">
+              <span>{accountTypeLabel(a.type)}</span>
+              {a.account_number && <span className="normal-case">· {a.account_number}</span>}
+              <span>· {a.currency}</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <h1 className="font-display truncate text-[2rem] leading-[1.05] font-medium sm:text-[2.5rem]">
+                {a.name}
+              </h1>
               {!a.is_active && <Badge variant="outline">Inactive</Badge>}
             </div>
-            <p className="text-muted-foreground text-xs">
-              {accountTypeLabel(a.type)}
-              {a.account_number ? ` · ${a.account_number}` : ''} · opened{' '}
-              {formatShortDate(a.opening_balance_date)} with{' '}
-              <Money minor={a.opening_balance} currency={a.currency} />
-            </p>
           </div>
-          <Button variant="ghost" size="icon" aria-label="Edit account" onClick={() => setEdit(true)}>
+        </div>
+        <div className="flex w-full flex-wrap gap-2 sm:w-auto">
+          <Button variant="outline" size="icon" aria-label="Edit account" onClick={() => setEdit(true)}>
             <Pencil />
           </Button>
-        </div>
-        <Money
-          minor={a.current_balance}
-          currency={a.currency}
-          tone="auto"
-          className="text-3xl font-semibold tracking-tight"
-        />
-        <div className="flex gap-2">
-          <Button size="sm" onClick={() => uiStore.openAdd({ account_id: a.id })}>
-            <Plus data-icon="inline-start" /> Add transaction
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => setTransfer(true)}>
+          <Button variant="outline" className="flex-1 sm:flex-none" onClick={() => setTransfer(true)}>
             <ArrowLeftRight data-icon="inline-start" /> Transfer
           </Button>
+          <Button className="flex-1 sm:flex-none" onClick={() => uiStore.openAdd({ account_id: a.id })}>
+            <Plus data-icon="inline-start" /> Add transaction
+          </Button>
         </div>
-      </div>
-      <TransactionList
-        groups={groups}
-        loading={txs.isPending}
-        error={txs.error}
-        onRetry={() => void txs.refetch()}
-        hasMore={txs.hasNextPage}
-        loadingMore={txs.isFetchingNextPage}
-        onLoadMore={() => void txs.fetchNextPage()}
-        perspectiveAccountId={a.id}
-        currency={a.currency}
-        emptyTitle="No transactions on this account"
-      />
+      </header>
+
+      <Statement account={a} />
+
+      <Section title="Transactions">
+        <TransactionList
+          groups={groups}
+          loading={txs.isPending}
+          error={txs.error}
+          onRetry={() => void txs.refetch()}
+          hasMore={txs.hasNextPage}
+          loadingMore={txs.isFetchingNextPage}
+          onLoadMore={() => void txs.fetchNextPage()}
+          perspectiveAccountId={a.id}
+          currency={a.currency}
+          emptyTitle="No transactions on this account"
+        />
+      </Section>
       <AccountFormSheet open={edit} onOpenChange={setEdit} account={a} />
       <TransferDialog open={transfer} onOpenChange={setTransfer} fromAccountId={a.id} />
     </div>
   )
+}
+
+/**
+ * The head of a bank statement: the balance as it stands, and how it got
+ * there — opening balance, money in, money out. In and out come from the
+ * accounts report, which covers active accounts only.
+ */
+function Statement({ account: a }: { account: Account }) {
+  const report = useReportAccounts(ALL_TIME.from, ALL_TIME.to)
+  const r = report.data?.find((x) => x.account_id === a.id)
+  const moneyIn = r ? r.income + r.transfers_in : null
+  const moneyOut = r ? r.expenses + r.transfers_out : null
+  const line = 'flex items-baseline justify-between gap-4 py-2.5 text-sm'
+  return (
+    <section
+      className="bg-card grid overflow-hidden rounded-lg border lg:grid-cols-12"
+      aria-label="Statement"
+    >
+      <div className="flex flex-col justify-between gap-4 p-5 sm:p-6 lg:col-span-5 lg:border-r">
+        <div>
+          <div className="eyebrow">Balance today</div>
+          <div
+            className={cn(
+              'figure mt-3 text-[2.75rem] leading-none break-words sm:text-[3.5rem]',
+              a.current_balance < 0 && 'text-expense',
+            )}
+          >
+            {formatMoney(a.current_balance, a.currency)}
+          </div>
+        </div>
+        <p className="text-muted-foreground text-xs">
+          Opened {formatShortDate(a.opening_balance_date)}. Cleared transactions only; drafts count once
+          confirmed.
+        </p>
+      </div>
+      <div className="border-t px-5 py-3 sm:px-6 lg:col-span-7 lg:border-t-0 lg:py-4">
+        <div className="eyebrow pb-1">Statement · since the account was opened</div>
+        <dl className="divide-rule divide-y">
+          <div className={line}>
+            <dt className="text-muted-foreground">
+              Opening balance <span className="text-xs">· {formatShortDate(a.opening_balance_date)}</span>
+            </dt>
+            <dd className="font-medium">
+              <Money minor={a.opening_balance} currency={a.currency} />
+            </dd>
+          </div>
+          <div className={line}>
+            <dt className="text-muted-foreground">
+              Money in
+              {r && r.transfers_in > 0 && (
+                <span className="text-xs"> · incl. {formatMoney(r.transfers_in, a.currency)} transfers</span>
+              )}
+            </dt>
+            <dd className="font-medium">
+              {moneyIn === null ? (
+                <StatementGap loading={report.isPending} />
+              ) : (
+                <Money minor={moneyIn} currency={a.currency} tone="income" sign="always" />
+              )}
+            </dd>
+          </div>
+          <div className={line}>
+            <dt className="text-muted-foreground">
+              Money out
+              {r && r.transfers_out > 0 && (
+                <span className="text-xs"> · incl. {formatMoney(r.transfers_out, a.currency)} transfers</span>
+              )}
+            </dt>
+            <dd className="font-medium">
+              {moneyOut === null ? (
+                <StatementGap loading={report.isPending} />
+              ) : (
+                <Money minor={-moneyOut} currency={a.currency} tone="expense" />
+              )}
+            </dd>
+          </div>
+        </dl>
+        <dl className={cn(line, 'border-foreground/50 border-t-[3px] border-double font-semibold')}>
+          <dt>Balance</dt>
+          <dd>
+            <Money
+              minor={a.current_balance}
+              currency={a.currency}
+              tone={a.current_balance < 0 ? 'expense' : 'neutral'}
+            />
+          </dd>
+        </dl>
+      </div>
+    </section>
+  )
+}
+
+function StatementGap({ loading }: { loading: boolean }) {
+  if (loading) return <Skeleton className="h-4 w-20" />
+  return <span className="text-muted-foreground font-normal">—</span>
 }
 
 export const accountDetailRoute = createRoute({

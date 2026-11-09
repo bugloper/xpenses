@@ -1,18 +1,21 @@
 import { createRoute, Link } from '@tanstack/react-router'
+import { ArrowRight } from 'lucide-react'
 import { z } from 'zod'
 import { Suspense, lazy, useMemo } from 'react'
+import { Panel } from '@/components/common/kit'
 import { PageHeader, Section } from '@/components/common/PageHeader'
 import { TransactionList } from '@/components/transactions/TransactionList'
+import { BalanceHero } from '@/components/dashboard/BalanceHero'
 import { BudgetSummary } from '@/components/dashboard/BudgetSummary'
-import { Skeleton } from '@/components/ui/skeleton'
+import { CategoryBreakdown } from '@/components/dashboard/CategoryBreakdown'
 import { PeriodSelector } from '@/components/dashboard/PeriodSelector'
-import { BalanceHero } from '@/components/dashboard/StatTiles'
-import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   formatMonthLabel,
   granularityFor,
   isISODate,
   presetRange,
+  rangeDays,
   rangeLabel,
   rangeMonth,
   trendRange,
@@ -33,9 +36,19 @@ import { appRoute } from './__root'
 const CashFlowChart = lazy(() =>
   import('@/components/dashboard/CashFlowChart').then((m) => ({ default: m.CashFlowChart })),
 )
-const CategoryDonut = lazy(() =>
-  import('@/components/dashboard/CategoryDonut').then((m) => ({ default: m.CategoryDonut })),
-)
+
+/** A quiet text link in a panel header: "See all", "Manage". */
+function HeaderLink({ to, children }: { to: string; children: string }) {
+  return (
+    <Link
+      to={to}
+      className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-[0.8125rem] font-medium transition-colors"
+    >
+      {children}
+      <ArrowRight className="size-3.5" />
+    </Link>
+  )
+}
 
 const searchSchema = z.object({
   period: z.enum(['today', 'week', 'month', 'prev_month', 'custom']).optional().catch(undefined),
@@ -71,24 +84,30 @@ function DashboardPage() {
     [summary.data?.recent_transactions, pending],
   )
 
+  const running = granularity === 'day' && rangeDays(range) > 1
+
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="Dashboard" description={rangeLabel(range)} />
-      <PeriodSelector
-        preset={preset}
-        range={range}
-        onChange={(p, r) =>
-          void navigate({
-            search:
-              p === 'custom'
-                ? { period: 'custom', from: r.from, to: r.to }
-                : p === 'month'
-                  ? {}
-                  : { period: p },
-            replace: true,
-          })
-        }
-      />
+      <div className="flex flex-col gap-4 border-b pb-5 lg:flex-row lg:items-end lg:justify-between">
+        <PageHeader title="Dashboard" eyebrow={rangeLabel(range)} rule={false} />
+        <div className="min-w-0">
+          <PeriodSelector
+            preset={preset}
+            range={range}
+            onChange={(p, r) =>
+              void navigate({
+                search:
+                  p === 'custom'
+                    ? { period: 'custom', from: r.from, to: r.to }
+                    : p === 'month'
+                      ? {}
+                      : { period: p },
+                replace: true,
+              })
+            }
+          />
+        </div>
+      </div>
       <BalanceHero
         summary={summary.data}
         loading={summary.isPending}
@@ -98,60 +117,66 @@ function DashboardPage() {
         range={range}
       />
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Section title={granularity === 'day' ? 'Daily cash flow' : 'Monthly trend'}>
-          <div className="bg-card border rounded-[1.25rem] p-4">
-            <Suspense fallback={<Skeleton className="h-56 w-full rounded-xl" />}>
-              <CashFlowChart
-                data={cashFlow.data}
-                loading={cashFlow.isPending}
-                error={cashFlow.error}
-                onRetry={() => void cashFlow.refetch()}
-                currency={currency}
-              />
-            </Suspense>
-          </div>
-        </Section>
-        <Section
-          title={`Budgets · ${formatMonthLabel(month)}`}
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-12">
+        <Panel
+          className="md:col-span-2 lg:col-span-8"
+          eyebrow={running ? 'Running totals' : granularity === 'day' ? 'By day' : 'Last six months'}
+          title={running ? 'Cash flow this period' : granularity === 'day' ? 'Cash flow' : 'Monthly trend'}
           action={
-            <Button variant="link" size="sm" className="h-auto p-0" asChild>
-              <Link to="/budgets">Manage</Link>
-            </Button>
+            <div className="eyebrow hidden items-center gap-4 sm:flex" aria-hidden>
+              <span className="flex items-center gap-1.5">
+                <span className="bg-income h-0.5 w-3" /> Money in
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="bg-expense h-0.5 w-3" /> Money out
+              </span>
+            </div>
           }
         >
-          <div className="bg-card border rounded-[1.25rem] p-4">
-            <BudgetSummary
-              data={budgets.data}
-              loading={budgets.isPending}
-              error={budgets.error}
-              onRetry={() => void budgets.refetch()}
+          <Suspense fallback={<Skeleton className="h-60 w-full rounded-md" />}>
+            <CashFlowChart
+              data={cashFlow.data}
+              loading={cashFlow.isPending}
+              error={cashFlow.error}
+              onRetry={() => void cashFlow.refetch()}
               currency={currency}
+              running={running}
             />
-          </div>
-        </Section>
-        <Section title="Spending by category" className="lg:col-span-2">
-          <div className="bg-card border rounded-[1.25rem] p-4 sm:p-5">
-            <Suspense fallback={<Skeleton className="h-64 w-full rounded-xl" />}>
-              <CategoryDonut
-                data={categories.data}
-                loading={categories.isPending}
-                error={categories.error}
-                onRetry={() => void categories.refetch()}
-                currency={currency}
-                range={range}
-              />
-            </Suspense>
-          </div>
-        </Section>
+          </Suspense>
+        </Panel>
+
+        <Panel
+          className="lg:col-span-4"
+          eyebrow={formatMonthLabel(month)}
+          title="Budgets"
+          action={<HeaderLink to="/budgets">Manage</HeaderLink>}
+          flush
+        >
+          <BudgetSummary
+            data={budgets.data}
+            loading={budgets.isPending}
+            error={budgets.error}
+            onRetry={() => void budgets.refetch()}
+            currency={currency}
+            month={month}
+          />
+        </Panel>
+
+        <Panel className="lg:col-span-5 lg:self-start" eyebrow="Ranked" title="Spending by category" flush>
+          <CategoryBreakdown
+            data={categories.data}
+            loading={categories.isPending}
+            error={categories.error}
+            onRetry={() => void categories.refetch()}
+            currency={currency}
+            range={range}
+          />
+        </Panel>
+
         <Section
           title="Recent transactions"
-          className="lg:col-span-2"
-          action={
-            <Button variant="link" size="sm" className="h-auto p-0" asChild>
-              <Link to="/transactions">See all</Link>
-            </Button>
-          }
+          className="md:col-span-2 lg:col-span-7"
+          action={<HeaderLink to="/transactions">See all</HeaderLink>}
         >
           <TransactionList
             groups={recentGroups}

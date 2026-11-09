@@ -50,7 +50,13 @@ export function LinkDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="flex gap-2">
-          <Input readOnly value={url} aria-label={label} onFocus={(e) => e.currentTarget.select()} />
+          <Input
+            readOnly
+            value={url}
+            aria-label={label}
+            className="font-mono text-xs"
+            onFocus={(e) => e.currentTarget.select()}
+          />
           <Button type="button" onClick={() => void copy()} aria-label={`Copy ${label.toLowerCase()}`}>
             {copied ? <Check data-icon="inline-start" /> : <Copy data-icon="inline-start" />}
             {copied ? 'Copied' : 'Copy'}

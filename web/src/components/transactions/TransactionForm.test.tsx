@@ -3,12 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Account, Category } from '@/types/api'
-import {
-  TransactionForm,
-  defaultValues,
-  toCreateRequest,
-  transactionSchema,
-} from './TransactionForm'
+import { TransactionForm, defaultValues, toCreateRequest, transactionSchema } from './TransactionForm'
 
 const accounts: Account[] = [
   {
@@ -217,7 +212,9 @@ describe('TransactionForm', () => {
     expect(JSON.parse(localStorage.getItem('xpenses-last-used') ?? '{}')).toMatchObject({
       expense: { account_id: 'acc-1', category_id: 'cat-food' },
     })
-    expect(JSON.parse(localStorage.getItem('xpenses-recent-categories') ?? '{}')).toEqual({ expense: ['cat-food'] })
+    expect(JSON.parse(localStorage.getItem('xpenses-recent-categories') ?? '{}')).toEqual({
+      expense: ['cat-food'],
+    })
   })
 
   it('hides categories and shows the destination account for transfers', async () => {
@@ -236,7 +233,12 @@ describe('new category from the picker', () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
       const url = String(input)
       if (url.includes('/categories') && init?.method === 'POST') {
-        const body = JSON.parse(String(init.body)) as { name: string; type: string; icon: string; color: string }
+        const body = JSON.parse(String(init.body)) as {
+          name: string
+          type: string
+          icon: string
+          color: string
+        }
         const created: Category = {
           id: 'cat-new',
           name: body.name,

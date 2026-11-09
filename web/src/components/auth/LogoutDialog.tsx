@@ -92,20 +92,25 @@ function LogoutFlow() {
     <AlertDialog open onOpenChange={(o) => !o && !busy && uiStore.setLogout(false)}>
       <AlertDialogContent>
         <AlertDialogHeader>
+          <p className="eyebrow">Before you log out</p>
           <AlertDialogTitle>
             You have {unsynced} unsynced transaction{unsynced === 1 ? '' : 's'}
           </AlertDialogTitle>
           <AlertDialogDescription>
             {unsynced === 1 ? 'It has' : 'They have'} not reached the server yet. Sync now, or log out and{' '}
             {unsynced === 1 ? 'it' : 'they'} will stay on this device until you sign in again.
-            {syncNote && <span className="text-destructive mt-2 block">{syncNote}</span>}
+            {syncNote && (
+              <span className="border-destructive/30 border-l-destructive bg-destructive/[0.06] text-destructive mt-3 block rounded-md border border-l-[3px] px-3 py-2 text-left">
+                {syncNote}
+              </span>
+            )}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <Button variant="outline" disabled={busy !== null} onClick={() => uiStore.setLogout(false)}>
+          <Button variant="ghost" disabled={busy !== null} onClick={() => uiStore.setLogout(false)}>
             Cancel
           </Button>
-          <Button variant="secondary" disabled={busy !== null} onClick={() => void finish()}>
+          <Button variant="outline" disabled={busy !== null} onClick={() => void finish()}>
             {busy === 'logout' ? 'Logging out…' : 'Log out anyway'}
           </Button>
           <Button disabled={busy !== null} onClick={() => void syncNow()}>

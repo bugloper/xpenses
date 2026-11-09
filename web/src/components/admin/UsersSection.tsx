@@ -1,7 +1,9 @@
-import { MoreHorizontal } from 'lucide-react'
-import { useState } from 'react'
+import { MoreHorizontal, Search } from 'lucide-react'
+import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
+import { Panel } from '@/components/common/kit'
+import { Segmented } from '@/components/common/Segmented'
 import { ErrorState } from '@/components/common/States'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -12,30 +14,105 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { errorMessage } from '@/lib/api'
-import { accessDaysLeft, useAuth } from '@/lib/auth'
-import { formatShortDate, relativeTime } from '@/lib/dates'
+import { accessDaysLeft, initials, useAuth } from '@/lib/auth'
+import { formatDateTime, formatShortDate, relativeTime } from '@/lib/dates'
 import {
   useAdminUsers,
   useCreatePasswordReset,
   useDeleteAdminUser,
   useUpdateAdminUser,
 } from '@/lib/queries/auth'
+import { cn } from '@/lib/utils'
 import type { AdminUser, CreatedPasswordReset } from '@/types/api'
 import { ExtendAccessDialog } from './ExtendAccessDialog'
 import { LinkDialog } from './LinkDialog'
 
-/** "Until 8 Nov 2027" for users, "No end date" for admins, with the expired state in red. */
+/** Where a user stands on their free year. Admins have no end date. */
+export type AccessState = 'exempt' | 'open' | 'ending' | 'expired'
+export function accessState(u: Pick<AdminUser, 'role' | 'access_until'>, now = new Date()): AccessState {
+  const left = accessDaysLeft(u, now)
+  if (left === null) return 'exempt'
+  if (left < 0) return 'expired'
+  if (left <= 30) return 'ending'
+  return 'open'
+}
+
+type Filter = 'all' | 'active' | 'ending' | 'expired' | 'disabled'
+const FILTERS: { value: Filter; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'active', label: 'Active' },
+  { value: 'ending', label: 'Ending soon' },
+  { value: 'expired', label: 'Expired' },
+  { value: 'disabled', label: 'Disabled' },
+]
+
+function matches(u: AdminUser, filter: Filter, query: string) {
+  const q = query.trim().toLowerCase()
+  if (q && !u.name.toLowerCase().includes(q) && !u.email.toLowerCase().includes(q)) return false
+  switch (filter) {
+    case 'active':
+      return u.is_active
+    case 'ending':
+      return accessState(u) === 'ending'
+    case 'expired':
+      return accessState(u) === 'expired'
+    case 'disabled':
+      return !u.is_active
+    default:
+      return true
+  }
+}
+
+/** "Until 8 Nov 2027" for users, "No end date" for admins, the expired state in red. */
 function AccessCell({ u }: { u: AdminUser }) {
   const left = accessDaysLeft(u)
   if (left === null) return <span className="text-muted-foreground">No end date</span>
   if (left < 0) return <Badge variant="destructive">Expired {formatShortDate(u.access_until)}</Badge>
   return (
-    <span className={left <= 30 ? 'text-warning font-medium' : undefined}>
+    <span className={cn('whitespace-nowrap', left <= 30 && 'text-warn font-medium')}>
       {formatShortDate(u.access_until)}
       {left <= 30 && <span className="font-normal"> · {left === 0 ? 'last day' : `${left} days`}</span>}
     </span>
+  )
+}
+
+/** Initials only: profile pictures are served for the signed-in user alone. */
+function Monogram({ u }: { u: AdminUser }) {
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        'flex size-9 shrink-0 items-center justify-center rounded-md border font-mono text-xs font-semibold',
+        u.role === 'admin'
+          ? 'border-saffron/50 bg-saffron-soft text-accent-foreground'
+          : 'bg-muted text-muted-foreground',
+      )}
+    >
+      {initials(u.name)}
+    </span>
+  )
+}
+
+function RoleTag({ u }: { u: AdminUser }) {
+  return u.role === 'admin' ? (
+    <Badge variant="outline" className="border-saffron/50 text-accent-foreground">
+      Admin
+    </Badge>
+  ) : (
+    <Badge variant="secondary">User</Badge>
+  )
+}
+
+function StatusTag({ u }: { u: AdminUser }) {
+  return u.is_active ? (
+    <span className="text-muted-foreground inline-flex items-center gap-1.5 text-xs">
+      <span aria-hidden className="bg-income size-1.5 rounded-full" /> Active
+    </span>
+  ) : (
+    <Badge variant="destructive">Disabled</Badge>
   )
 }
 
@@ -62,13 +139,20 @@ function UserActions({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button size="sm" variant="ghost" aria-label={`Actions for ${u.name}`}>
+        <Button
+          size="icon-sm"
+          variant="ghost"
+          className="size-10 md:size-8"
+          aria-label={`Actions for ${u.name}`}
+        >
           <MoreHorizontal />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuItem
-          onSelect={() => reset.mutate(u.id, { onSuccess: onReset, onError: (e) => toast.error(errorMessage(e)) })}
+          onSelect={() =>
+            reset.mutate(u.id, { onSuccess: onReset, onError: (e) => toast.error(errorMessage(e)) })
+          }
         >
           Reset password…
         </DropdownMenuItem>
@@ -104,110 +188,161 @@ function UserActions({
   )
 }
 
-export function UsersSection() {
+const TH = 'eyebrow px-3 py-2.5 text-left font-normal'
+
+export function UsersSection({ id }: { id?: string }) {
   const { user: me } = useAuth()
   const { data, isPending, error, refetch } = useAdminUsers()
   const del = useDeleteAdminUser()
   const [doomed, setDoomed] = useState<AdminUser | null>(null)
   const [reset, setReset] = useState<{ user: AdminUser; link: CreatedPasswordReset } | null>(null)
   const [extending, setExtending] = useState<AdminUser | null>(null)
-  if (isPending) return <Skeleton className="h-40 w-full rounded-[1.25rem]" />
-  if (error) return <ErrorState error={error} onRetry={() => void refetch()} compact />
+  const [filter, setFilter] = useState<Filter>('all')
+  const [query, setQuery] = useState('')
+  const shown = useMemo(() => (data ?? []).filter((u) => matches(u, filter, query)), [data, filter, query])
+
+  const actions = (u: AdminUser) => (
+    <UserActions
+      u={u}
+      self={u.id === me?.id}
+      onDelete={() => setDoomed(u)}
+      onReset={(link) => setReset({ user: u, link })}
+      onExtend={() => setExtending(u)}
+    />
+  )
+  const you = (u: AdminUser) =>
+    u.id === me?.id && <span className="text-muted-foreground font-normal"> (you)</span>
+
   return (
-    <>
-      <div className="bg-card border rounded-[1.25rem]">
-        {/* Table on wide screens */}
-        <table className="hidden w-full text-sm sm:table">
-          <thead className="text-muted-foreground text-xs">
-            <tr className="border-b">
-              <th className="px-4 py-3 text-left font-medium">User</th>
-              <th className="px-2 py-3 text-left font-medium">Role</th>
-              <th className="px-2 py-3 text-left font-medium">Status</th>
-              <th className="px-2 py-3 text-right font-medium">Accounts</th>
-              <th className="px-2 py-3 text-right font-medium">Transactions</th>
-              <th className="px-2 py-3 text-left font-medium">Access until</th>
-              <th className="px-2 py-3 text-left font-medium">Last login</th>
-              <th className="px-2 py-3" />
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {data.map((u) => {
-              const self = u.id === me?.id
-              return (
-                <tr key={u.id}>
-                  <td className="px-4 py-3">
-                    <p className="font-medium">
-                      {u.name}
-                      {self && <span className="text-muted-foreground font-normal"> (you)</span>}
-                    </p>
-                    <p className="text-muted-foreground text-xs">{u.email}</p>
+    <Panel
+      id={id}
+      title="Users"
+      description={data ? `${data.length} on this instance. Each sees only their own data.` : undefined}
+      flush
+    >
+      <div className="flex flex-col gap-3 border-b px-4 py-3 sm:px-5 md:flex-row md:items-center md:justify-between">
+        <div className="no-scrollbar -mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
+          <Segmented
+            aria-label="Show users"
+            size="sm"
+            className="w-max sm:w-max"
+            value={filter}
+            onChange={setFilter}
+            options={FILTERS}
+          />
+        </div>
+        <div className="relative md:w-64">
+          <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+          <Input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Name or email"
+            aria-label="Find a user"
+            className="h-9 pl-9"
+          />
+        </div>
+      </div>
+      {isPending ? (
+        <div className="p-5">
+          <Skeleton className="h-40 w-full rounded-md" />
+        </div>
+      ) : error ? (
+        <ErrorState error={error} onRetry={() => void refetch()} compact />
+      ) : shown.length === 0 ? (
+        <p className="text-muted-foreground px-5 py-10 text-center text-sm">No user matches.</p>
+      ) : (
+        <>
+          {/* A table on wide screens */}
+          <table className="hidden w-full text-sm md:table">
+            <thead>
+              <tr className="border-b">
+                <th className={cn(TH, 'pl-5')}>User</th>
+                <th className={TH}>Role</th>
+                <th className={TH}>Status</th>
+                <th className={TH}>Joined</th>
+                <th className={TH}>Last login</th>
+                <th className={cn(TH, 'text-right')}>Accts · Txns</th>
+                <th className={TH}>Access until</th>
+                <th className="w-12 pr-3">
+                  <span className="sr-only">Actions</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-rule divide-y">
+              {shown.map((u) => (
+                <tr
+                  key={u.id}
+                  className={cn('hover:bg-muted/40 transition-colors', !u.is_active && 'bg-muted/30')}
+                >
+                  <td className="py-3 pr-3 pl-5">
+                    <div className="flex items-center gap-3">
+                      <Monogram u={u} />
+                      <div className="min-w-0">
+                        <p className="truncate font-medium">
+                          {u.name}
+                          {you(u)}
+                        </p>
+                        <p className="text-muted-foreground truncate text-xs">{u.email}</p>
+                      </div>
+                    </div>
                   </td>
-                  <td className="px-2 py-3">
-                    <Badge variant={u.role === 'admin' ? 'default' : 'secondary'}>{u.role}</Badge>
+                  <td className="px-3 py-3">
+                    <RoleTag u={u} />
                   </td>
-                  <td className="px-2 py-3">
-                    <Badge variant={u.is_active ? 'outline' : 'destructive'}>
-                      {u.is_active ? 'Active' : 'Disabled'}
-                    </Badge>
+                  <td className="px-3 py-3">
+                    <StatusTag u={u} />
                   </td>
-                  <td className="px-2 py-3 text-right tabular-nums">{u.account_count}</td>
-                  <td className="px-2 py-3 text-right tabular-nums">{u.transaction_count}</td>
-                  <td className="px-2 py-3 text-xs">
-                    <AccessCell u={u} />
+                  <td className="text-muted-foreground px-3 py-3 text-xs whitespace-nowrap">
+                    {formatShortDate(u.created_at.slice(0, 10))}
                   </td>
-                  <td className="text-muted-foreground px-2 py-3 text-xs">
+                  <td className="text-muted-foreground px-3 py-3 text-xs whitespace-nowrap">
                     {u.last_login_at ? relativeTime(u.last_login_at) : 'never'}
                   </td>
-                  <td className="px-2 py-3 text-right">
-                    <UserActions
-                      u={u}
-                      self={self}
-                      onDelete={() => setDoomed(u)}
-                      onReset={(link) => setReset({ user: u, link })}
-                      onExtend={() => setExtending(u)}
-                    />
+                  <td className="text-muted-foreground px-3 py-3 text-right font-mono text-xs tabular-nums">
+                    {u.account_count} · {u.transaction_count}
                   </td>
+                  <td className="px-3 py-3 text-xs">
+                    <AccessCell u={u} />
+                  </td>
+                  <td className="py-3 pr-3 text-right">{actions(u)}</td>
                 </tr>
-              )
-            })}
-          </tbody>
-        </table>
-        {/* Cards on phones */}
-        <ul className="divide-y sm:hidden">
-          {data.map((u) => {
-            const self = u.id === me?.id
-            return (
-              <li key={u.id} className="flex items-start gap-3 px-4 py-3">
+              ))}
+            </tbody>
+          </table>
+          {/* Rows on phones */}
+          <ul className="divide-rule divide-y md:hidden">
+            {shown.map((u) => (
+              <li
+                key={u.id}
+                className={cn('flex items-start gap-3 py-3 pr-2 pl-4', !u.is_active && 'bg-muted/30')}
+              >
+                <Monogram u={u} />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-1.5">
                     <p className="truncate text-sm font-medium">
                       {u.name}
-                      {self && <span className="text-muted-foreground font-normal"> (you)</span>}
+                      {you(u)}
                     </p>
-                    <Badge variant={u.role === 'admin' ? 'default' : 'secondary'}>{u.role}</Badge>
+                    <RoleTag u={u} />
                     {!u.is_active && <Badge variant="destructive">Disabled</Badge>}
                   </div>
                   <p className="text-muted-foreground truncate text-xs">{u.email}</p>
+                  <p className="mt-1.5 text-xs">
+                    <span className="eyebrow mr-1.5">Access</span>
+                    <AccessCell u={u} />
+                  </p>
                   <p className="text-muted-foreground mt-1 text-xs">
                     {u.account_count} accounts · {u.transaction_count} transactions · last login{' '}
                     {u.last_login_at ? relativeTime(u.last_login_at) : 'never'}
                   </p>
-                  <p className="mt-1 text-xs">
-                    Access: <AccessCell u={u} />
-                  </p>
                 </div>
-                <UserActions
-                      u={u}
-                      self={self}
-                      onDelete={() => setDoomed(u)}
-                      onReset={(link) => setReset({ user: u, link })}
-                      onExtend={() => setExtending(u)}
-                    />
+                {actions(u)}
               </li>
-            )
-          })}
-        </ul>
-      </div>
+            ))}
+          </ul>
+        </>
+      )}
       <ExtendAccessDialog user={extending} onClose={() => setExtending(null)} />
       <LinkDialog
         open={reset !== null}
@@ -217,7 +352,7 @@ export function UsersSection() {
         url={reset ? window.location.origin + reset.link.reset_path : ''}
         note={
           reset
-            ? `Send it to ${reset.user.email}. It works once and expires ${relativeTime(reset.link.expires_at)}; their other sessions are signed out when it is used.`
+            ? `Send it to ${reset.user.email}. It works once and expires ${formatDateTime(reset.link.expires_at)}; their other sessions are signed out when it is used.`
             : undefined
         }
       />
@@ -239,6 +374,6 @@ export function UsersSection() {
           }
         }}
       />
-    </>
+    </Panel>
   )
 }

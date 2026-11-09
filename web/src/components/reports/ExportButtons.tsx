@@ -32,7 +32,8 @@ export function ExportButtons({
     }
   }
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2" role="group" aria-label="Export this report">
+      <span className="eyebrow hidden sm:inline">Export</span>
       <Button
         type="button"
         variant="outline"
@@ -46,7 +47,7 @@ export function ExportButtons({
         ) : (
           <Download data-icon="inline-start" />
         )}
-        <span className="hidden sm:inline">Export </span>CSV
+        CSV
       </Button>
       <Button
         type="button"
@@ -61,7 +62,7 @@ export function ExportButtons({
         ) : (
           <FileText data-icon="inline-start" />
         )}
-        <span className="hidden sm:inline">Export </span>PDF
+        PDF
       </Button>
     </div>
   )

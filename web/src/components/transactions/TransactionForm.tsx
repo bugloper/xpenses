@@ -250,30 +250,6 @@ export function TransactionForm({
     >
       <Controller
         control={control}
-        name="amount"
-        render={({ field }) => (
-          <Field data-invalid={!!err.amount}>
-            <AmountInput
-              ref={(el) => {
-                field.ref(el)
-                ;(amountRef as React.MutableRefObject<HTMLInputElement | null>).current = el
-              }}
-              id={`${formId}-amount`}
-              value={field.value}
-              onChange={field.onChange}
-              currency={currency}
-              tone={tone}
-              invalid={!!err.amount}
-              autoFocus={mode === 'create'}
-              allowNegative={type === 'adjustment'}
-            />
-            <FieldError errors={[err.amount]} className="text-center" />
-          </Field>
-        )}
-      />
-
-      <Controller
-        control={control}
         name="type"
         render={({ field }) =>
           field.value === 'refund' || field.value === 'adjustment' ? (
@@ -299,9 +275,34 @@ export function TransactionForm({
               onChange={field.onChange}
               options={TYPE_OPTIONS}
               size="lg"
+              className="w-full sm:w-full"
             />
           )
         }
+      />
+
+      <Controller
+        control={control}
+        name="amount"
+        render={({ field }) => (
+          <Field data-invalid={!!err.amount}>
+            <AmountInput
+              ref={(el) => {
+                field.ref(el)
+                ;(amountRef as React.MutableRefObject<HTMLInputElement | null>).current = el
+              }}
+              id={`${formId}-amount`}
+              value={field.value}
+              onChange={field.onChange}
+              currency={currency}
+              tone={tone}
+              invalid={!!err.amount}
+              autoFocus={mode === 'create'}
+              allowNegative={type === 'adjustment'}
+            />
+            <FieldError errors={[err.amount]} className="text-center" />
+          </Field>
+        )}
       />
 
       {categoryType && (
@@ -325,7 +326,7 @@ export function TransactionForm({
         />
       )}
 
-      <div className={cn('grid gap-4', type === 'transfer' && 'sm:grid-cols-2')}>
+      <div className={cn('grid gap-5', type === 'transfer' && 'sm:grid-cols-2 sm:gap-4')}>
         <Controller
           control={control}
           name="account_id"
@@ -440,31 +441,30 @@ export function FormActions({
   onSaveAnother?: () => void
   formId?: string
 }) {
+  // Pinned to the bottom of the sheet so Save is always one tap away on a phone.
   return (
-    <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+    <div
+      data-slot="form-actions"
+      className="bg-card sticky bottom-0 z-10 -mx-4 -mb-4 flex items-center gap-2 border-t px-4 py-3 lg:-mx-5 lg:px-5"
+    >
       {onCancel && (
         <Button
           type="button"
           variant="ghost"
           onClick={onCancel}
           disabled={submitting}
-          className="h-10 rounded-xl"
+          className="max-sm:px-2.5"
         >
           Cancel
         </Button>
       )}
+      <span className="flex-1" />
       {mode === 'create' && onSaveAnother && (
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onSaveAnother}
-          disabled={submitting}
-          className="h-10 rounded-xl"
-        >
+        <Button type="button" variant="outline" onClick={onSaveAnother} disabled={submitting}>
           Save & add another
         </Button>
       )}
-      <Button type="submit" form={formId} disabled={submitting} className="h-10 rounded-xl sm:min-w-28">
+      <Button type="submit" form={formId} disabled={submitting} className="min-w-24">
         {submitting ? 'Saving…' : mode === 'create' ? 'Save' : 'Save changes'}
       </Button>
     </div>

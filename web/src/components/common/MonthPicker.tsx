@@ -11,7 +11,15 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
  * A month label that opens a year-and-month grid, so any month is two taps
  * away instead of a run of arrow presses.
  */
-export function MonthPicker({ value, onChange, className }: { value: string; onChange: (yyyymm: string) => void; className?: string }) {
+export function MonthPicker({
+  value,
+  onChange,
+  className,
+}: {
+  value: string
+  onChange: (yyyymm: string) => void
+  className?: string
+}) {
   const [open, setOpen] = useState(false)
   const [year, setYear] = useState(() => Number(value.slice(0, 4)))
   const thisMonth = currentMonth()
@@ -31,7 +39,10 @@ export function MonthPicker({ value, onChange, className }: { value: string; onC
         <button
           type="button"
           aria-label={`Choose month, currently ${formatMonthLabel(value)}`}
-          className={cn('hover:bg-muted inline-flex h-9 items-center gap-1 rounded-full px-3 font-medium transition-colors', className)}
+          className={cn(
+            'hover:bg-muted font-display inline-flex h-10 items-center gap-1.5 rounded-md px-3 text-xl transition-colors',
+            className,
+          )}
         >
           {formatMonthLabel(value)}
           <ChevronDown className="text-muted-foreground size-4" />
@@ -39,11 +50,23 @@ export function MonthPicker({ value, onChange, className }: { value: string; onC
       </PopoverTrigger>
       <PopoverContent className="w-64 p-3" align="center">
         <div className="flex items-center justify-between">
-          <Button type="button" variant="ghost" size="icon-sm" aria-label="Previous year" onClick={() => setYear((y) => y - 1)}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Previous year"
+            onClick={() => setYear((y) => y - 1)}
+          >
             <ChevronLeft />
           </Button>
           <span className="text-sm font-semibold tabular-nums">{year}</span>
-          <Button type="button" variant="ghost" size="icon-sm" aria-label="Next year" onClick={() => setYear((y) => y + 1)}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Next year"
+            onClick={() => setYear((y) => y + 1)}
+          >
             <ChevronRight />
           </Button>
         </div>
@@ -59,9 +82,11 @@ export function MonthPicker({ value, onChange, className }: { value: string; onC
                 aria-selected={selected}
                 onClick={() => pick(m)}
                 className={cn(
-                  'h-9 rounded-lg text-sm font-medium transition-colors',
+                  'h-9 rounded-md text-sm font-medium transition-colors',
                   selected ? 'bg-foreground text-background' : 'hover:bg-muted',
-                  m === thisMonth && !selected && 'text-primary',
+                  m === thisMonth &&
+                    !selected &&
+                    'decoration-saffron underline decoration-2 underline-offset-4',
                 )}
               >
                 {name}
@@ -69,7 +94,13 @@ export function MonthPicker({ value, onChange, className }: { value: string; onC
             )
           })}
         </div>
-        <Button type="button" variant="outline" size="sm" className="mt-3 w-full" onClick={() => pick(thisMonth)}>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="mt-3 w-full"
+          onClick={() => pick(thisMonth)}
+        >
           This month
         </Button>
       </PopoverContent>

@@ -1,17 +1,16 @@
 import { Link, Outlet, useRouterState } from '@tanstack/react-router'
-import { ChevronLeft, Moon, Plus, Sun } from 'lucide-react'
+import { ArrowLeft, Moon, Plus, Sun } from 'lucide-react'
 import { LogoutDialog } from '@/components/auth/LogoutDialog'
-import { Avatar, MoreSheetUser, SidebarUser } from '@/components/auth/UserBadge'
+import { MoreSheetUser, UserMenu } from '@/components/auth/UserBadge'
 import { ResponsiveSheet } from '@/components/common/ResponsiveSheet'
 import { AddTransactionSheet } from '@/components/transactions/AddTransactionSheet'
-import { Button } from '@/components/ui/button'
 import { useAuth } from '@/lib/auth'
 import { uiStore, useUIStore } from '@/lib/ui-store'
 import { cn } from '@/lib/utils'
-import { Logo } from './Brand'
 import { AccessBanner } from './AccessBanner'
+import { Logo } from './Brand'
 import { CurrencyMenu } from './CurrencyMenu'
-import { ALL_NAV, MORE_NAV, PRIMARY_NAV, visibleNav, type NavItem } from './nav'
+import { MORE_NAV, PRIMARY_NAV, SETUP_NAV, TAB_NAV, visibleNav, type NavItem } from './nav'
 import { PendingSheet } from './PendingSheet'
 import { PwaInstallPrompt } from './PwaInstallPrompt'
 import { PwaUpdatePrompt } from './PwaUpdatePrompt'
@@ -22,100 +21,125 @@ function isActive(item: NavItem, pathname: string) {
   return item.exact ? pathname === item.to : pathname === item.to || pathname.startsWith(item.to + '/')
 }
 
-/** What the top bar says, and where its back arrow goes, for the screen we are on. */
-function pageFor(pathname: string): { title: string; back?: string } {
+/** Where the phone's back arrow goes on a detail screen, and what that screen is called. */
+function backFor(pathname: string): { title: string; back: string } | null {
   const [first = '', second] = pathname.split('/').filter(Boolean)
   if (first === 'transactions' && second) return { title: 'Transaction', back: '/transactions' }
   if (first === 'accounts' && second) return { title: 'Account', back: '/accounts' }
-  if (first === 'add') return { title: 'Add transaction', back: '/' }
-  const item = ALL_NAV.find((i) => (i.exact ? pathname === i.to : first === i.to.slice(1)))
-  return { title: item?.label ?? 'Xpenses' }
+  if (first === 'add') return { title: 'Record a payment', back: '/' }
+  return null
 }
 
-function Sidebar() {
-  const { isAdmin } = useAuth()
-  const pathname = useRouterState({ select: (s) => s.location.pathname })
+/** A square button on the ink bar. */
+const inkButton =
+  'inline-flex size-9 shrink-0 items-center justify-center rounded-md text-ink-foreground/85 transition-colors hover:bg-ink-foreground/10 hover:text-ink-foreground'
+
+function ThemeButton() {
+  const { theme, toggle } = useTheme()
   return (
-    <aside className="bg-sidebar fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r md:flex">
-      <div className="flex h-18 items-center px-5">
-        <Logo sub="Expense tracker" />
-      </div>
-      <div className="px-3 pb-2">
-        <Button className="w-full" size="lg" onClick={() => uiStore.openAdd()} aria-label="Add transaction">
-          <Plus /> Add transaction
-        </Button>
-      </div>
-      <nav aria-label="Main" className="flex-1 space-y-0.5 overflow-y-auto px-3 py-2">
-        {visibleNav(ALL_NAV, isAdmin).map((item) => {
-          const Icon = item.icon
-          const current = isActive(item, pathname)
-          return (
-            <Link
-              key={item.to}
-              to={item.to}
-              className={cn(
-                'group flex h-10 items-center gap-3 rounded-full px-3.5 text-sm font-medium transition-colors',
-                current ? 'bg-foreground text-background' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-              )}
-            >
-              <Icon
-                className={cn(
-                  'size-[1.0625rem]',
-                  current ? 'text-background' : 'text-muted-foreground group-hover:text-foreground',
-                )}
-              />
-              <span className="flex-1">{item.label}</span>
-            </Link>
-          )
-        })}
-      </nav>
-      <div className="border-t p-3">
-        <SidebarUser />
-      </div>
-    </aside>
+    <button type="button" onClick={toggle} aria-label="Toggle theme" className={inkButton}>
+      {theme === 'dark' ? <Sun className="size-[1.125rem]" /> : <Moon className="size-[1.125rem]" />}
+    </button>
   )
 }
 
-/** A round button in the header, the way a centred title is framed. */
-const roundButton =
-  'relative inline-flex size-11 shrink-0 items-center justify-center rounded-full border bg-card text-foreground transition-colors hover:bg-muted'
-
-function Topbar() {
-  const { user } = useAuth()
-  const { theme, toggle } = useTheme()
+/** Desktop: one ink bar across the top — the mark, the screens as typeset tabs, then the tools. */
+function Masthead() {
   const pathname = useRouterState({ select: (s) => s.location.pathname })
-  const page = pageFor(pathname)
+  const tab = (item: NavItem) => {
+    const current = isActive(item, pathname)
+    return (
+      <Link
+        key={item.to}
+        to={item.to}
+        aria-current={current ? 'page' : undefined}
+        className={cn(
+          'relative flex h-full items-center px-3 text-[0.8125rem] font-medium tracking-wide transition-colors',
+          current ? 'text-ink-foreground' : 'text-ink-muted hover:text-ink-foreground',
+        )}
+      >
+        {item.label}
+        <span
+          aria-hidden
+          className={cn(
+            'bg-saffron absolute inset-x-3 bottom-0 h-[3px] rounded-t-sm transition-opacity',
+            current ? 'opacity-100' : 'opacity-0',
+          )}
+        />
+      </Link>
+    )
+  }
   return (
-    <header className="bg-background/85 sticky top-0 z-20 grid h-16 grid-cols-[2.75rem_1fr_auto] items-center gap-2 px-4 backdrop-blur-xl sm:px-6 md:h-18 md:px-8">
-      {page.back ? (
-        <Link to={page.back} aria-label="Back" className={roundButton}>
-          <ChevronLeft className="size-5" />
+    <header className="bg-ink text-ink-foreground sticky top-0 z-30 hidden lg:block">
+      <div className="mx-auto flex h-16 max-w-7xl items-center gap-6 px-8">
+        <Link to="/" aria-label="Xpenses home" className="shrink-0">
+          <Logo inverted />
         </Link>
-      ) : user ? (
-        <Link to="/settings" aria-label="Your profile" className="rounded-full md:invisible">
-          <Avatar user={user} className="size-11 text-sm" />
-        </Link>
-      ) : (
-        <span />
-      )}
-      <div className="min-w-0 truncate text-center text-lg font-semibold tracking-tight md:invisible">{page.title}</div>
-      <div className="flex items-center gap-2">
-        <CurrencyMenu />
-        <button type="button" onClick={toggle} aria-label="Toggle theme" className={roundButton}>
-          {theme === 'dark' ? <Sun className="size-5" /> : <Moon className="size-5" />}
-        </button>
+        <nav aria-label="Main" className="flex h-full min-w-0 flex-1 items-stretch">
+          {PRIMARY_NAV.map(tab)}
+          <span aria-hidden className="bg-ink-foreground/15 mx-2 my-5 w-px" />
+          {SETUP_NAV.map(tab)}
+        </nav>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <CurrencyMenu />
+          <ThemeButton />
+          <button
+            type="button"
+            onClick={() => uiStore.openAdd()}
+            aria-label="Add transaction"
+            className="bg-saffron text-saffron-foreground ml-1.5 inline-flex h-9 items-center gap-1.5 rounded-md px-3.5 text-sm font-semibold transition-[filter] hover:brightness-95"
+          >
+            <Plus className="size-4" strokeWidth={2.75} /> Record
+          </button>
+          <span aria-hidden className="bg-ink-foreground/15 mx-1.5 h-6 w-px" />
+          <UserMenu />
+        </div>
       </div>
     </header>
   )
 }
 
-/** The bar along the bottom of a phone, with the round + in the middle. */
+/** Phone and tablet: a slim ink bar — the mark, or a back arrow on a detail screen. */
+function Topbar() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname })
+  const back = backFor(pathname)
+  return (
+    <header className="bg-ink text-ink-foreground sticky top-0 z-30 lg:hidden">
+      <div className="flex h-14 items-center gap-2 px-3 sm:px-5">
+        {back ? (
+          <>
+            <Link to={back.back} aria-label="Back" className={inkButton}>
+              <ArrowLeft className="size-5" />
+            </Link>
+            <span className="font-display min-w-0 flex-1 truncate text-lg">{back.title}</span>
+          </>
+        ) : (
+          <Link to="/" aria-label="Xpenses home" className="min-w-0 flex-1">
+            <Logo inverted />
+          </Link>
+        )}
+        <CurrencyMenu />
+        <ThemeButton />
+      </div>
+    </header>
+  )
+}
+
+/** The phone's ink tab bar, with the saffron Record key in the middle. */
 function Tabbar() {
   const { moreOpen } = useUIStore()
   const { isAdmin } = useAuth()
   const pathname = useRouterState({ select: (s) => s.location.pathname })
   const moreActive = MORE_NAV.some((i) => isActive(i, pathname))
-  const [dashboard, transactions, reports] = PRIMARY_NAV as [NavItem, NavItem, NavItem]
+  const [home, ledger, budgets] = TAB_NAV as [NavItem, NavItem, NavItem]
+  const cell =
+    'relative flex h-16 flex-col items-center justify-center gap-1 text-[0.6875rem] font-medium tracking-wide transition-colors'
+  const marker = (on: boolean) => (
+    <span
+      aria-hidden
+      className={cn('bg-saffron absolute top-0 h-[3px] w-8 rounded-b-sm', on ? 'opacity-100' : 'opacity-0')}
+    />
+  )
   const tab = (item: NavItem) => {
     const Icon = item.icon
     const current = isActive(item, pathname)
@@ -123,77 +147,81 @@ function Tabbar() {
       <Link
         key={item.to}
         to={item.to}
-        className={cn(
-          'relative flex h-16 flex-col items-center justify-center gap-1 text-[0.6875rem] font-medium transition-colors',
-          current ? 'text-foreground' : 'text-muted-foreground',
-        )}
+        aria-label={item.label}
+        aria-current={current ? 'page' : undefined}
+        className={cn(cell, current ? 'text-ink-foreground' : 'text-ink-muted')}
       >
-        <Icon className="size-[1.375rem]" strokeWidth={current ? 2.5 : 1.75} />
-        {item.label}
+        {marker(current)}
+        <Icon className="size-[1.3rem]" strokeWidth={current ? 2.25 : 1.75} />
+        {item.short ?? item.label}
       </Link>
     )
   }
   return (
     <>
-      <nav aria-label="Main" className="safe-bottom bg-card/95 fixed inset-x-0 bottom-0 z-30 border-t backdrop-blur-xl md:hidden">
-        <div className="mx-auto grid max-w-lg grid-cols-5">
-          {tab(dashboard)}
-          {tab(transactions)}
-          <div className="flex justify-center">
+      <nav aria-label="Main" className="safe-bottom bg-ink fixed inset-x-0 bottom-0 z-30 lg:hidden">
+        <div className="mx-auto grid max-w-xl grid-cols-5">
+          {tab(home)}
+          {tab(ledger)}
+          <div className="flex items-center justify-center">
             <button
               type="button"
               aria-label="Add transaction"
               onClick={() => uiStore.openAdd()}
-              className="bg-primary text-primary-foreground shadow-primary/40 ring-background -mt-6 flex size-15 items-center justify-center rounded-full shadow-lg ring-6 transition-transform active:scale-95"
+              className="bg-saffron text-saffron-foreground ring-ink flex size-13 -translate-y-3 items-center justify-center rounded-lg shadow-[0_8px_20px_-6px_rgb(0_0_0/0.5)] ring-4 transition-transform active:scale-95"
             >
-              <Plus className="size-7" strokeWidth={2.5} />
+              <Plus className="size-6" strokeWidth={2.75} />
             </button>
           </div>
-          {tab(reports)}
+          {tab(budgets)}
           <button
             type="button"
             onClick={() => uiStore.setMore(true)}
-            className={cn(
-              'relative flex h-16 flex-col items-center justify-center gap-1 text-[0.6875rem] font-medium transition-colors',
-              moreActive ? 'text-foreground' : 'text-muted-foreground',
-            )}
+            className={cn(cell, moreActive ? 'text-ink-foreground' : 'text-ink-muted')}
           >
-            <MoreIcon bold={moreActive} />
+            {marker(moreActive)}
+            <MoreIcon />
             More
           </button>
         </div>
       </nav>
       <ResponsiveSheet open={moreOpen} onOpenChange={uiStore.setMore} title="More">
         <MoreSheetUser />
-        <div className="grid grid-cols-2 gap-2 pb-2">
+        <ul className="divide-y border-y">
           {visibleNav(MORE_NAV, isAdmin).map((item) => {
             const Icon = item.icon
+            const current = isActive(item, pathname)
             return (
-              <Link
-                key={item.to}
-                to={item.to}
-                onClick={() => uiStore.setMore(false)}
-                className="bg-card hover:bg-muted/60 flex items-center gap-3 rounded-[1.25rem] border px-3 py-3 text-sm font-medium"
-              >
-                <span className="bg-accent text-primary flex size-9 items-center justify-center rounded-full">
-                  <Icon className="size-4.5" />
-                </span>
-                {item.label}
-              </Link>
+              <li key={item.to}>
+                <Link
+                  to={item.to}
+                  onClick={() => uiStore.setMore(false)}
+                  className="hover:bg-muted/60 flex items-center gap-3 px-1 py-3.5 text-[0.9375rem] font-medium"
+                >
+                  <Icon className="text-muted-foreground size-[1.125rem]" />
+                  <span className="flex-1">{item.label === 'Admin' ? 'Admin console' : item.label}</span>
+                  {current && <span className="bg-saffron size-1.5 rounded-full" aria-hidden />}
+                </Link>
+              </li>
             )
           })}
-        </div>
+        </ul>
       </ResponsiveSheet>
     </>
   )
 }
 
-function MoreIcon({ bold }: { bold: boolean }) {
+function MoreIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="size-[1.375rem]" fill="currentColor" aria-hidden>
-      <circle cx="5" cy="12" r={bold ? 2.4 : 2} />
-      <circle cx="12" cy="12" r={bold ? 2.4 : 2} />
-      <circle cx="19" cy="12" r={bold ? 2.4 : 2} />
+    <svg
+      viewBox="0 0 24 24"
+      className="size-[1.3rem]"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      aria-hidden
+    >
+      <path d="M4 7h16M4 12h16M4 17h10" strokeLinecap="square" />
     </svg>
   )
 }
@@ -201,18 +229,22 @@ function MoreIcon({ bold }: { bold: boolean }) {
 export function AppShell() {
   return (
     <div className="min-h-dvh">
-      <Sidebar />
-      <div className="md:pl-64">
-        <Topbar />
-        <main className="mx-auto w-full max-w-6xl px-4 pt-4 pb-28 sm:px-6 md:px-8 md:pt-6 md:pb-12">
-          <div className="mb-4 grid gap-2 empty:hidden">
-            <AccessBanner />
-            <SyncPill />
-          </div>
-          <Outlet />
-        </main>
-        <Tabbar />
-      </div>
+      <a
+        href="#main"
+        className="bg-saffron text-saffron-foreground sr-only z-50 rounded-md px-3 py-2 text-sm font-semibold focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
+      >
+        Skip to content
+      </a>
+      <Masthead />
+      <Topbar />
+      <main id="main" className="mx-auto w-full max-w-7xl px-4 pt-5 pb-28 sm:px-6 lg:px-8 lg:pt-10 lg:pb-16">
+        <div className="mb-5 grid gap-2 empty:hidden">
+          <AccessBanner />
+          <SyncPill />
+        </div>
+        <Outlet />
+      </main>
+      <Tabbar />
       <AddTransactionSheet />
       <PendingSheet />
       <LogoutDialog />

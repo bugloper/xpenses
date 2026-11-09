@@ -1,6 +1,7 @@
 import { Outlet, createRootRoute, createRoute, redirect } from '@tanstack/react-router'
 import { HomePage } from '@/components/auth/HomePage'
 import { AppShell } from '@/components/layout/AppShell'
+import { Logo } from '@/components/layout/Brand'
 import { ErrorState } from '@/components/common/States'
 import { Toaster } from '@/components/ui/sonner'
 import { isApiError, isNetworkError } from '@/lib/api'
@@ -67,20 +68,35 @@ export const rootRoute = createRootRoute({
   component: () => (
     <>
       <Outlet />
-      <Toaster position="top-center" richColors closeButton />
+      <Toaster position="top-center" closeButton />
     </>
   ),
   errorComponent: ({ error, reset }) => (
-    <div className="p-6">
+    <StandalonePage>
       <ErrorState error={error} onRetry={reset} />
-    </div>
+    </StandalonePage>
   ),
   notFoundComponent: () => (
-    <div className="p-6">
+    <StandalonePage>
       <ErrorState error={new Error('This page does not exist.')} title="Not found" />
-    </div>
+      <div className="flex justify-center">
+        <a href="/" className="text-sm font-medium underline underline-offset-4">
+          Back to Xpenses
+        </a>
+      </div>
+    </StandalonePage>
   ),
 })
+
+/** A page outside the app shell (errors, not found): the mark on paper, the message on a sheet. */
+function StandalonePage({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex min-h-dvh flex-col items-center justify-center gap-6 px-4 py-10">
+      <Logo />
+      <div className="bg-card w-full max-w-md rounded-lg border p-2">{children}</div>
+    </div>
+  )
+}
 
 /** The app shell for a signed-in user; the public home page for a visitor (the guard lets visitors reach only `/`). */
 function AppOrHome() {

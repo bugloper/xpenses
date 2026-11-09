@@ -52,7 +52,13 @@ export function CategoryFormSheet({
   const { data: all = [] } = useCategories(true)
   const form = useForm<Values>({
     resolver: zodResolver(schema),
-    defaultValues: { name: '', type: defaultType, icon: 'circle-dashed', color: COLOR_PALETTE[0]!, parent_id: '' },
+    defaultValues: {
+      name: '',
+      type: defaultType,
+      icon: 'circle-dashed',
+      color: COLOR_PALETTE[0]!,
+      parent_id: '',
+    },
   })
   const { control, handleSubmit, reset, formState, watch, setValue } = form
   useEffect(() => {
@@ -60,7 +66,13 @@ export function CategoryFormSheet({
     const parent = defaultParentId ? all.find((c) => c.id === defaultParentId) : undefined
     reset(
       category
-        ? { name: category.name, type: category.type, icon: category.icon, color: category.color, parent_id: category.parent_id ?? '' }
+        ? {
+            name: category.name,
+            type: category.type,
+            icon: category.icon,
+            color: category.color,
+            parent_id: category.parent_id ?? '',
+          }
         : {
             name: '',
             type: defaultType,
@@ -85,7 +97,13 @@ export function CategoryFormSheet({
   const submit = handleSubmit(async (v) => {
     try {
       if (category) {
-        await update.mutateAsync({ id: category.id, name: v.name, icon: v.icon, color: v.color, parent_id: v.parent_id ?? '' })
+        await update.mutateAsync({
+          id: category.id,
+          name: v.name,
+          icon: v.icon,
+          color: v.color,
+          parent_id: v.parent_id ?? '',
+        })
         toast.success('Category updated')
       } else {
         const created = await create.mutateAsync({ ...v, parent_id: v.parent_id || null })
@@ -114,17 +132,25 @@ export function CategoryFormSheet({
         </div>
       }
     >
-      <form id="category-form" className="flex flex-col gap-5" onSubmit={(e) => {
+      <form
+        id="category-form"
+        className="flex flex-col gap-5"
+        onSubmit={(e) => {
           e.stopPropagation()
           void submit(e)
         }}
         noValidate
       >
-        <div className="bg-muted/50 flex items-center gap-3 rounded-xl p-3">
+        <div className="bg-muted/40 flex items-center gap-3 rounded-md border border-dashed p-3">
           <CategoryIcon icon={icon} color={color} size="lg" />
-          <div>
-            <p className="font-medium">{name || 'Preview'}</p>
-            <p className="text-muted-foreground text-xs capitalize">{watch('type')}</p>
+          <div className="min-w-0">
+            <p className="eyebrow">
+              {watch('type')} ·{' '}
+              {parentId
+                ? `under ${parents.find((p) => p.id === parentId)?.name ?? 'a main category'}`
+                : 'main category'}
+            </p>
+            <p className="font-display mt-1 truncate text-xl leading-tight">{name || 'Preview'}</p>
           </div>
         </div>
         <Controller
@@ -184,7 +210,9 @@ export function CategoryFormSheet({
                 </SelectContent>
               </Select>
               <p className="text-muted-foreground text-xs">
-                {parentId ? 'A sub-category: it is filed under the main category above.' : 'Main categories group sub-categories in the picker and reports.'}
+                {parentId
+                  ? 'A sub-category: it is filed under the main category above.'
+                  : 'Main categories group sub-categories in the picker and reports.'}
               </p>
             </Field>
           )}
@@ -204,7 +232,7 @@ export function CategoryFormSheet({
                     aria-checked={field.value === c}
                     aria-label={c}
                     onClick={() => field.onChange(c)}
-                    className="ring-offset-card aria-checked:ring-foreground flex aspect-square items-center justify-center rounded-full ring-offset-2 transition-transform hover:scale-110 aria-checked:ring-2"
+                    className="ring-offset-card aria-checked:ring-foreground flex aspect-square items-center justify-center rounded-sm ring-offset-2 transition-shadow aria-checked:ring-2"
                     style={{ backgroundColor: c }}
                   >
                     {field.value === c && <Check className="size-4 text-white" />}
@@ -234,10 +262,10 @@ export function CategoryFormSheet({
                       aria-label={n}
                       onClick={() => field.onChange(n)}
                       className={cn(
-                        'flex aspect-square items-center justify-center rounded-lg transition-colors',
+                        'flex aspect-square items-center justify-center rounded-md border transition-colors',
                         active
-                          ? 'bg-primary/15 text-primary ring-primary ring-2'
-                          : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground',
+                          ? 'border-foreground bg-card text-foreground shadow-[inset_0_0_0_1px_var(--foreground)]'
+                          : 'bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground border-transparent',
                       )}
                     >
                       <Icon className="size-4.5" />

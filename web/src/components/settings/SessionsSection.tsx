@@ -3,6 +3,7 @@ import { Monitor, Smartphone, X } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
+import { Panel } from '@/components/common/kit'
 import { ErrorState } from '@/components/common/States'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -41,6 +42,9 @@ export function describeUserAgent(ua: string): string {
   return [browser, os].filter(Boolean).join(' on ')
 }
 
+/** Sessions shown before the rest are folded away. */
+const FOLD = 5
+
 function isMobile(ua: string) {
   return /iPhone|iPad|Android|Mobile/.test(ua)
 }
@@ -49,14 +53,18 @@ function SessionRow({ s }: { s: AuthSession }) {
   const revoke = useRevokeSession()
   const Icon = isMobile(s.user_agent) ? Smartphone : Monitor
   return (
-    <li className="flex items-center gap-3 py-3">
-      <span className="bg-muted text-muted-foreground flex size-9 shrink-0 items-center justify-center rounded-xl">
+    <li className="flex items-center gap-3 px-4 py-3 sm:px-5">
+      <span className="bg-muted text-muted-foreground flex size-9 shrink-0 items-center justify-center rounded-md border">
         <Icon className="size-4" />
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <p className="truncate text-sm font-medium">{describeUserAgent(s.user_agent)}</p>
-          {s.current && <Badge variant="secondary">Current</Badge>}
+          {s.current && (
+            <Badge variant="outline" className="border-saffron/50 text-accent-foreground">
+              This device
+            </Badge>
+          )}
         </div>
         <p className="text-muted-foreground text-xs">
           Last seen {relativeTime(s.last_seen_at)} · signed in {relativeTime(s.created_at)}
@@ -83,25 +91,61 @@ function SessionRow({ s }: { s: AuthSession }) {
 }
 
 /** Every device signed in, with revoke per device and sign-out of all of them at once. */
-export function SessionsSection() {
+export function SessionsSection({ id }: { id?: string }) {
   const { data, isPending, error, refetch } = useSessions()
   const navigate = useNavigate()
   const [confirmAll, setConfirmAll] = useState(false)
-  if (isPending) return <Skeleton className="h-24 w-full rounded-[1.25rem]" />
-  if (error) return <ErrorState error={error} onRetry={() => void refetch()} compact />
-  const sessions = [...data].sort((a, b) => Number(b.current) - Number(a.current))
+  const [all, setAll] = useState(false)
+  const sessions = data ? [...data].sort((a, b) => Number(b.current) - Number(a.current)) : []
   return (
-    <div className="bg-card border rounded-[1.25rem] px-4">
-      <ul className="divide-y">
-        {sessions.map((s) => (
-          <SessionRow key={s.id} s={s} />
-        ))}
-      </ul>
-      <div className="flex justify-end border-t py-2">
-        <Button variant="ghost" size="sm" className="text-destructive" onClick={() => setConfirmAll(true)}>
-          Log out everywhere
-        </Button>
-      </div>
+    <Panel
+      id={id}
+      title="Devices signed in"
+      description={
+        data
+          ? `${data.length} session${data.length === 1 ? '' : 's'}. Revoke any you do not recognise.`
+          : undefined
+      }
+      action={
+        data && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-destructive"
+            onClick={() => setConfirmAll(true)}
+          >
+            Log out everywhere
+          </Button>
+        )
+      }
+      flush
+    >
+      {isPending ? (
+        <div className="p-5">
+          <Skeleton className="h-16 w-full rounded-md" />
+        </div>
+      ) : error ? (
+        <ErrorState error={error} onRetry={() => void refetch()} compact />
+      ) : (
+        <ul className="divide-rule divide-y">
+          {(all ? sessions : sessions.slice(0, FOLD)).map((s) => (
+            <SessionRow key={s.id} s={s} />
+          ))}
+          {sessions.length > FOLD && (
+            <li className="bg-muted/50 px-4 py-2 sm:px-5">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="-ml-2"
+                onClick={() => setAll((v) => !v)}
+                aria-expanded={all}
+              >
+                {all ? 'Show fewer' : `Show all ${sessions.length} sessions`}
+              </Button>
+            </li>
+          )}
+        </ul>
+      )}
       <ConfirmDialog
         open={confirmAll}
         onOpenChange={setConfirmAll}
@@ -118,6 +162,6 @@ export function SessionsSection() {
           }
         }}
       />
-    </div>
+    </Panel>
   )
 }

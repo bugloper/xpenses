@@ -26,40 +26,49 @@ export const AmountInput = forwardRef<HTMLInputElement, Props>(function AmountIn
   return (
     <div
       className={cn(
-        'bg-muted/60 flex items-baseline justify-center gap-2 rounded-[1.25rem] px-4 py-5',
-        invalid && 'ring-destructive/50 ring-2',
+        'flex items-baseline justify-center gap-2 border-b-2 px-2 pt-3 pb-2 transition-colors',
+        'focus-within:border-foreground',
+        invalid ? 'border-destructive focus-within:border-destructive' : 'border-border',
       )}
     >
-      <span className="text-muted-foreground text-lg font-medium">{currencySymbol(currency)}</span>
-      <input
-        ref={ref}
-        id={id}
-        aria-label="Amount"
-        aria-invalid={invalid}
-        type="text"
-        inputMode="decimal"
-        autoComplete="off"
-        enterKeyHint="done"
-        placeholder="0.00"
-        autoFocus={autoFocus}
-        value={value}
-        onChange={(e) => {
-          const next = e.target.value.replace(/,/g, '')
-          if (next === '' || pattern.test(next)) onChange(next)
-        }}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && onEnter) {
-            e.preventDefault()
-            onEnter()
-          }
-        }}
-        className={cn(
-          'tabular placeholder:text-muted-foreground/40 w-full min-w-0 bg-transparent text-center text-5xl font-semibold tracking-tight outline-none',
-          tone === 'expense' && 'text-expense',
-          tone === 'income' && 'text-income',
-        )}
-        style={{ width: `${Math.max(4, value.length + 1)}ch`, maxWidth: '100%' }}
-      />
+      <span className="figure text-muted-foreground text-2xl sm:text-[1.75rem]">
+        {currencySymbol(currency)}
+      </span>
+      {/* The input sizes to its text: an invisible copy in the same grid cell sets the width. */}
+      <span className="figure inline-grid min-w-0 text-[3.25rem] leading-none sm:text-[3.75rem]">
+        <span aria-hidden className="invisible col-start-1 row-start-1 overflow-hidden pr-1 whitespace-pre">
+          {value || '0.00'}
+        </span>
+        <input
+          ref={ref}
+          id={id}
+          aria-label="Amount"
+          aria-invalid={invalid}
+          type="text"
+          inputMode="decimal"
+          size={1}
+          autoComplete="off"
+          enterKeyHint="done"
+          placeholder="0.00"
+          autoFocus={autoFocus}
+          value={value}
+          onChange={(e) => {
+            const next = e.target.value.replace(/,/g, '')
+            if (next === '' || pattern.test(next)) onChange(next)
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && onEnter) {
+              e.preventDefault()
+              onEnter()
+            }
+          }}
+          className={cn(
+            'placeholder:text-muted-foreground/35 col-start-1 row-start-1 w-full min-w-0 bg-transparent text-left outline-none [font:inherit]',
+            tone === 'expense' && 'text-expense',
+            tone === 'income' && 'text-income',
+          )}
+        />
+      </span>
     </div>
   )
 })
