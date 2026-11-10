@@ -37,13 +37,8 @@ test.describe('authentication', () => {
     await loginAs(page)
     await page.goto('/accounts')
     await expect(page.getByRole('heading', { name: 'Accounts', exact: true })).toBeVisible()
-    if (isMobile) {
-      await page.getByRole('button', { name: 'More' }).click()
-      await page.getByRole('button', { name: 'Log out' }).click()
-    } else {
-      await page.getByRole('button', { name: /Signed in as/ }).click()
-      await page.getByRole('menuitem', { name: 'Log out' }).click()
-    }
+    if (isMobile) await page.getByRole('button', { name: 'More' }).click()
+    await page.getByRole('button', { name: 'Log out' }).click()
     // Logging out lands on the public home page, not the sign-in form.
     await expect(page).toHaveURL(/\/$/)
     await expect(page.getByRole('heading', { name: /Every ngultrum/ })).toBeVisible()

@@ -1,15 +1,6 @@
-import { Link } from '@tanstack/react-router'
-import { ChevronDown, LifeBuoy, LogOut, Settings, ShieldCheck } from 'lucide-react'
+import { LogOut, ShieldCheck } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { initials, useAuth } from '@/lib/auth'
 import { avatarUrl } from '@/lib/queries/auth'
 import { uiStore } from '@/lib/ui-store'
@@ -38,57 +29,6 @@ export function RoleBadge({ user, className }: { user: User; className?: string 
     <Badge variant="outline" className={cn('border-saffron/50 text-accent-foreground gap-1', className)}>
       <ShieldCheck /> Admin
     </Badge>
-  )
-}
-
-/** The masthead's account menu: who is signed in, Settings, the admin console, Log out. */
-export function UserMenu() {
-  const { user, isAdmin } = useAuth()
-  if (!user) return null
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          className="hover:bg-ink-foreground/10 flex items-center gap-2 rounded-md py-1 pr-2 pl-1 transition-colors"
-          aria-label={`Signed in as ${user.name}`}
-        >
-          <Avatar user={user} className="size-8" />
-          <ChevronDown className="text-ink-muted size-4" />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" side="top" className="w-64">
-        <DropdownMenuLabel className="flex flex-col gap-0.5 py-2">
-          <span className="flex items-center gap-2">
-            <span className="truncate text-sm font-medium">{user.name}</span>
-            <RoleBadge user={user} />
-          </span>
-          <span className="text-muted-foreground truncate text-xs font-normal">{user.email}</span>
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link to="/settings">
-            <Settings /> Settings
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link to="/help">
-            <LifeBuoy /> Feedback & support
-          </Link>
-        </DropdownMenuItem>
-        {isAdmin && (
-          <DropdownMenuItem asChild>
-            <Link to="/admin">
-              <ShieldCheck /> Admin console
-            </Link>
-          </DropdownMenuItem>
-        )}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={() => uiStore.requestLogout()}>
-          <LogOut /> Log out
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
   )
 }
 

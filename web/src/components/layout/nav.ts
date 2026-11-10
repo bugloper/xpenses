@@ -38,7 +38,7 @@ export const SETUP_NAV: NavItem[] = [
 export const ACCOUNT_NAV: NavItem[] = [
   { to: '/settings', label: 'Settings', icon: Settings },
   { to: '/help', label: 'Feedback & support', icon: LifeBuoy },
-  { to: '/admin', label: 'Admin', icon: ShieldCheck, adminOnly: true },
+  { to: '/admin', label: 'Admin console', icon: ShieldCheck, adminOnly: true },
 ]
 
 /** The phone's tab bar shows the first three primary screens; the rest live under More. */

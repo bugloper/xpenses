@@ -1,7 +1,7 @@
 import { Link, Outlet, useRouterState } from '@tanstack/react-router'
-import { ArrowLeft, Moon, Plus, Sun } from 'lucide-react'
+import { ArrowLeft, LogOut, Moon, Plus, Sun } from 'lucide-react'
 import { LogoutDialog } from '@/components/auth/LogoutDialog'
-import { MoreSheetUser, UserMenu } from '@/components/auth/UserBadge'
+import { Avatar, MoreSheetUser, RoleBadge } from '@/components/auth/UserBadge'
 import { ResponsiveSheet } from '@/components/common/ResponsiveSheet'
 import { AddTransactionSheet } from '@/components/transactions/AddTransactionSheet'
 import { useAuth } from '@/lib/auth'
@@ -46,10 +46,12 @@ function ThemeButton() {
 /**
  * Desktop: the phone's ink tab bar turned on its side. The mark, the saffron
  * Record key, the screens with the same icons as the tabs (a saffron bar marks
- * the current one), and at the foot the currency, theme and account.
+ * the current one), then the account's own screens and Log out, and at the
+ * foot who is signed in, the currency and the theme.
  */
 function Sidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname })
+  const { user, isAdmin } = useAuth()
   const item = (it: NavItem) => {
     const Icon = it.icon
     const current = isActive(it, pathname)
@@ -98,14 +100,35 @@ function Sidebar() {
           Set up
         </div>
         {SETUP_NAV.map(item)}
-        <span className="flex-1" />
-        {ACCOUNT_NAV.filter((i) => i.to === '/help').map(item)}
+        <span className="min-h-5 flex-1" />
+        {visibleNav(ACCOUNT_NAV, isAdmin).map(item)}
+        <button
+          type="button"
+          onClick={() => uiStore.requestLogout()}
+          className="text-ink-muted hover:bg-ink-foreground/5 hover:text-ink-foreground flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium transition-colors"
+        >
+          <LogOut className="size-[1.125rem]" strokeWidth={1.75} />
+          Log out
+        </button>
       </nav>
-      <div className="border-ink-foreground/10 flex items-center gap-1.5 border-t px-3 py-3">
-        <UserMenu />
-        <span className="flex-1" />
-        <CurrencyMenu />
-        <ThemeButton />
+      <div className="border-ink-foreground/10 flex flex-col gap-3 border-t px-3 py-3">
+        {user && (
+          <div className="flex items-center gap-2.5">
+            <Avatar user={user} className="size-9" />
+            <div className="min-w-0 flex-1">
+              <p className="flex items-center gap-1.5">
+                <span className="truncate text-sm font-medium">{user.name}</span>
+                <RoleBadge user={user} className="text-saffron h-4 px-1 text-[0.625rem]" />
+              </p>
+              <p className="text-ink-muted truncate text-xs">{user.email}</p>
+            </div>
+          </div>
+        )}
+        <div className="flex items-center gap-1.5">
+          <CurrencyMenu />
+          <span className="flex-1" />
+          <ThemeButton />
+        </div>
       </div>
     </aside>
   )
@@ -211,7 +234,7 @@ function Tabbar() {
                   className="hover:bg-muted/60 flex items-center gap-3 px-1 py-3.5 text-[0.9375rem] font-medium"
                 >
                   <Icon className="text-muted-foreground size-[1.125rem]" />
-                  <span className="flex-1">{item.label === 'Admin' ? 'Admin console' : item.label}</span>
+                  <span className="flex-1">{item.label}</span>
                   {current && <span className="bg-saffron size-1.5 rounded-full" aria-hidden />}
                 </Link>
               </li>
