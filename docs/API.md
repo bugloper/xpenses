@@ -45,7 +45,7 @@ Status codes: 200 OK, 201 Created, 204 No Content, 400 bad_request, 404 not_foun
 | GET | /transactions/:id/attachment | the image bytes (`Cache-Control: private`) |
 | DELETE | /transactions/:id/attachment | → 204 |
 | POST | /transactions/:id/attachment/scan | OCRs the stored screenshot, saves what it says as `receipt` → the parsed scan (see /receipts/scan). 501 when the server has no Tesseract |
-| POST | /receipts/scan | multipart `file` → `{recognised, bank, amount, journal_no, from_account, to_account, payment_type, date, time}`; nothing stored. Templates: mBoB, mPay (`journal_no` carries the RRNO; accounts empty). 501 without Tesseract |
+| POST | /receipts/scan | multipart `file` → `{recognised, bank, amount, journal_no, from_account, to_account, payment_type, date, time}`; nothing stored. Templates: mBoB, mPay and DK Bank (for mPay and DK `journal_no` carries the RRNO; accounts empty); other Bhutanese banks are read by a general reader. 501 without Tesseract |
 | GET | /receipts/capabilities | `{ocr: boolean, banks: ["mBoB", "mPay"]}` |
 | GET | /budgets | `[{id,category_id,amount}]` monthly amount per expense category |
 | POST | /budgets | `{category_id, amount}` (409 if exists) |

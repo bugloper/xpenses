@@ -76,9 +76,9 @@ export function useScanAttachment() {
   })
 }
 
-/** What the app calls its reference: mBoB prints a journal number, mPay an RRNO. */
+/** What the app calls its reference: mBoB prints a journal number, mPay and DK Bank an RRNO. */
 export function referenceLabel(bank: string): string {
-  if (bank === 'mPay') return 'RRNO'
+  if (bank === 'mPay' || bank === 'DK Bank') return 'RRNO'
   if (bank === 'mBoB') return 'Journal no.'
   return 'Reference'
 }

@@ -1,6 +1,6 @@
 // Package receipts turns the OCR text of a payment-app success screen into
-// the fields worth keeping on a transaction. One template per app (mBoB and
-// mPay), and a general reader for the other Bhutanese banks' apps; a screen
+// the fields worth keeping on a transaction. One template per app (mBoB, mPay
+// and DK Bank), and a general reader for the other Bhutanese banks' apps; a screen
 // that is not a bank payment yields a Receipt with Recognised=false.
 package receipts
 
@@ -29,6 +29,9 @@ type Receipt struct {
 func Parse(text string) Receipt {
 	norm := normalise(text)
 	switch {
+	// DK's screen also says "RRNO" and "Fund transfer": it goes first.
+	case isDK(norm):
+		return parseDK(norm)
 	case isMPay(norm):
 		return parseMPay(norm)
 	// Another bank's name beats mBoB's broad "fund transfer" signal.
@@ -162,6 +165,45 @@ func parseMPay(text string) Receipt {
 	}
 	if m := reTime.FindStringSubmatch(text); m != nil {
 		r.Time = parseTime(fixDigits(m[1]))
+	}
+	return r
+}
+
+// ---- DK Bank -------------------------------------------------------------------
+
+var (
+	// DK Bank's success screen names the bank only in its logo. It is known by
+	// its "Fund transfer no(RRNO)" label with a "Beneficiary name" or its
+	// "Date and time" line. The amount stands under "Transfer successful" with
+	// "BTN" after it (which OCR often misreads), the RRNO sits on the line
+	// below its label, and the date is day/month/year with the time.
+	reDK         = regexp.MustCompile(`(?i)fund\s*transfer\s*no\.?\s*\(?\s*rr\s?no\b|beneficiary\s*name[\s\S]*date\s*and\s*time`)
+	reDKAmount   = regexp.MustCompile(`(?i)(?:transfer|payment)\s*successful\s*\n?\s*([0-9OoIl][0-9OoIl,]*\.[0-9OoIl]{2})`)
+	reDKRRNO     = regexp.MustCompile(`(?i)rr\s?no\)?\s*[:;]?\s*\n?\s*([0-9OoIl]{8,16})\b`)
+	reDKDateTime = regexp.MustCompile(`(?i)date\s*and\s*time\s*[:;]?\s*([0-9OoIl]{1,2})/([0-9OoIl]{1,2})/([0-9OoIl]{4})(?:\s+([0-9OoIl]{1,2}:[0-9OoIl]{2}(?::[0-9OoIl]{2})?))?`)
+)
+
+func isDK(text string) bool { return reDK.MatchString(text) }
+
+func parseDK(text string) Receipt {
+	r := Receipt{Recognised: true, Bank: "DK Bank"}
+	if m := reDKAmount.FindStringSubmatch(text); m != nil {
+		r.Amount = parseMinor(fixDigits(m[1]))
+	}
+	if m := reDKRRNO.FindStringSubmatch(text); m != nil {
+		r.JournalNo = fixDigits(m[1])
+	}
+	if m := rePurpose.FindStringSubmatch(text); m != nil {
+		r.PaymentType = strings.TrimSpace(m[1])
+	}
+	if m := reDKDateTime.FindStringSubmatch(text); m != nil {
+		d, err := time.Parse("2/1/2006", fixDigits(m[1])+"/"+fixDigits(m[2])+"/"+fixDigits(m[3]))
+		if err == nil {
+			r.Date = d.Format("2006-01-02")
+		}
+		if m[4] != "" {
+			r.Time = parseTime(fixDigits(m[4]))
+		}
 	}
 	return r
 }

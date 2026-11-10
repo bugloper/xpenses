@@ -124,3 +124,35 @@ func TestParseOtherBanks(t *testing.T) {
 		t.Errorf("shop receipt recognised: %+v", r)
 	}
 }
+
+// Tesseract's reading of a real DK Bank success screen ("BTN" came out as "an").
+const dkText = `Transfer successful
+2,500.00 an
+Fund transfer no(RRNO)
+614301669673
+Beneficiary name
+TENZIN PHUNTSHO
+Mobile number A SOR EOE
+Purpose Others
+Remarks
+Date and time 23/05/2026 01:55:35
+Save Share
+a
+`
+
+func TestParseDK(t *testing.T) {
+	want := Receipt{Recognised: true, Bank: "DK Bank", Amount: 250000, JournalNo: "614301669673",
+		PaymentType: "Others", Date: "2026-05-23", Time: "01:55:35"}
+	if got := Parse(dkText); got != want {
+		t.Fatalf("\n got %+v\nwant %+v", got, want)
+	}
+	// OCR slips: the RRNO on the label's line, look-alike digits, no time.
+	got := Parse("Transfer successful\nl,25O.5O BTN\nFund transfer no (RR NO): 6143O1669673\nBeneficiary name\nPEMA\nDate and time 3/1l/2026\n")
+	if got.Bank != "DK Bank" || got.Amount != 125050 || got.JournalNo != "614301669673" || got.Date != "2026-11-03" || got.Time != "" {
+		t.Fatalf("tolerant: %+v", got)
+	}
+	// mPay keeps its own template.
+	if r := Parse(mpayText); r.Bank != "mPay" {
+		t.Errorf("mPay screen read as %q", r.Bank)
+	}
+}

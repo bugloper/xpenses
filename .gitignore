@@ -31,3 +31,4 @@ web/.vite/
 # A real banking screenshot used only for local OCR checks; never committed.
 testdata/receipts/mbob_success.png
 testdata/receipts/mpay_success.png
+testdata/receipts/dk_success.png

@@ -97,6 +97,14 @@ func TestExtractRealMPayIfPresent(t *testing.T) {
 	expectMPay(t, r, text, r.JournalNo)
 }
 
+func TestExtractRealDKIfPresent(t *testing.T) {
+	text := extractReal(t, "../../testdata/receipts/dk_success.png")
+	r := receipts.Parse(text)
+	if r.Bank != "DK Bank" || r.Amount != 250000 || r.JournalNo != "614301669673" || r.Date != "2026-05-23" || r.Time != "01:55:35" {
+		t.Fatalf("DK screen read as %+v\ntext:\n%s", r, text)
+	}
+}
+
 func TestExtractUnavailable(t *testing.T) {
 	e := ocr.New("/definitely/not/tesseract")
 	if e.Available() {
