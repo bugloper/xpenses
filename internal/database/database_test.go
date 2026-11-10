@@ -40,3 +40,39 @@ func TestMigrateFreshDatabaseIsIdempotent(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestAccessUntilMovesToBhutanDate(t *testing.T) {
+	db, err := OpenTest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	users := []struct{ id, createdAt, accessUntil, want string }{
+		{"early", "2026-03-04T20:30:00Z", "2027-03-04", "2027-03-05"},    // 02:30 Bhutan on the 5th
+		{"daytime", "2026-03-04T05:00:00Z", "2027-03-04", "2027-03-04"},  // 11:00 Bhutan, already right
+		{"extended", "2026-03-04T20:30:00Z", "2028-01-31", "2028-01-31"}, // set by the administrator
+		{"leap", "2028-02-28T19:00:00Z", "2029-02-28", "2029-03-01"},     // Bhutan 29 Feb, as Go's AddDate
+	}
+	for _, u := range users {
+		if _, err := db.Exec(`INSERT INTO users (id, email, name, password_hash, created_at, updated_at, access_until)
+			VALUES (?, ?, 'U', 'x', ?, ?, ?)`, u.id, u.id+"@example.com", u.createdAt, u.createdAt, u.accessUntil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	fix, err := migrationFS.ReadFile("migrations/0009_access_until_bhutan.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(string(fix)); err != nil {
+		t.Fatal(err)
+	}
+	for _, u := range users {
+		var got string
+		if err := db.QueryRow(`SELECT access_until FROM users WHERE id = ?`, u.id).Scan(&got); err != nil {
+			t.Fatal(err)
+		}
+		if got != u.want {
+			t.Errorf("%s: access_until = %s, want %s", u.id, got, u.want)
+		}
+	}
+}
