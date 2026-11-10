@@ -16,28 +16,31 @@ const txCols = `t.user_id, t.id, t.type, t.amount, t.currency, t.account_id, a.n
 	t.category_id, COALESCE(c.name,''), COALESCE(c.icon,''), COALESCE(c.color,''),
 	t.description, t.payee, t.transaction_date, t.notes, t.origin, t.status, t.recurring_id,
 	t.client_id, t.created_at, t.updated_at, t.attachment_mime,
-	t.receipt_bank, t.receipt_reference, t.receipt_payment_type, t.receipt_date, t.receipt_time`
+	t.receipt_bank, t.receipt_reference, t.receipt_payment_type, t.receipt_date, t.receipt_time,
+	t.loan_id, COALESCE(l.counterparty,'')`
 
 const txFrom = ` FROM transactions t
 	JOIN accounts a ON a.id = t.account_id
 	LEFT JOIN accounts ta ON ta.id = t.transfer_account_id
-	LEFT JOIN categories c ON c.id = t.category_id`
+	LEFT JOIN categories c ON c.id = t.category_id
+	LEFT JOIN loans l ON l.id = t.loan_id`
 
 func scanTx(s interface{ Scan(...any) error }) (*models.Transaction, error) {
 	var t models.Transaction
-	var transferID, catID, recID, clientID sql.NullString
+	var transferID, catID, recID, clientID, loanID sql.NullString
 	var rc models.Receipt
 	if err := s.Scan(&t.UserID, &t.ID, &t.Type, &t.Amount, &t.Currency, &t.AccountID, &t.AccountName, &transferID, &t.TransferAccountName,
 		&catID, &t.CategoryName, &t.CategoryIcon, &t.CategoryColor,
 		&t.Description, &t.Payee, &t.TransactionDate, &t.Notes, &t.Origin, &t.Status, &recID,
 		&clientID, &t.CreatedAt, &t.UpdatedAt, &t.AttachmentMime,
-		&rc.Bank, &rc.Reference, &rc.PaymentType, &rc.Date, &rc.Time); err != nil {
+		&rc.Bank, &rc.Reference, &rc.PaymentType, &rc.Date, &rc.Time, &loanID, &t.LoanCounterparty); err != nil {
 		return nil, err
 	}
 	t.TransferAccountID = strPtr(transferID)
 	t.CategoryID = strPtr(catID)
 	t.RecurringID = strPtr(recID)
 	t.ClientID = strPtr(clientID)
+	t.LoanID = strPtr(loanID)
 	t.Tags = []string{}
 	t.HasAttachment = t.AttachmentMime != ""
 	if !rc.IsEmpty() {
@@ -79,9 +82,16 @@ func buildFilter(f dto.TransactionFilter) (string, []any) {
 		where = append(where, `(t.account_id = ? OR t.transfer_account_id = ?)`)
 		args = append(args, f.AccountID, f.AccountID)
 	}
-	if f.Type != "" {
+	if f.Type == "loan" {
+		// Every loan movement: lending, borrowing and both kinds of repayment.
+		where = append(where, `t.type IN ('loan_given','loan_received','loan_repayment','loan_repayment_received')`)
+	} else if f.Type != "" {
 		where = append(where, `t.type = ?`)
 		args = append(args, f.Type)
+	}
+	if f.LoanID != "" {
+		where = append(where, `t.loan_id = ?`)
+		args = append(args, f.LoanID)
 	}
 	if f.Status != "" {
 		where = append(where, `t.status = ?`)
@@ -192,22 +202,22 @@ func (TransactionRepo) Insert(ctx context.Context, db DBTX, t *models.Transactio
 	_, err := db.ExecContext(ctx, `INSERT INTO transactions
 		(user_id, id, type, amount, currency, account_id, transfer_account_id, category_id, description, payee,
 		 transaction_date, notes, origin, status, recurring_id, client_id, created_at, updated_at,
-		 receipt_bank, receipt_reference, receipt_payment_type, receipt_date, receipt_time)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		 receipt_bank, receipt_reference, receipt_payment_type, receipt_date, receipt_time, loan_id)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		t.UserID, t.ID, t.Type, t.Amount, t.Currency, t.AccountID, nullStr(t.TransferAccountID), nullStr(t.CategoryID),
 		t.Description, t.Payee, t.TransactionDate, t.Notes, t.Origin, t.Status, nullStr(t.RecurringID),
 		nullStr(t.ClientID), t.CreatedAt, t.UpdatedAt,
-		rcField(t.Receipt, 0), rcField(t.Receipt, 1), rcField(t.Receipt, 2), rcField(t.Receipt, 3), rcField(t.Receipt, 4))
+		rcField(t.Receipt, 0), rcField(t.Receipt, 1), rcField(t.Receipt, 2), rcField(t.Receipt, 3), rcField(t.Receipt, 4), nullStr(t.LoanID))
 	return err
 }
 
 func (TransactionRepo) Update(ctx context.Context, db DBTX, t *models.Transaction) error {
 	_, err := db.ExecContext(ctx, `UPDATE transactions SET type=?, amount=?, currency=?, account_id=?, transfer_account_id=?,
 		category_id=?, description=?, payee=?, transaction_date=?, notes=?, status=?, updated_at=?,
-		receipt_bank=?, receipt_reference=?, receipt_payment_type=?, receipt_date=?, receipt_time=? WHERE id=? AND user_id=?`,
+		receipt_bank=?, receipt_reference=?, receipt_payment_type=?, receipt_date=?, receipt_time=?, loan_id=? WHERE id=? AND user_id=?`,
 		t.Type, t.Amount, t.Currency, t.AccountID, nullStr(t.TransferAccountID), nullStr(t.CategoryID),
 		t.Description, t.Payee, t.TransactionDate, t.Notes, t.Status, t.UpdatedAt,
-		rcField(t.Receipt, 0), rcField(t.Receipt, 1), rcField(t.Receipt, 2), rcField(t.Receipt, 3), rcField(t.Receipt, 4), t.ID, t.UserID)
+		rcField(t.Receipt, 0), rcField(t.Receipt, 1), rcField(t.Receipt, 2), rcField(t.Receipt, 3), rcField(t.Receipt, 4), nullStr(t.LoanID), t.ID, t.UserID)
 	return err
 }
 

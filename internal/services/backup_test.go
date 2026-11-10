@@ -95,3 +95,30 @@ func TestBackupAndRestore(t *testing.T) {
 		t.Fatalf("users after restore: %d", n)
 	}
 }
+
+// A restore copies only the tables it lists: a table missing from the list
+// would keep the current instance's rows (pointing at users the backup
+// replaces) instead of the backup's.
+func TestRestoreCoversEveryTable(t *testing.T) {
+	db, err := database.OpenTest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	rows, err := db.Query(`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT IN ('schema_migrations', 'sqlite_sequence')`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	listed := map[string]bool{}
+	for _, n := range restoreTables {
+		listed[n] = true
+	}
+	for rows.Next() {
+		var name string
+		rows.Scan(&name)
+		if !listed[name] {
+			t.Errorf("table %s is not restored from backups", name)
+		}
+	}
+}

@@ -55,6 +55,17 @@ func (CategoryRepo) Get(ctx context.Context, db DBTX, userID, id string) (*model
 	return c, err
 }
 
+// FindByName returns the user's active category with this exact name and
+// type, nil when there is none.
+func (CategoryRepo) FindByName(ctx context.Context, db DBTX, userID, name, typ string) (*models.Category, error) {
+	c, err := scanCategory(db.QueryRowContext(ctx, `SELECT `+categoryCols+` FROM categories
+		WHERE user_id = ? AND name = ? AND type = ? AND is_active = 1 ORDER BY parent_id IS NULL LIMIT 1`, userID, name, typ))
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	return c, err
+}
+
 func (CategoryRepo) Insert(ctx context.Context, db DBTX, c *models.Category) error {
 	_, err := db.ExecContext(ctx, `INSERT INTO categories
 		(user_id, id, name, icon, color, type, parent_id, is_active, is_system, sort_order, created_at, updated_at)

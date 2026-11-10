@@ -1,36 +1,12 @@
 // Period presets, URL params and export URLs for the Reports screen.
-import { addMonths, endOfMonth, endOfWeek, startOfMonth, startOfWeek } from 'date-fns'
 import { toQuery } from '@/lib/api'
-import { isISODate, toISODate, type DateRange } from '@/lib/dates'
+import { PERIOD_PRESETS, isISODate, presetRange, type DateRange, type PeriodPreset } from '@/lib/dates'
 import type { CashFlowGranularity, ExportFormat, ExportReport, FlowType, ReportCategory } from '@/types/api'
 
-export type ReportPeriodPreset = 'month' | 'prev_month' | 'week' | 'last3' | 'custom'
-export const REPORT_PRESETS: { value: ReportPeriodPreset; label: string }[] = [
-  { value: 'week', label: 'This week' },
-  { value: 'month', label: 'This month' },
-  { value: 'prev_month', label: 'Previous month' },
-  { value: 'last3', label: 'Last 3 months' },
-]
-
-export function reportPresetRange(preset: ReportPeriodPreset, now = new Date()): DateRange {
-  switch (preset) {
-    case 'week':
-      return {
-        from: toISODate(startOfWeek(now, { weekStartsOn: 1 })),
-        to: toISODate(endOfWeek(now, { weekStartsOn: 1 })),
-      }
-    case 'prev_month': {
-      const prev = addMonths(now, -1)
-      return { from: toISODate(startOfMonth(prev)), to: toISODate(endOfMonth(prev)) }
-    }
-    case 'last3':
-      return { from: toISODate(startOfMonth(addMonths(now, -2))), to: toISODate(endOfMonth(now)) }
-    case 'month':
-    case 'custom':
-    default:
-      return { from: toISODate(startOfMonth(now)), to: toISODate(endOfMonth(now)) }
-  }
-}
+// Reports offer the same periods as the dashboard.
+export type ReportPeriodPreset = PeriodPreset
+export const REPORT_PRESETS = PERIOD_PRESETS
+export const reportPresetRange = presetRange
 
 export type ReportsSearch = {
   period?: ReportPeriodPreset
@@ -186,7 +162,7 @@ export function rollupCategories(rows: ReportCategory[]): CategoryRollup[] {
     g.count += r.count
     if (r.parent_id) g.children.push(r)
   }
-  const total = [...groups.values()].reduce((n, g) => n + g.amount, 0)
+  const total = [...groups.values()].filter((g) => g.amount > 0).reduce((n, g) => n + g.amount, 0)
   const out = [...groups.values()].map((g) => {
     const own = g.amount - g.children.reduce((n, c) => n + c.amount, 0)
     const children =
@@ -212,5 +188,20 @@ export function rollupCategories(rows: ReportCategory[]): CategoryRollup[] {
       },
     }
   })
-  return out.sort((a, b) => b.amount - a.amount)
+  // A main category whose refunds outweigh its spending has nothing to rank.
+  return out.filter((g) => g.amount > 0).sort((a, b) => b.amount - a.amount)
+}
+
+/**
+ * Refunds in the period beyond what was spent in their main categories (a
+ * negative amount, 0 when none): what the ranked categories leave out, so
+ * that ranked + this = the period's total.
+ */
+export function refundsBeyondSpending(rows: ReportCategory[]): number {
+  const net = new Map<string, number>()
+  for (const r of rows) {
+    const key = r.parent_id ?? r.category_id ?? 'none'
+    net.set(key, (net.get(key) ?? 0) + r.amount)
+  }
+  return [...net.values()].filter((v) => v < 0).reduce((n, v) => n + v, 0)
 }

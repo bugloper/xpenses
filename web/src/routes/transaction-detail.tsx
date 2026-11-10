@@ -13,9 +13,16 @@ import { errorMessage } from '@/lib/api'
 import { categoryPath } from '@/lib/categories'
 import { formatDateTime, formatShortDate, parseISODate } from '@/lib/dates'
 import { currencySymbol, formatMoney } from '@/lib/money'
-import { useCategories, useDeleteTransaction, useDuplicateTransaction, useTransaction } from '@/lib/queries'
+import {
+  useCategories,
+  useDeleteTransaction,
+  useDuplicateTransaction,
+  useLoan,
+  useTransaction,
+} from '@/lib/queries'
+import { TYPE_MEANING } from '@/components/transactions/TransactionForm'
 import { referenceLabel } from '@/lib/receipts'
-import { displayAmount, transactionTitle } from '@/lib/transactions'
+import { LOAN_LABELS, displayAmount, isLoanType, specialKind, transactionTitle } from '@/lib/transactions'
 import { uiStore } from '@/lib/ui-store'
 import { cn } from '@/lib/utils'
 import { appRoute } from './__root'
@@ -33,6 +40,27 @@ function Line({ label, children, mono }: { label: string; children: ReactNode; m
   )
 }
 
+/** The loan a transaction belongs to, with what is still owed on it now. */
+function LoanLink({ id, name }: { id: string; name?: string }) {
+  const { data: loan } = useLoan(id)
+  return (
+    <span className="flex flex-wrap items-baseline gap-x-2">
+      <Link
+        to="/loans/$id"
+        params={{ id }}
+        className="decoration-foreground/30 hover:decoration-foreground font-medium underline underline-offset-4"
+      >
+        {name || loan?.counterparty || 'Open the loan'}
+      </Link>
+      {loan && (
+        <span className="text-muted-foreground text-xs">
+          {loan.outstanding > 0 ? `${formatMoney(loan.outstanding, loan.currency)} still owed` : 'settled'}
+        </span>
+      )}
+    </span>
+  )
+}
+
 function longDate(iso: string) {
   const d = parseISODate(iso)
   return d ? format(d, 'EEEE, d MMMM yyyy') : iso
@@ -44,6 +72,7 @@ const TYPE_LABEL: Record<string, string> = {
   transfer: 'Transfer',
   refund: 'Refund',
   adjustment: 'Adjustment',
+  ...LOAN_LABELS,
 }
 
 function TransactionDetailPage() {
@@ -60,8 +89,10 @@ function TransactionDetailPage() {
     return <ErrorState error={error ?? new Error('Not found')} onRetry={() => void refetch()} />
 
   const isTransfer = tx.type === 'transfer'
+  const isLoan = isLoanType(tx.type)
   const amount = displayAmount(tx)
-  const tone = isTransfer || amount === 0 ? '' : amount > 0 ? 'text-income' : 'text-expense'
+  // Loan movements change balances but are neither income nor spending: no colour.
+  const tone = isTransfer || isLoan || amount === 0 ? '' : amount > 0 ? 'text-income' : 'text-expense'
   const sign = isTransfer ? '' : amount < 0 ? '−' : amount > 0 ? '+' : ''
   const [whole, fraction] = formatMoney(Math.abs(amount), tx.currency, { bare: true }).split('.')
   const path = categoryPath(allCategories, tx.category_id)
@@ -121,15 +152,12 @@ function TransactionDetailPage() {
               </span>
             </div>
             <div className="mt-4 flex items-center gap-3">
-              <CategoryIcon
-                icon={tx.category_icon}
-                color={tx.category_color}
-                kind={isTransfer ? 'transfer' : tx.type === 'adjustment' ? 'adjustment' : undefined}
-              />
+              <CategoryIcon icon={tx.category_icon} color={tx.category_color} kind={specialKind(tx.type)} />
               <h1 className="font-display min-w-0 text-[1.625rem] leading-tight font-medium break-words sm:text-[1.875rem]">
                 {transactionTitle(tx)}
               </h1>
             </div>
+            <p className="text-muted-foreground mt-2 text-sm">{TYPE_MEANING[tx.type]}</p>
             <p
               className={cn(
                 'figure mt-5 flex items-baseline leading-none',
@@ -163,6 +191,11 @@ function TransactionDetailPage() {
                 tx.category_name
               )}
             </Line>
+            {tx.loan_id && (
+              <Line label="Loan">
+                <LoanLink id={tx.loan_id} name={tx.loan_counterparty} />
+              </Line>
+            )}
             <Line label="Payee">{tx.payee}</Line>
             <Line label="Description">{tx.description}</Line>
             {tx.receipt?.reference && (

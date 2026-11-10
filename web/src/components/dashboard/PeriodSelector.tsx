@@ -1,13 +1,6 @@
 import { DateRangePicker } from '@/components/common/DateRangePicker'
-import { presetRange, rangeLabel, type DateRange, type PeriodPreset } from '@/lib/dates'
+import { PERIOD_PRESETS, presetRange, rangeLabel, type DateRange, type PeriodPreset } from '@/lib/dates'
 import { cn } from '@/lib/utils'
-
-const PRESETS: { value: PeriodPreset; label: string }[] = [
-  { value: 'today', label: 'Today' },
-  { value: 'week', label: 'This week' },
-  { value: 'month', label: 'This month' },
-  { value: 'prev_month', label: 'Previous month' },
-]
 
 const TAB =
   'h-8 shrink-0 rounded-[5px] px-3 text-[0.8125rem] font-medium whitespace-nowrap transition-colors sm:px-3.5'
@@ -15,7 +8,7 @@ const TAB_ON = 'bg-card text-foreground shadow-[0_1px_0_0_var(--border),0_1px_3p
 const TAB_OFF = 'text-muted-foreground hover:text-foreground'
 
 /**
- * The statement's period, as index tabs in a tray: four presets and a custom
+ * The period every screen reports on, as index tabs in a tray: the presets and a custom
  * range at the end. Scrolls sideways on a narrow phone rather than wrapping.
  */
 export function PeriodSelector({
@@ -30,7 +23,7 @@ export function PeriodSelector({
   return (
     <div className="no-scrollbar -mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
       <div role="group" aria-label="Period" className="bg-muted inline-flex gap-0.5 rounded-md border p-0.5">
-        {PRESETS.map((p) => (
+        {PERIOD_PRESETS.map((p) => (
           <button
             key={p.value}
             type="button"

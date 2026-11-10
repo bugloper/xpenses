@@ -153,3 +153,24 @@ describe('transactionTitle', () => {
     )
   })
 })
+
+describe('loans and refunds in the ledger', () => {
+  it('leaves loan movements out of the day totals and takes refunds off spending', () => {
+    const [day] = groupByDay([
+      tx({ type: 'expense', amount: 5000 }),
+      tx({ type: 'refund', amount: 1200 }),
+      tx({ type: 'loan_given', amount: 100000, loan_id: 'l' }),
+      tx({ type: 'loan_repayment_received', amount: 40000, loan_id: 'l' }),
+      tx({ type: 'income', amount: 300, loan_id: 'l' }),
+    ])
+    expect(day).toMatchObject({ income: 300, expense: 3800, net: -3500 })
+  })
+
+  it('names a loan movement by what happened and with whom', () => {
+    const t = (type: Transaction['type']) => transactionTitle(tx({ type, loan_counterparty: 'Pema' }))
+    expect(t('loan_given')).toBe('Lent to Pema')
+    expect(t('loan_received')).toBe('Borrowed from Pema')
+    expect(t('loan_repayment')).toBe('Repaid Pema')
+    expect(t('loan_repayment_received')).toBe('Repaid by Pema')
+  })
+})

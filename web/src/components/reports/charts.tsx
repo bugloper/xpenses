@@ -208,3 +208,73 @@ export function SpendingBars({
     </div>
   )
 }
+
+export type BarSeries = { key: string; label: string; color: string }
+
+/**
+ * Side-by-side bars per month for any set of series (income alone; money set
+ * aside and taken out; money lent and repaid). One colour per series, the
+ * figures in the tooltip.
+ */
+export function SeriesBars({
+  rows,
+  series,
+  currency,
+  height = 240,
+}: {
+  rows: { period: string }[]
+  series: BarSeries[]
+  currency: string
+  height?: number
+}) {
+  return (
+    <div className="w-full" style={{ height }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={rows} margin={MARGIN} barGap={1} barCategoryGap="22%">
+          <CartesianGrid vertical={false} stroke={SERIES.grid} />
+          <XAxis
+            dataKey="period"
+            tickFormatter={formatPeriodTick}
+            tickLine={false}
+            axisLine={{ stroke: SERIES.axis }}
+            tick={TICK}
+            tickMargin={6}
+            interval="preserveStartEnd"
+            minTickGap={8}
+          />
+          <YAxis tickFormatter={compact} tickLine={false} axisLine={false} width={40} tick={TICK} />
+          <Tooltip
+            cursor={{ fill: SERIES.cursor, opacity: 0.6 }}
+            content={(p: TipProps) => {
+              if (!p.active || !p.payload?.length) return null
+              const r = p.payload[0]?.payload as ({ period: string } & Record<string, unknown>) | undefined
+              if (!r) return null
+              return (
+                <Slip
+                  title={periodLong(r.period)}
+                  currency={currency}
+                  rows={series.map((s) => ({
+                    key: s.key,
+                    label: s.label,
+                    value: Number(r[s.key]),
+                    color: s.color,
+                  }))}
+                />
+              )
+            }}
+          />
+          {series.map((s) => (
+            <Bar
+              key={s.key}
+              dataKey={s.key}
+              name={s.label}
+              fill={s.color}
+              radius={[2, 2, 0, 0]}
+              maxBarSize={22}
+            />
+          ))}
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}

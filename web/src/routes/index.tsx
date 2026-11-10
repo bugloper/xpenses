@@ -30,6 +30,8 @@ import {
   useReportSummary,
 } from '@/lib/queries'
 import { groupByDay } from '@/lib/transactions'
+import { Insights } from '@/components/dashboard/Insights'
+import { Position } from '@/components/dashboard/Position'
 import { appRoute } from './__root'
 
 // Recharts is the heaviest dependency: load it only when the dashboard renders.
@@ -51,7 +53,7 @@ function HeaderLink({ to, children }: { to: string; children: string }) {
 }
 
 const searchSchema = z.object({
-  period: z.enum(['today', 'week', 'month', 'prev_month', 'custom']).optional().catch(undefined),
+  period: z.enum(['today', 'week', 'month', 'prev_month', 'year', 'custom']).optional().catch(undefined),
   from: z.string().optional().catch(undefined),
   to: z.string().optional().catch(undefined),
 })
@@ -70,11 +72,11 @@ function DashboardPage() {
   const summary = useReportSummary(range.from, range.to)
   const trend = trendRange(range)
   const granularity = granularityFor(range)
-  const cashFlow = useReportCashFlow(
-    granularity === 'day' ? range.from : trend.from,
-    granularity === 'day' ? range.to : trend.to,
-    granularity === 'day' ? 'day' : 'month',
-  )
+  // A month or less: by day. A year: its own months. Anything between: the
+  // six months to its end, for a trend.
+  const wide = rangeDays(range) > 180
+  const chartRange = granularity === 'day' || wide ? range : trend
+  const cashFlow = useReportCashFlow(chartRange.from, chartRange.to, granularity === 'day' ? 'day' : 'month')
   const categories = useReportCategories(range.from, range.to, 'expense')
   const month = rangeMonth(range)
   const budgets = useReportBudgets(month)
@@ -117,18 +119,29 @@ function DashboardPage() {
         range={range}
       />
 
+      <Insights summary={summary.data} range={range} currency={currency} />
+      <Position currency={currency} />
+
       <div className="grid gap-6 md:grid-cols-2">
         <Panel
           className="md:col-span-2"
-          eyebrow={running ? 'Running totals' : granularity === 'day' ? 'By day' : 'Last six months'}
+          eyebrow={
+            running
+              ? 'Running totals'
+              : granularity === 'day'
+                ? 'By day'
+                : wide
+                  ? 'By month'
+                  : 'Last six months'
+          }
           title={running ? 'Cash flow this period' : granularity === 'day' ? 'Cash flow' : 'Monthly trend'}
           action={
             <div className="eyebrow hidden items-center gap-4 sm:flex" aria-hidden>
               <span className="flex items-center gap-1.5">
-                <span className="bg-income h-0.5 w-3" /> Money in
+                <span className="bg-income h-0.5 w-3" /> Income
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="bg-expense h-0.5 w-3" /> Money out
+                <span className="bg-expense h-0.5 w-3" /> Spending
               </span>
             </div>
           }

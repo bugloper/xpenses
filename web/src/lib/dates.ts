@@ -4,11 +4,13 @@ import {
   addMonths,
   endOfMonth,
   endOfWeek,
+  endOfYear,
   format,
   isValid,
   parseISO,
   startOfMonth,
   startOfWeek,
+  startOfYear,
   subDays,
 } from 'date-fns'
 
@@ -60,7 +62,16 @@ export function currentMonth(): string {
   return format(new Date(), 'yyyy-MM')
 }
 
-export type PeriodPreset = 'today' | 'week' | 'month' | 'prev_month' | 'custom'
+export type PeriodPreset = 'today' | 'week' | 'month' | 'prev_month' | 'year' | 'custom'
+
+/** The periods every screen offers, in order (custom comes last, as a picker). */
+export const PERIOD_PRESETS: { value: Exclude<PeriodPreset, 'custom'>; label: string }[] = [
+  { value: 'today', label: 'Today' },
+  { value: 'week', label: 'This week' },
+  { value: 'month', label: 'This month' },
+  { value: 'prev_month', label: 'Previous month' },
+  { value: 'year', label: 'This year' },
+]
 export type DateRange = { from: string; to: string }
 
 export function presetRange(preset: PeriodPreset, now = new Date()): DateRange {
@@ -76,6 +87,8 @@ export function presetRange(preset: PeriodPreset, now = new Date()): DateRange {
       const prev = addMonths(now, -1)
       return { from: toISODate(startOfMonth(prev)), to: toISODate(endOfMonth(prev)) }
     }
+    case 'year':
+      return { from: toISODate(startOfYear(now)), to: toISODate(endOfYear(now)) }
     case 'month':
     case 'custom':
     default:
@@ -118,6 +131,12 @@ export function trendRange(range: DateRange): DateRange {
   const t = parseISODate(range.to) ?? new Date()
   const start = startOfMonth(addMonths(t, -5))
   return { from: toISODate(start), to: toISODate(endOfMonth(t)) }
+}
+
+/** The twelve months to the end of the range's month, for year-long trends. */
+export function twelveMonthsTo(range: DateRange): DateRange {
+  const t = parseISODate(range.to) ?? new Date()
+  return { from: toISODate(startOfMonth(addMonths(t, -11))), to: toISODate(endOfMonth(t)) }
 }
 
 export function formatPeriodTick(period: string): string {

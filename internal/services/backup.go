@@ -145,8 +145,8 @@ func IsEncrypted(data []byte) bool {
 // admin who triggered it must sign in again afterwards.
 var restoreTables = []string{
 	"users", "sessions", "login_attempts", "invites", "app_settings",
-	"accounts", "categories", "recurring_transactions", "transactions", "tags", "transaction_tags",
-	"budgets", "settings",
+	"password_resets", "accounts", "categories", "recurring_transactions", "loans", "transactions", "tags",
+	"transaction_tags", "budgets", "settings", "savings_goals", "savings_goal_entries", "feedback", "testimonials",
 }
 
 // Restore replaces the contents of the live database with the uploaded

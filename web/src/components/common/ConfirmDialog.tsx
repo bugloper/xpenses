@@ -21,6 +21,7 @@ export function ConfirmDialog({
   destructive,
   onConfirm,
   loading,
+  hideConfirm,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -30,6 +31,8 @@ export function ConfirmDialog({
   destructive?: boolean
   onConfirm: () => void | Promise<void>
   loading?: boolean
+  /** Only explain (the action isn't possible): the dialog offers Close alone. */
+  hideConfirm?: boolean
 }) {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -39,20 +42,22 @@ export function ConfirmDialog({
           {description && <AlertDialogDescription>{description}</AlertDialogDescription>}
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={loading}>Cancel</AlertDialogCancel>
-          <AlertDialogAction
-            disabled={loading}
-            className={cn(
-              destructive && buttonVariants({ variant: 'destructive' }),
-              destructive && 'bg-destructive hover:bg-destructive/90 text-white',
-            )}
-            onClick={(e) => {
-              e.preventDefault()
-              void Promise.resolve(onConfirm()).then(() => onOpenChange(false))
-            }}
-          >
-            {confirmLabel}
-          </AlertDialogAction>
+          <AlertDialogCancel disabled={loading}>{hideConfirm ? 'Close' : 'Cancel'}</AlertDialogCancel>
+          {!hideConfirm && (
+            <AlertDialogAction
+              disabled={loading}
+              className={cn(
+                destructive && buttonVariants({ variant: 'destructive' }),
+                destructive && 'bg-destructive hover:bg-destructive/90 text-white',
+              )}
+              onClick={(e) => {
+                e.preventDefault()
+                void Promise.resolve(onConfirm()).then(() => onOpenChange(false))
+              }}
+            >
+              {confirmLabel}
+            </AlertDialogAction>
+          )}
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

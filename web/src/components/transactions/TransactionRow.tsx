@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { categoryPath } from '@/lib/categories'
 import { parseISODate } from '@/lib/dates'
 import { useAccounts, useCategories } from '@/lib/queries'
-import { displayAmount, transactionTitle, type ListRow } from '@/lib/transactions'
+import { displayAmount, isLoanType, specialKind, transactionTitle, type ListRow } from '@/lib/transactions'
 import { cn } from '@/lib/utils'
 import type { Transaction } from '@/types/api'
 
@@ -53,16 +53,20 @@ export function TransactionRow({
       : row.tx
   const amount = displayAmount(tx, perspectiveAccountId)
   const isTransfer = tx.type === 'transfer'
-  const neutral = isTransfer && !perspectiveAccountId
+  const isLoan = isLoanType(tx.type)
+  // Transfers and loan movements are neither income nor spending: no colour.
+  const neutral = (isTransfer && !perspectiveAccountId) || isLoan
   const pending = row.kind === 'pending'
   const isVoid = tx.status === 'void'
   const path = categoryPath(categories, tx.category_id)
 
   const categoryText = isTransfer
     ? 'Transfer'
-    : tx.type === 'adjustment'
-      ? 'Adjustment'
-      : (path?.category.name ?? tx.category_name ?? 'Uncategorised')
+    : isLoan
+      ? 'Loan'
+      : tx.type === 'adjustment'
+        ? 'Adjustment'
+        : (path?.category.name ?? tx.category_name ?? 'Uncategorised')
   const accountText = tx.account_name ?? ''
   const title = transactionTitle(tx)
   // What the payee line is about, when there's more than its name.
@@ -105,7 +109,7 @@ export function TransactionRow({
             icon={tx.category_icon}
             color={tx.category_color}
             size="sm"
-            kind={isTransfer ? 'transfer' : tx.type === 'adjustment' ? 'adjustment' : undefined}
+            kind={specialKind(tx.type)}
             className={cn(isVoid && 'opacity-50')}
           />
         )}
@@ -129,7 +133,7 @@ export function TransactionRow({
           minor={amount}
           currency={tx.currency}
           tone={neutral ? 'neutral' : 'auto'}
-          sign={neutral ? 'never' : 'always'}
+          sign={neutral && !isLoan ? 'never' : 'always'}
           className={cn('text-[0.9375rem] font-medium', isVoid && 'text-muted-foreground line-through')}
         />
       </span>

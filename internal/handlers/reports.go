@@ -22,6 +22,34 @@ func (h *ReportHandler) Register(g *echo.Group) {
 	g.GET("/reports/accounts", h.Accounts)
 	g.GET("/reports/budgets", h.Budgets)
 	g.GET("/reports/export", h.Export)
+	g.GET("/reports/loans", h.Loans)
+	g.GET("/reports/savings", h.Savings)
+}
+
+// Loans is money lent, borrowed and repaid by month (never income or expense).
+func (h *ReportHandler) Loans(c echo.Context) error {
+	p, err := period(c)
+	if err != nil {
+		return err
+	}
+	out, err := h.Svc.LoanActivity(c.Request().Context(), p)
+	if err != nil {
+		return err
+	}
+	return JSON(c, http.StatusOK, out)
+}
+
+// Savings is savings goal contributions and withdrawals by month.
+func (h *ReportHandler) Savings(c echo.Context) error {
+	p, err := period(c)
+	if err != nil {
+		return err
+	}
+	out, err := h.Svc.SavingsActivity(c.Request().Context(), p)
+	if err != nil {
+		return err
+	}
+	return JSON(c, http.StatusOK, out)
 }
 
 func period(c echo.Context) (reports.Period, error) {

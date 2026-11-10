@@ -59,11 +59,27 @@ export function AccountsTab({ range }: { range: DateRange }) {
                 </span>
                 <ChevronRight className="text-muted-foreground/50 size-4 shrink-0" />
               </span>
-              <dl className="grid grid-cols-2 gap-x-4 gap-y-2 pl-12 text-[0.8125rem] sm:grid-cols-4">
+              <dl
+                className={cn(
+                  'grid grid-cols-2 gap-x-4 gap-y-2 pl-12 text-[0.8125rem]',
+                  a.loans_in || a.loans_out ? 'sm:grid-cols-5' : 'sm:grid-cols-4',
+                )}
+              >
                 <Cell label="Opening" value={<Money minor={a.opening_balance} currency={a.currency} />} />
                 <Cell label="In" value={<Flow minor={a.income} currency={a.currency} tone="income" />} />
                 <Cell label="Out" value={<Flow minor={-a.expenses} currency={a.currency} tone="expense" />} />
                 <Cell label="Transfers" value={<Transfers a={a} start />} />
+                {(a.loans_in > 0 || a.loans_out > 0) && (
+                  <Cell
+                    label="Loans"
+                    value={
+                      <Transfers
+                        a={{ transfers_in: a.loans_in, transfers_out: a.loans_out, currency: a.currency }}
+                        start
+                      />
+                    }
+                  />
+                )}
               </dl>
             </Link>
           </li>
@@ -79,7 +95,10 @@ export function AccountsTab({ range }: { range: DateRange }) {
   )
 }
 
-/** Net transfers, with the two sides underneath when both happened. */
+/**
+ * Net transfers (or loan movements: lent, borrowed, repaid), with the two
+ * sides underneath when both happened. Neither is income or spending.
+ */
 function Transfers({
   a,
   start,

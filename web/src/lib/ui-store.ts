@@ -7,6 +7,8 @@ export type AddPreset = {
   account_id?: string
   transfer_account_id?: string
   category_id?: string
+  /** The loan to lend more on, borrow more on, or repay. */
+  loan_id?: string
   /** When set, the sheet edits this transaction instead of creating. */
   editId?: string
   /** Revise a failed offline item. */

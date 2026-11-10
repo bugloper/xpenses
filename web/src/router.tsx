@@ -12,6 +12,8 @@ import { settingsRoute } from './routes/settings'
 import { reportsRoute } from './routes/reports'
 import { adminRoute } from './routes/admin'
 import { helpRoute } from './routes/help'
+import { loanDetailRoute, loansRoute } from './routes/loans'
+import { savingsRoute } from './routes/savings'
 import {
   authLayoutRoute,
   expiredRoute,
@@ -31,6 +33,9 @@ const routeTree = rootRoute.addChildren([
     accountDetailRoute,
     categoriesRoute,
     budgetsRoute,
+    savingsRoute,
+    loansRoute,
+    loanDetailRoute,
     settingsRoute,
     reportsRoute,
     adminRoute,

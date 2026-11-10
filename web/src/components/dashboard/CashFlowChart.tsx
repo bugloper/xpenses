@@ -54,7 +54,7 @@ const LABEL = {
 }
 
 /**
- * Money in and out over time. `running` draws the period's running totals
+ * Income and spending over time (transfers and loans are neither). `running` draws the period's running totals
  * (a day's salary no longer dwarfs every other day) and stops at today;
  * otherwise each period is a pair of bars.
  */
@@ -86,7 +86,7 @@ export function CashFlowChart({
     )
 
   const formatter = (value: unknown, name: unknown) =>
-    [formatMoney(Number(value), currency), name === 'income' ? 'Money in' : 'Money out'] as [string, string]
+    [formatMoney(Number(value), currency), name === 'income' ? 'Income' : 'Spending'] as [string, string]
 
   if (running) {
     const now = today()

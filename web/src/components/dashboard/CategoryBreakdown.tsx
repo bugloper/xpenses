@@ -4,7 +4,7 @@ import { CategoryIcon } from '@/components/common/CategoryIcon'
 import { Money } from '@/components/common/Money'
 import { EmptyState, ErrorState } from '@/components/common/States'
 import { Skeleton } from '@/components/ui/skeleton'
-import { rollupCategories } from '@/lib/reports'
+import { refundsBeyondSpending, rollupCategories } from '@/lib/reports'
 import type { DateRange } from '@/lib/dates'
 import type { ReportCategory } from '@/types/api'
 
@@ -38,13 +38,16 @@ export function CategoryBreakdown({
       </div>
     )
   if (error && !data) return <ErrorState error={error} onRetry={onRetry} compact />
-  const rows = rollupCategories((data ?? []).filter((r) => r.amount > 0)).map((g) => g.row)
+  const rows = rollupCategories(data ?? []).map((g) => g.row)
   if (rows.length === 0) return <EmptyState title="No expenses in this period" className="py-10" />
-  const total = rows.reduce((n, r) => n + r.amount, 0)
+  const ranked = rows.reduce((n, r) => n + r.amount, 0)
+  // Refunds that outweigh their category's spending still come off the total.
+  const refunds = refundsBeyondSpending(data ?? [])
+  const total = ranked + refunds
   const top = rows.slice(0, SHOWN)
   const rest = rows.slice(SHOWN)
   const restAmount = rest.reduce((n, r) => n + r.amount, 0)
-  const share = (amount: number) => (total > 0 ? (amount * 100) / total : 0)
+  const share = (amount: number) => (ranked > 0 ? (amount * 100) / ranked : 0)
 
   return (
     <div>
@@ -89,7 +92,7 @@ export function CategoryBreakdown({
           <li>
             <Link
               to="/reports"
-              search={{ tab: 'categories', period: 'custom', from: range.from, to: range.to }}
+              search={{ tab: 'spending', period: 'custom', from: range.from, to: range.to }}
               className="hover:bg-muted/55 text-muted-foreground flex items-center gap-3 px-4 py-3 text-sm transition-colors sm:px-5"
             >
               <span className="w-4 shrink-0" aria-hidden />
@@ -103,6 +106,12 @@ export function CategoryBreakdown({
           </li>
         )}
       </ol>
+      {refunds < 0 && (
+        <div className="text-muted-foreground flex items-baseline justify-between gap-3 border-t px-4 py-2.5 text-sm sm:px-5">
+          <span>Refunds on categories with no spending this period</span>
+          <Money minor={refunds} currency={currency} className="text-sm" />
+        </div>
+      )}
       <div className="flex items-baseline justify-between gap-3 border-t px-4 py-3 sm:px-5">
         <span className="eyebrow">Total spent</span>
         <Money minor={total} currency={currency} className="figure text-lg" />

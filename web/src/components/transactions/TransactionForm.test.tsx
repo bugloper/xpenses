@@ -167,6 +167,51 @@ describe('toCreateRequest', () => {
     const t = { ...v, type: 'transfer' as const, transfer_account_id: 'acc-2' }
     expect(toCreateRequest(t, 'BTN')).toMatchObject({ category_id: null, transfer_account_id: 'acc-2' })
   })
+
+  it('lends to someone new, or repays a loan with interest kept apart', () => {
+    const lend = {
+      ...defaultValues({ account_id: 'acc-1', type: 'loan_given' }),
+      amount: '2000',
+      counterparty: ' Pema ',
+      category_id: 'cat-food',
+    }
+    expect(lend.loan_id).toBe('__new')
+    expect(toCreateRequest(lend, 'BTN')).toMatchObject({
+      type: 'loan_given',
+      amount: 200000,
+      category_id: null,
+      new_loan: { counterparty: 'Pema', due_date: null },
+    })
+    const repay = {
+      ...defaultValues({ account_id: 'acc-1', type: 'loan_repayment', loan_id: 'loan-1' }),
+      amount: '500',
+      interest: '25.50',
+    }
+    expect(toCreateRequest(repay, 'BTN')).toMatchObject({ loan_id: 'loan-1', interest: 2550, amount: 50000 })
+    expect(toCreateRequest(repay, 'BTN')).not.toHaveProperty('new_loan')
+  })
+
+  it('needs a name for a new loan and a loan for a repayment', () => {
+    const base = { ...defaultValues({ account_id: 'acc-1' }), amount: '10' }
+    const noName = transactionSchema.safeParse({ ...base, type: 'loan_received', loan_id: '__new' })
+    expect(noName.success).toBe(false)
+    expect(noName.error?.issues.map((i) => i.path[0])).toContain('counterparty')
+    const noLoan = transactionSchema.safeParse({
+      ...base,
+      type: 'loan_repayment_received',
+      loan_id: undefined,
+    })
+    expect(noLoan.error?.issues.map((i) => i.path[0])).toContain('loan_id')
+  })
+
+  it('files a refund under the expense category it refunds', () => {
+    const v = {
+      ...defaultValues({ account_id: 'acc-1', type: 'refund' }),
+      amount: '12',
+      category_id: 'cat-food',
+    }
+    expect(toCreateRequest(v, 'BTN')).toMatchObject({ type: 'refund', category_id: 'cat-food', amount: 1200 })
+  })
 })
 
 describe('TransactionForm', () => {
@@ -201,7 +246,7 @@ describe('TransactionForm', () => {
     expect(screen.getByRole('button', { name: 'Category' })).toHaveTextContent('Food')
     expect(screen.getByRole('button', { name: 'Category' })).toHaveTextContent('Food & Groceries')
     await user.click(screen.getByRole('combobox', { name: /Account/ }))
-    await user.click(await screen.findByRole('option', { name: 'BOB' }))
+    await user.click(await screen.findByRole('option', { name: /^BOB/ }))
     await user.click(screen.getByRole('button', { name: /^Save$/ }))
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1))
     const [values] = onSubmit.mock.calls[0] as [Parameters<typeof toCreateRequest>[0]]

@@ -1,9 +1,10 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Controller, useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod'
 import { CategoryField } from '@/components/categories/CategoryField'
 import { DateField } from '@/components/common/DateField'
+import { SaveToGoal } from '@/components/savings/SaveToGoal'
 import { Segmented } from '@/components/common/Segmented'
 import { Button } from '@/components/ui/button'
 import { Field, FieldError, FieldLabel } from '@/components/ui/field'
@@ -12,21 +13,36 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { today } from '@/lib/dates'
 import { getLastUsed, setLastUsed } from '@/lib/last-used'
 import { pushRecentCategory } from '@/lib/recent-categories'
-import { minorToDecimalString, parseAmount } from '@/lib/money'
+import { formatMoney, minorToDecimalString, parseAmount } from '@/lib/money'
 import { useAccounts, useCategories } from '@/lib/queries'
+import { NEW_LOAN, isLoanType } from '@/lib/transactions'
 import { cn } from '@/lib/utils'
-import type { CreateTransactionRequest, Transaction, TransactionType } from '@/types/api'
+import {
+  LOAN_TYPES,
+  TRANSACTION_TYPES,
+  type Account,
+  type CreateTransactionRequest,
+  type LoanTransactionType,
+  type Transaction,
+  type TransactionType,
+} from '@/types/api'
 import { AmountInput } from './AmountInput'
+import { LoanFields } from './LoanFields'
 
 export const transactionSchema = z
   .object({
-    type: z.enum(['expense', 'income', 'transfer', 'refund', 'adjustment']),
+    type: z.enum(TRANSACTION_TYPES as [TransactionType, ...TransactionType[]]),
     amount: z.string(),
     account_id: z.string().min(1, 'Select an account'),
     transfer_account_id: z.string().optional(),
     category_id: z.string().optional(),
     transaction_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Pick a date'),
     description: z.string().max(500, 'Too long').optional(),
+    /** The loan a loan movement belongs to, or NEW_LOAN to start one. */
+    loan_id: z.string().optional(),
+    counterparty: z.string().max(120, 'Too long').optional(),
+    due_date: z.string().optional(),
+    interest: z.string().optional(),
   })
   .superRefine((v, ctx) => {
     const minor = parseAmount(v.amount)
@@ -52,6 +68,21 @@ export const transactionSchema = z
         })
       }
     }
+    if (isLoanType(v.type)) {
+      if (v.loan_id === NEW_LOAN && (v.type === 'loan_given' || v.type === 'loan_received')) {
+        if (!v.counterparty?.trim())
+          ctx.addIssue({ code: 'custom', path: ['counterparty'], message: 'Enter a name' })
+        if (v.due_date && v.due_date < v.transaction_date)
+          ctx.addIssue({ code: 'custom', path: ['due_date'], message: 'Must not be before the loan' })
+      } else if (!v.loan_id || v.loan_id === NEW_LOAN) {
+        ctx.addIssue({ code: 'custom', path: ['loan_id'], message: 'Pick the loan' })
+      }
+      if (v.interest && v.interest.trim() !== '') {
+        const i = parseAmount(v.interest)
+        if (i === null || i < 0)
+          ctx.addIssue({ code: 'custom', path: ['interest'], message: 'Enter a valid amount' })
+      }
+    }
   })
 
 export type TransactionFormValues = z.infer<typeof transactionSchema>
@@ -61,7 +92,7 @@ export function toCreateRequest(v: TransactionFormValues, currency: string): Cre
   const amount = parseAmount(v.amount) ?? 0
   const isTransfer = v.type === 'transfer'
   const hasCategory = v.type === 'expense' || v.type === 'income' || v.type === 'refund'
-  return {
+  const req: CreateTransactionRequest = {
     type: v.type,
     amount,
     currency,
@@ -72,6 +103,17 @@ export function toCreateRequest(v: TransactionFormValues, currency: string): Cre
     transaction_date: v.transaction_date,
     status: 'cleared',
   }
+  if (isLoanType(v.type)) {
+    if (v.loan_id === NEW_LOAN) {
+      req.new_loan = { counterparty: v.counterparty?.trim() ?? '', due_date: v.due_date || null }
+    } else {
+      req.loan_id = v.loan_id ?? null
+    }
+    const interest = v.interest ? parseAmount(v.interest) : null
+    if (interest && (v.type === 'loan_repayment' || v.type === 'loan_repayment_received'))
+      req.interest = interest
+  }
+  return req
 }
 
 export function fromTransaction(tx: Transaction): TransactionFormValues {
@@ -83,6 +125,7 @@ export function fromTransaction(tx: Transaction): TransactionFormValues {
     category_id: tx.category_id ?? undefined,
     transaction_date: tx.transaction_date,
     description: tx.description,
+    loan_id: tx.loan_id ?? undefined,
   }
 }
 
@@ -112,6 +155,7 @@ export function defaultValues(preset: Partial<TransactionFormValues> = {}): Tran
     category_id: given.category_id ?? last.category_id ?? undefined,
     transaction_date: today(),
     description: '',
+    loan_id: isLoanType(type) && (type === 'loan_given' || type === 'loan_received') ? NEW_LOAN : undefined,
     ...given,
   }
 }
@@ -129,10 +173,55 @@ type Props = {
   allowAddAnother?: boolean
 }
 
-const TYPE_OPTIONS: { value: TransactionType; label: string; tone?: 'income' | 'expense' }[] = [
+/** The loan movement picked last, so Loan reopens on it. */
+let lastLoanType: LoanTransactionType | null = null
+function getLastLoanType() {
+  return lastLoanType
+}
+
+/** The form's first choice. Refunds sit under Money in, loan movements under Loan. */
+type Kind = 'expense' | 'income' | 'transfer' | 'loan'
+const KIND_OPTIONS: { value: Kind; label: string; tone?: 'income' | 'expense' }[] = [
   { value: 'expense', label: 'Expense', tone: 'expense' },
   { value: 'income', label: 'Income', tone: 'income' },
   { value: 'transfer', label: 'Transfer' },
+  { value: 'loan', label: 'Loan' },
+]
+function kindOf(type: TransactionType): Kind | null {
+  if (isLoanType(type)) return 'loan'
+  if (type === 'refund') return 'income'
+  if (type === 'expense' || type === 'income' || type === 'transfer') return type
+  return null
+}
+const LOAN_OPTIONS = LOAN_TYPES.map((value) => ({
+  value,
+  label: {
+    loan_given: 'Lend',
+    loan_received: 'Borrow',
+    loan_repayment: 'Repay',
+    loan_repayment_received: 'Get repaid',
+  }[value],
+}))
+/** What each kind of entry means for the user's money, said before they save it. */
+export const TYPE_MEANING: Record<TransactionType | 'save', string> = {
+  expense: 'Money you spent. Counts as spending.',
+  income: 'Money you earned. Counts as income.',
+  refund: 'Money back on something you bought. Comes off spending in its category.',
+  transfer: 'Money moved between your own accounts. Neither income nor spending.',
+  save: 'Money set aside for a savings goal. Never spending.',
+  adjustment: 'Corrects a balance to match the bank. Neither income nor spending.',
+  loan_given: 'Money you lend. It is owed back to you, so it is not spending.',
+  loan_received: 'Money you borrow. You owe it back, so it is not income.',
+  loan_repayment: 'Paying back what you borrowed. Not spending; any interest is.',
+  loan_repayment_received: 'Money paid back to you. Not income; any interest is.',
+}
+const TRANSFER_OPTIONS: { value: 'accounts' | 'goal'; label: string }[] = [
+  { value: 'accounts', label: 'Between accounts' },
+  { value: 'goal', label: 'Toward a goal' },
+]
+const INCOME_OPTIONS: { value: 'income' | 'refund'; label: string }[] = [
+  { value: 'income', label: 'Earned' },
+  { value: 'refund', label: 'Refund' },
 ]
 
 export function TransactionForm({
@@ -157,6 +246,8 @@ export function TransactionForm({
   const accountId = useWatch({ control, name: 'account_id' })
   const categoryId = useWatch({ control, name: 'category_id' })
   const amountRef = useRef<HTMLInputElement>(null)
+  // Transfer › Toward a goal: the sheet becomes the save-to-goal form.
+  const [saving, setSaving] = useState(false)
 
   const { data: accounts = [] } = useAccounts()
   const { data: categories = [] } = useCategories()
@@ -182,10 +273,14 @@ export function TransactionForm({
     if (last.account_id) setValue('account_id', last.account_id)
     setValue('category_id', last.category_id ?? undefined)
     if (last.transfer_account_id) setValue('transfer_account_id', last.transfer_account_id)
+    // Lending and borrowing start a new loan unless one is picked; a
+    // repayment has to name its loan.
+    setValue('loan_id', type === 'loan_given' || type === 'loan_received' ? NEW_LOAN : undefined)
   }, [type, mode, setValue])
 
+  // A refund gives back money spent, so it takes the expense category it refunds.
   const categoryType =
-    type === 'expense' ? 'expense' : type === 'income' || type === 'refund' ? 'income' : null
+    type === 'expense' || type === 'refund' ? 'expense' : type === 'income' ? 'income' : null
   // Clear a category that doesn't match the new type.
   useEffect(() => {
     if (
@@ -214,9 +309,13 @@ export function TransactionForm({
   }, [mode, activeAccounts, accountId, type, setValue, formState.isSubmitted])
 
   const tone = type === 'expense' ? 'expense' : type === 'income' || type === 'refund' ? 'income' : 'neutral'
+  const kind = kindOf(type)
+  const loanType = isLoanType(type) ? type : null
+  const moneyIn = type === 'loan_received' || type === 'loan_repayment_received'
 
   const submit = (addAnother: boolean) =>
     handleSubmit(async (values) => {
+      if (isLoanType(values.type)) lastLoanType = values.type
       setLastUsed(values.type, {
         account_id: values.account_id,
         category_id: values.category_id,
@@ -237,22 +336,13 @@ export function TransactionForm({
     })
 
   const err = formState.errors
-
-  return (
-    <form
-      id={formId}
-      className="flex flex-col gap-5"
-      onSubmit={(e) => {
-        e.preventDefault()
-        void submit(false)()
-      }}
-      noValidate
-    >
+  const typeSelector = (
+    <>
       <Controller
         control={control}
         name="type"
         render={({ field }) =>
-          field.value === 'refund' || field.value === 'adjustment' ? (
+          kind === null ? (
             <Field>
               <FieldLabel>Type</FieldLabel>
               <Select value={field.value} onValueChange={field.onChange}>
@@ -269,18 +359,77 @@ export function TransactionForm({
               </Select>
             </Field>
           ) : (
-            <Segmented
-              aria-label="Transaction type"
-              value={field.value}
-              onChange={field.onChange}
-              options={TYPE_OPTIONS}
-              size="lg"
-              className="w-full sm:w-full"
-            />
+            <div className="flex flex-col gap-2">
+              <Segmented
+                aria-label="Transaction type"
+                value={kind}
+                onChange={(k) => {
+                  if (k !== 'transfer') setSaving(false)
+                  field.onChange(k === 'loan' ? (getLastLoanType() ?? 'loan_given') : (k as TransactionType))
+                }}
+                options={KIND_OPTIONS}
+                size="lg"
+                className="w-full sm:w-full"
+              />
+              {loanType && (
+                <Segmented
+                  aria-label="Kind of loan"
+                  value={loanType}
+                  onChange={(t: LoanTransactionType) => field.onChange(t)}
+                  options={LOAN_OPTIONS}
+                  size="md"
+                  className="w-full sm:w-full"
+                />
+              )}
+              {type === 'transfer' && mode === 'create' && (
+                <Segmented
+                  aria-label="Kind of transfer"
+                  value={saving ? 'goal' : 'accounts'}
+                  onChange={(v) => setSaving(v === 'goal')}
+                  options={TRANSFER_OPTIONS}
+                  size="md"
+                  className="w-full sm:w-full"
+                />
+              )}
+              {(type === 'income' || type === 'refund') && (
+                <Segmented
+                  aria-label="Kind of income"
+                  value={type}
+                  onChange={(t) => field.onChange(t)}
+                  options={INCOME_OPTIONS}
+                  size="md"
+                  className="w-full sm:w-full"
+                />
+              )}
+              <p className="text-muted-foreground px-0.5 text-[0.8125rem]" aria-live="polite">
+                {TYPE_MEANING[saving && type === 'transfer' ? 'save' : type]}
+              </p>
+            </div>
           )
         }
       />
+    </>
+  )
 
+  if (saving && type === 'transfer')
+    return (
+      <div className="flex flex-col gap-5">
+        {typeSelector}
+        <SaveToGoal currency={currency} onDone={onCancel} />
+      </div>
+    )
+
+  return (
+    <form
+      id={formId}
+      className="flex flex-col gap-5"
+      onSubmit={(e) => {
+        e.preventDefault()
+        void submit(false)()
+      }}
+      noValidate
+    >
+      {typeSelector}
       <Controller
         control={control}
         name="amount"
@@ -311,7 +460,9 @@ export function TransactionForm({
           name="category_id"
           render={({ field }) => (
             <Field data-invalid={!!err.category_id}>
-              <FieldLabel htmlFor={`${formId}-category`}>Category</FieldLabel>
+              <FieldLabel htmlFor={`${formId}-category`}>
+                {type === 'refund' ? 'What was refunded' : 'Category'}
+              </FieldLabel>
               <CategoryField
                 id={`${formId}-category`}
                 categories={categories}
@@ -326,6 +477,17 @@ export function TransactionForm({
         />
       )}
 
+      {loanType && (
+        <LoanFields
+          control={control}
+          type={loanType}
+          errors={err}
+          mode={mode}
+          formId={formId}
+          currency={currency}
+        />
+      )}
+
       <div className={cn('grid gap-5', type === 'transfer' && 'sm:grid-cols-2 sm:gap-4')}>
         <Controller
           control={control}
@@ -333,7 +495,11 @@ export function TransactionForm({
           render={({ field }) => (
             <Field data-invalid={!!err.account_id}>
               <FieldLabel htmlFor={`${formId}-account`}>
-                {type === 'transfer' ? 'From account' : 'Account'}
+                {type === 'transfer' || (loanType && !moneyIn)
+                  ? 'From account'
+                  : loanType
+                    ? 'Into account'
+                    : 'Account'}
               </FieldLabel>
               <Select value={field.value || undefined} onValueChange={field.onChange}>
                 <SelectTrigger id={`${formId}-account`} className="w-full" aria-invalid={!!err.account_id}>
@@ -342,7 +508,7 @@ export function TransactionForm({
                 <SelectContent>
                   {activeAccounts.map((a) => (
                     <SelectItem key={a.id} value={a.id}>
-                      {a.name}
+                      <AccountOption account={a} />
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -371,7 +537,7 @@ export function TransactionForm({
                       .filter((a) => a.id !== accountId)
                       .map((a) => (
                         <SelectItem key={a.id} value={a.id}>
-                          {a.name}
+                          <AccountOption account={a} />
                         </SelectItem>
                       ))}
                   </SelectContent>
@@ -425,6 +591,18 @@ export function TransactionForm({
         onSaveAnother={allowAddAnother ? () => void submit(true)() : undefined}
       />
     </form>
+  )
+}
+
+/** An account in a picker: its name, and what it holds now, so the choice is informed. */
+function AccountOption({ account }: { account: Account }) {
+  return (
+    <span className="flex w-full items-baseline justify-between gap-3">
+      <span className="truncate">{account.name}</span>
+      <span className="text-muted-foreground font-mono text-xs tabular-nums">
+        {formatMoney(account.current_balance, account.currency)}
+      </span>
+    </span>
   )
 }
 

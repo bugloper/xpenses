@@ -13,8 +13,9 @@ import (
 )
 
 // Service answers report queries over the ledger. Every report counts only
-// cleared transactions and never treats a transfer as income or expense.
-// "Income" is income + refund; "expenses" is expense only.
+// cleared transactions and never treats a transfer or a loan movement as
+// income or expense. "Income" is income only; "expenses" is expense less
+// refunds (see sumIncome / sumExpenses).
 //
 // Every query is scoped to auth.UserID(ctx). Joins onto categories/accounts
 // repeat the user predicate (c.user_id = t.user_id) rather than relying on
@@ -89,6 +90,10 @@ type AccountRow struct {
 	Expenses       int64  `json:"expenses"`
 	TransfersIn    int64  `json:"transfers_in"`
 	TransfersOut   int64  `json:"transfers_out"`
+	// LoansIn is money borrowed or repaid to the user; LoansOut money lent or
+	// paid back on what the user borrowed.
+	LoansIn  int64 `json:"loans_in"`
+	LoansOut int64 `json:"loans_out"`
 }
 
 type BudgetRow struct {
@@ -134,19 +139,30 @@ func ExpenseChangePct(cur, prev int64) *float64 {
 	return &v
 }
 
+// Money in and money out, as income and expense reports count them. Income is
+// only what was earned; a refund gives back money spent, so it reduces
+// expenses rather than adding to income. Transfers, loan movements
+// (lending, borrowing, repayments) and adjustments are neither: interest on
+// a loan is its own expense or income row and counts like any other.
+const (
+	sumIncome   = `COALESCE(SUM(CASE WHEN t.type = 'income' THEN t.amount ELSE 0 END), 0)`
+	sumExpenses = `COALESCE(SUM(CASE WHEN t.type = 'expense' THEN t.amount WHEN t.type = 'refund' THEN -t.amount ELSE 0 END), 0)`
+)
+
 // flowFilter is the SQL predicate for the given flow type.
 func flowFilter(typ string) string {
 	if typ == FlowIncome {
-		return `t.type IN ('income','refund')`
+		return `t.type = 'income'`
 	}
-	return `t.type = 'expense'`
+	return `t.type IN ('expense','refund')`
 }
+
+// flowAmount is a row's contribution to its flow: refunds count against expenses.
+const flowAmount = `CASE WHEN t.type = 'refund' THEN -t.amount ELSE t.amount END`
 
 func (s *Service) totals(ctx context.Context, p Period) (PeriodTotals, error) {
 	out := PeriodTotals{From: p.From, To: p.To}
-	err := s.db.QueryRowContext(ctx, `SELECT
-		COALESCE(SUM(CASE WHEN t.type IN ('income','refund') THEN t.amount ELSE 0 END), 0),
-		COALESCE(SUM(CASE WHEN t.type = 'expense' THEN t.amount ELSE 0 END), 0)
+	err := s.db.QueryRowContext(ctx, `SELECT `+sumIncome+`, `+sumExpenses+`
 		FROM transactions t WHERE t.user_id = ? AND t.status = 'cleared' AND t.transaction_date BETWEEN ? AND ?`,
 		auth.UserID(ctx), p.From, p.To).Scan(&out.Income, &out.Expenses)
 	out.Net = out.Income - out.Expenses
@@ -180,12 +196,18 @@ func (s *Service) Summary(ctx context.Context, p Period) (*Summary, error) {
 }
 
 func (s *Service) Categories(ctx context.Context, p Period, typ string) ([]CategoryRow, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT t.category_id, COALESCE(c.name, 'Uncategorised'),
-		COALESCE(c.icon, 'circle'), COALESCE(c.color, '#64748b'), c.parent_id, COALESCE(pc.name, ''), SUM(t.amount), COUNT(*)
+	// A refund counts against the expense category it refunds. Refunds
+	// recorded before that, under an income category, reduce spending as
+	// uncategorised. Every non-zero row is returned, so the rows add up to the
+	// period's expenses even when a category's refunds outweigh its spending
+	// (that row is negative; clients net it into its main category).
+	rows, err := s.db.QueryContext(ctx, `SELECT c.id, COALESCE(c.name, 'Uncategorised'),
+		COALESCE(c.icon, 'circle'), COALESCE(c.color, '#64748b'), c.parent_id, COALESCE(pc.name, ''), SUM(`+flowAmount+`), COUNT(*)
 		FROM transactions t LEFT JOIN categories c ON c.id = t.category_id AND c.user_id = t.user_id
+			AND NOT (t.type = 'refund' AND c.type <> 'expense')
 		LEFT JOIN categories pc ON pc.id = c.parent_id
 		WHERE t.user_id = ? AND t.status = 'cleared' AND `+flowFilter(typ)+` AND t.transaction_date BETWEEN ? AND ?
-		GROUP BY t.category_id ORDER BY SUM(t.amount) DESC, c.name`, auth.UserID(ctx), p.From, p.To)
+		GROUP BY c.id HAVING SUM(`+flowAmount+`) <> 0 ORDER BY SUM(`+flowAmount+`) DESC, c.name`, auth.UserID(ctx), p.From, p.To)
 	if err != nil {
 		return nil, apperr.Internal(err)
 	}
@@ -221,9 +243,7 @@ func (s *Service) Categories(ctx context.Context, p Period, typ string) ([]Categ
 // CashFlow aggregates per day in SQL and buckets in Go so week/month labels
 // are deterministic and every bucket in the range is present.
 func (s *Service) CashFlow(ctx context.Context, p Period, granularity string) ([]CashFlowRow, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT t.transaction_date,
-		COALESCE(SUM(CASE WHEN t.type IN ('income','refund') THEN t.amount ELSE 0 END), 0),
-		COALESCE(SUM(CASE WHEN t.type = 'expense' THEN t.amount ELSE 0 END), 0)
+	rows, err := s.db.QueryContext(ctx, `SELECT t.transaction_date, `+sumIncome+`, `+sumExpenses+`
 		FROM transactions t WHERE t.user_id = ? AND t.status = 'cleared' AND t.transaction_date BETWEEN ? AND ?
 		GROUP BY t.transaction_date`, auth.UserID(ctx), p.From, p.To)
 	if err != nil {
@@ -265,9 +285,9 @@ func (s *Service) CashFlow(ctx context.Context, p Period, granularity string) ([
 
 func (s *Service) Merchants(ctx context.Context, p Period, typ string) ([]MerchantRow, error) {
 	rows, err := s.db.QueryContext(ctx, `SELECT CASE WHEN TRIM(t.payee) = '' THEN '(no payee)' ELSE t.payee END AS payee,
-		SUM(t.amount), COUNT(*)
+		SUM(`+flowAmount+`), COUNT(*)
 		FROM transactions t WHERE t.user_id = ? AND t.status = 'cleared' AND `+flowFilter(typ)+` AND t.transaction_date BETWEEN ? AND ?
-		GROUP BY payee ORDER BY SUM(t.amount) DESC, payee LIMIT 50`, auth.UserID(ctx), p.From, p.To)
+		GROUP BY payee HAVING SUM(`+flowAmount+`) > 0 ORDER BY SUM(`+flowAmount+`) DESC, payee LIMIT 50`, auth.UserID(ctx), p.From, p.To)
 	if err != nil {
 		return nil, apperr.Internal(err)
 	}
@@ -288,7 +308,8 @@ func (s *Service) Merchants(ctx context.Context, p Period, typ string) ([]Mercha
 
 // Accounts reports period activity per active account. Here adjustments do
 // count (positive as income, negative as expenses) because the point of this
-// report is to explain the balance movement of each account.
+// report is to explain the balance movement of each account; refunds reduce
+// expenses, and money lent, borrowed and repaid shows as loans in and out.
 func (s *Service) Accounts(ctx context.Context, p Period) ([]AccountRow, error) {
 	uid := auth.UserID(ctx)
 	accts, err := s.accounts.List(ctx, s.db, uid, false)
@@ -303,9 +324,12 @@ func (s *Service) Accounts(ctx context.Context, p Period) ([]AccountRow, error) 
 			OpeningBalance: a.OpeningBalance, Balance: a.CurrentBalance}
 	}
 	rows, err := s.db.QueryContext(ctx, `SELECT t.account_id,
-		COALESCE(SUM(CASE WHEN t.type IN ('income','refund') OR (t.type = 'adjustment' AND t.amount > 0) THEN t.amount ELSE 0 END), 0),
-		COALESCE(SUM(CASE WHEN t.type = 'expense' THEN t.amount WHEN t.type = 'adjustment' AND t.amount < 0 THEN -t.amount ELSE 0 END), 0),
-		COALESCE(SUM(CASE WHEN t.type = 'transfer' THEN t.amount ELSE 0 END), 0)
+		COALESCE(SUM(CASE WHEN t.type = 'income' OR (t.type = 'adjustment' AND t.amount > 0) THEN t.amount ELSE 0 END), 0),
+		COALESCE(SUM(CASE WHEN t.type = 'expense' THEN t.amount WHEN t.type = 'refund' THEN -t.amount
+			WHEN t.type = 'adjustment' AND t.amount < 0 THEN -t.amount ELSE 0 END), 0),
+		COALESCE(SUM(CASE WHEN t.type = 'transfer' THEN t.amount ELSE 0 END), 0),
+		COALESCE(SUM(CASE WHEN t.type IN ('loan_received','loan_repayment_received') THEN t.amount ELSE 0 END), 0),
+		COALESCE(SUM(CASE WHEN t.type IN ('loan_given','loan_repayment') THEN t.amount ELSE 0 END), 0)
 		FROM transactions t WHERE t.user_id = ? AND t.status = 'cleared' AND t.transaction_date BETWEEN ? AND ?
 		GROUP BY t.account_id`, uid, p.From, p.To)
 	if err != nil {
@@ -314,12 +338,13 @@ func (s *Service) Accounts(ctx context.Context, p Period) ([]AccountRow, error) 
 	defer rows.Close()
 	for rows.Next() {
 		var id string
-		var income, expenses, transfersOut int64
-		if err := rows.Scan(&id, &income, &expenses, &transfersOut); err != nil {
+		var income, expenses, transfersOut, loansIn, loansOut int64
+		if err := rows.Scan(&id, &income, &expenses, &transfersOut, &loansIn, &loansOut); err != nil {
 			return nil, apperr.Internal(err)
 		}
 		if i, ok := idx[id]; ok {
 			out[i].Income, out[i].Expenses, out[i].TransfersOut = income, expenses, transfersOut
+			out[i].LoansIn, out[i].LoansOut = loansIn, loansOut
 		}
 	}
 	if err := rows.Err(); err != nil {
@@ -349,11 +374,12 @@ func (s *Service) Accounts(ctx context.Context, p Period) ([]AccountRow, error) 
 }
 
 // Budgets reports spend against every budget for the calendar month. Spend is
-// cleared expenses in the budget's category or its direct children.
+// cleared expenses in the budget's category or its direct children, less
+// refunds made to them.
 func (s *Service) Budgets(ctx context.Context, month Period) ([]BudgetRow, error) {
 	rows, err := s.db.QueryContext(ctx, `SELECT b.id, b.category_id, c.name, c.icon, c.color, b.amount,
-		COALESCE((SELECT SUM(t.amount) FROM transactions t
-			WHERE t.user_id = b.user_id AND t.status = 'cleared' AND t.type = 'expense' AND t.transaction_date BETWEEN ? AND ?
+		COALESCE((SELECT SUM(`+flowAmount+`) FROM transactions t
+			WHERE t.user_id = b.user_id AND t.status = 'cleared' AND t.type IN ('expense','refund') AND t.transaction_date BETWEEN ? AND ?
 			AND (t.category_id = b.category_id
 				OR t.category_id IN (SELECT ch.id FROM categories ch WHERE ch.user_id = b.user_id AND ch.parent_id = b.category_id))), 0)
 		FROM budgets b JOIN categories c ON c.id = b.category_id AND c.user_id = b.user_id

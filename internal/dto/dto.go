@@ -89,6 +89,19 @@ type CreateTransactionRequest struct {
 	ClientID *string `json:"client_id"`
 	// Receipt carries the details read from an attached payment screenshot.
 	Receipt *Receipt `json:"receipt"`
+	// LoanID is the loan a loan movement belongs to. Lending or borrowing may
+	// instead start a new loan with NewLoan.
+	LoanID  *string  `json:"loan_id"`
+	NewLoan *NewLoan `json:"new_loan"`
+	// Interest paid or received with a repayment, on top of Amount (which is
+	// principal only). It is recorded as its own expense or income.
+	Interest int64 `json:"interest"`
+}
+
+// NewLoan starts a loan from the transaction that lends or borrows its money.
+type NewLoan struct {
+	Counterparty string  `json:"counterparty"`
+	DueDate      *string `json:"due_date"`
 }
 
 type UpdateTransactionRequest struct {
@@ -110,6 +123,8 @@ type UpdateTransactionRequest struct {
 	// Receipt replaces the stored receipt details; ClearReceipt drops them.
 	Receipt      *Receipt `json:"receipt"`
 	ClearReceipt bool     `json:"clear_receipt"`
+	// LoanID moves a loan movement to another loan of the same direction.
+	LoanID *string `json:"loan_id"`
 }
 
 // TransactionFilter is the query model for GET /transactions.
@@ -122,6 +137,7 @@ type TransactionFilter struct {
 	CategoryID string
 	AccountID  string
 	Type       string
+	LoanID     string
 	Status     string
 	Origin     string
 	Unmatched  bool
@@ -174,3 +190,52 @@ type UpdateRecurringRequest struct {
 }
 
 type UpdateSettingsRequest map[string]string
+
+type CreateLoanRequest struct {
+	Direction     string  `json:"direction"`
+	Counterparty  string  `json:"counterparty"`
+	OpeningAmount int64   `json:"opening_amount"`
+	Currency      string  `json:"currency"`
+	StartDate     string  `json:"start_date"`
+	DueDate       *string `json:"due_date"`
+	Notes         string  `json:"notes"`
+}
+
+type UpdateLoanRequest struct {
+	Counterparty  *string `json:"counterparty"`
+	OpeningAmount *int64  `json:"opening_amount"`
+	StartDate     *string `json:"start_date"`
+	DueDate       *string `json:"due_date"`
+	ClearDueDate  bool    `json:"clear_due_date"`
+	Notes         *string `json:"notes"`
+}
+
+type CreateSavingsGoalRequest struct {
+	Name         string  `json:"name"`
+	TargetAmount int64   `json:"target_amount"`
+	TargetDate   *string `json:"target_date"`
+	AccountID    *string `json:"account_id"`
+	Notes        string  `json:"notes"`
+}
+
+type UpdateSavingsGoalRequest struct {
+	Name            *string `json:"name"`
+	TargetAmount    *int64  `json:"target_amount"`
+	TargetDate      *string `json:"target_date"`
+	ClearTargetDate bool    `json:"clear_target_date"`
+	AccountID       *string `json:"account_id"`
+	ClearAccount    bool    `json:"clear_account"`
+	Notes           *string `json:"notes"`
+}
+
+// SavingsGoalEntryRequest adds to a goal (positive amount) or takes from it
+// (negative). FromAccountID on a contribution, or ToAccountID on a
+// withdrawal, also moves the money by a transfer to or from the goal's
+// account.
+type SavingsGoalEntryRequest struct {
+	Amount        int64   `json:"amount"`
+	EntryDate     string  `json:"entry_date"`
+	Note          string  `json:"note"`
+	FromAccountID *string `json:"from_account_id"`
+	ToAccountID   *string `json:"to_account_id"`
+}

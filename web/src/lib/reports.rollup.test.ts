@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ReportCategory } from '@/types/api'
-import { rollupCategories } from './reports'
+import { refundsBeyondSpending, rollupCategories } from './reports'
 
 const row = (p: Partial<ReportCategory>): ReportCategory => ({
   category_id: 'x',
@@ -38,5 +38,32 @@ describe('rollupCategories', () => {
     expect(out[0]!.row.icon).toBe('utensils')
     expect(out[0]!.row.pct).toBe(59.3)
     expect(out[1]!.children.map((c) => c.name)).toEqual(['Rent'])
+  })
+})
+
+describe('refunds beyond spending', () => {
+  const row = (id: string, amount: number, parent: string | null = null) => ({
+    category_id: id,
+    name: id,
+    icon: 'circle',
+    color: '#000',
+    parent_id: parent,
+    parent_name: parent ?? '',
+    amount,
+    count: 1,
+    pct: 0,
+  })
+  it('nets refunds into the main category and sets aside what is left', () => {
+    const rows = [
+      row('rent', 1000),
+      row('groceries', -450, 'food'),
+      row('eating-out', 300, 'food'),
+      row('fuel', -200),
+    ]
+    const groups = rollupCategories(rows)
+    expect(groups.map((g) => [g.row.name, g.amount])).toEqual([['rent', 1000]])
+    expect(refundsBeyondSpending(rows)).toBe(-350)
+    // Ranked plus refunds is the period's spending.
+    expect(groups.reduce((n, g) => n + g.amount, 0) + refundsBeyondSpending(rows)).toBe(650)
   })
 })

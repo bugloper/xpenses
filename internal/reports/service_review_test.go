@@ -68,7 +68,7 @@ func TestBalanceInvariants(t *testing.T) {
 	var total int64
 	for _, r := range rows {
 		total += r.Balance
-		if delta := r.Income - r.Expenses + r.TransfersIn - r.TransfersOut; r.OpeningBalance+delta != r.Balance {
+		if delta := r.Income - r.Expenses + r.TransfersIn - r.TransfersOut + r.LoansIn - r.LoansOut; r.OpeningBalance+delta != r.Balance {
 			t.Errorf("%s: opening %d + activity %d != balance %d (%+v)", r.AccountID, r.OpeningBalance, delta, r.Balance, r)
 		}
 	}
@@ -80,8 +80,9 @@ func TestBalanceInvariants(t *testing.T) {
 	if total != 137200+10700+800 {
 		t.Fatalf("total want %d got %d", 137200+10700+800, total)
 	}
-	// Transfers and adjustments never reach the income/expense summary.
-	if sum.Income != 50000+500 || sum.Expenses != 2500+1200+50 {
+	// Transfers and adjustments never reach the income/expense summary; the
+	// 500 refund comes off expenses instead of counting as income.
+	if sum.Income != 50000 || sum.Expenses != 2500+1200+50-500 {
 		t.Fatalf("summary flows: income %d expenses %d", sum.Income, sum.Expenses)
 	}
 

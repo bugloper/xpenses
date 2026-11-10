@@ -42,7 +42,9 @@ export function BalanceHero({
   const balanceLabel = range.to < today() ? `Balance on ${formatShortDate(range.to)}` : 'Total balance'
   const income = summary?.income ?? 0
   const expenses = summary?.expenses ?? 0
-  const flow = income + expenses
+  // Refunds larger than the period's spending leave it below zero: the bar
+  // shows no spending then rather than a negative share.
+  const flow = income + Math.max(0, expenses)
   const inShare = flow > 0 ? Math.round((income * 100) / flow) : 0
   const previous = summary
     ? rangeLabel({ from: summary.previous.from, to: summary.previous.to })
@@ -86,10 +88,10 @@ export function BalanceHero({
         </div>
 
         <dl className="grid sm:grid-cols-3">
-          <Column label="Money in" busy={busy}>
+          <Column label="Income" busy={busy}>
             <Money minor={income} currency={currency} tone="income" sign="always" />
           </Column>
-          <Column label="Money out" busy={busy}>
+          <Column label="Spending" busy={busy}>
             <Money minor={-expenses} currency={currency} tone="expense" />
           </Column>
           <Column label="Net" busy={busy} total>
@@ -101,16 +103,15 @@ export function BalanceHero({
           <div
             className="bg-bar flex h-2 w-full gap-px overflow-hidden rounded-[2px]"
             role="img"
-            aria-label={
-              flow > 0
-                ? `${inShare}% of the money moved came in, ${100 - inShare}% went out`
-                : 'No money moved'
-            }
+            aria-label={flow > 0 ? `Income ${inShare}%, spending ${100 - inShare}%` : 'No money moved'}
           >
             {flow > 0 && (
               <>
                 <div className="bg-income h-full" style={{ width: `${(income * 100) / flow}%` }} />
-                <div className="bg-expense h-full" style={{ width: `${(expenses * 100) / flow}%` }} />
+                <div
+                  className="bg-expense h-full"
+                  style={{ width: `${(Math.max(0, expenses) * 100) / flow}%` }}
+                />
               </>
             )}
           </div>

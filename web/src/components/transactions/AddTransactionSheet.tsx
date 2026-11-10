@@ -1,3 +1,4 @@
+import { NEW_LOAN } from '@/lib/transactions'
 import { AttachmentField } from './AttachmentField'
 import { ReceiptCard } from './ReceiptCard'
 import { toReceipt, useReceiptScan } from '@/lib/receipts'
@@ -85,6 +86,7 @@ export function toUpdateRequest(v: TransactionFormValues, currency: string): Upd
     clear_category: !c.category_id,
     description: c.description,
     transaction_date: c.transaction_date,
+    ...(c.loan_id ? { loan_id: c.loan_id } : {}),
   }
 }
 
@@ -164,6 +166,10 @@ function SheetBody({ preset }: { preset: AddPreset | null }) {
         category_id: p.category_id ?? undefined,
         transaction_date: p.transaction_date,
         description: p.description ?? '',
+        loan_id: p.new_loan ? NEW_LOAN : (p.loan_id ?? undefined),
+        counterparty: p.new_loan?.counterparty,
+        due_date: p.new_loan?.due_date ?? undefined,
+        interest: p.interest ? minorToDecimalString(p.interest) : undefined,
       }
     }
     return defaultValues({
@@ -171,6 +177,7 @@ function SheetBody({ preset }: { preset: AddPreset | null }) {
       account_id: preset?.account_id,
       transfer_account_id: preset?.transfer_account_id,
       category_id: preset?.category_id,
+      loan_id: preset?.loan_id,
       ...(prefillAmount ? { amount: prefillAmount } : {}),
       ...(prefillDate ? { transaction_date: prefillDate } : {}),
     })

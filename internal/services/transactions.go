@@ -11,17 +11,20 @@ import (
 	apperr "github.com/bugloper/xpenses/internal/errors"
 	"github.com/bugloper/xpenses/internal/models"
 	"github.com/bugloper/xpenses/internal/ocr"
+	"github.com/bugloper/xpenses/internal/reports"
 	"github.com/bugloper/xpenses/internal/repositories"
 	"github.com/bugloper/xpenses/internal/validators"
 )
 
-var txTypes = []string{models.TxExpense, models.TxIncome, models.TxTransfer, models.TxRefund, models.TxAdjustment}
+var txTypes = []string{models.TxExpense, models.TxIncome, models.TxTransfer, models.TxRefund, models.TxAdjustment,
+	models.TxLoanGiven, models.TxLoanReceived, models.TxLoanRepayment, models.TxLoanRepaymentReceived}
 
 type TransactionService struct {
 	DB              *sql.DB
 	Repo            repositories.TransactionRepo
 	Accounts        repositories.AccountRepo
 	Categories      repositories.CategoryRepo
+	Loans           repositories.LoanRepo
 	DefaultCurrency string
 	// AttachmentsDir holds one image per transaction (see attachments.go).
 	AttachmentsDir string
@@ -42,7 +45,7 @@ func (s *TransactionService) List(ctx context.Context, f dto.TransactionFilter) 
 	v.Date("date_from", f.DateFrom)
 	v.Date("date_to", f.DateTo)
 	if f.Type != "" {
-		v.OneOf("type", f.Type, txTypes...)
+		v.OneOf("type", f.Type, append([]string{"loan"}, txTypes...)...)
 	}
 	if err := v.Err(); err != nil {
 		return nil, 0, err
@@ -117,8 +120,29 @@ func (s *TransactionService) validate(ctx context.Context, db repositories.DBTX,
 	case models.TxAdjustment:
 		t.TransferAccountID = nil
 		t.CategoryID = nil
+		t.LoanID = nil
+	case models.TxLoanGiven, models.TxLoanReceived, models.TxLoanRepayment, models.TxLoanRepaymentReceived:
+		// Lending, borrowing and repaying are not categorised: they are
+		// neither income nor expense.
+		t.TransferAccountID = nil
+		t.CategoryID = nil
+		if err := s.validateLoanMovement(ctx, db, t, v); err != nil {
+			return err
+		}
 	default:
 		t.TransferAccountID = nil
+		if t.Type == models.TxRefund {
+			t.LoanID = nil
+		} else if t.LoanID != nil {
+			// Interest on a loan is an expense or income that names the loan.
+			l, err := s.Loans.Get(ctx, db, t.UserID, *t.LoanID)
+			if err != nil {
+				return apperr.Internal(err)
+			}
+			if l == nil {
+				v.Add("loan_id", "loan not found")
+			}
+		}
 		if t.CategoryID != nil && *t.CategoryID != "" {
 			c, err := s.Categories.Get(ctx, db, t.UserID, *t.CategoryID)
 			if err != nil {
@@ -128,10 +152,13 @@ func (s *TransactionService) validate(ctx context.Context, db repositories.DBTX,
 				v.Add("category_id", "category not found")
 			} else {
 				want := models.TxExpense
-				if t.Type == models.TxIncome || t.Type == models.TxRefund {
+				if t.Type == models.TxIncome {
 					want = models.TxIncome
 				}
-				if c.Type != want {
+				// A refund gives back money spent, so it takes the expense
+				// category it refunds; refunds recorded before that took an
+				// income category and may keep it.
+				if c.Type != want && t.Type != models.TxRefund {
 					v.Add("category_id", "category type does not match transaction type")
 				}
 			}
@@ -140,6 +167,46 @@ func (s *TransactionService) validate(ctx context.Context, db repositories.DBTX,
 		}
 	}
 	return v.Err()
+}
+
+// validateLoanMovement checks a loan transaction against its loan: the loan
+// exists and runs the right way (lending and being repaid are loans given;
+// borrowing and repaying are loans received), the currencies match, and a
+// repayment is no more than is still owed.
+func (s *TransactionService) validateLoanMovement(ctx context.Context, db repositories.DBTX, t *models.Transaction, v validators.Errors) error {
+	if t.LoanID == nil || *t.LoanID == "" {
+		v.Add("loan_id", "is required")
+		return nil
+	}
+	l, err := s.Loans.Get(ctx, db, t.UserID, *t.LoanID)
+	if err != nil {
+		return apperr.Internal(err)
+	}
+	if l == nil {
+		v.Add("loan_id", "loan not found")
+		return nil
+	}
+	if l.Direction != models.LoanDirectionOf(t.Type) {
+		if l.Direction == models.LoanGiven {
+			v.Add("loan_id", "is money you lent: record lending more or being paid back")
+		} else {
+			v.Add("loan_id", "is money you borrowed: record borrowing more or paying it back")
+		}
+		return nil
+	}
+	if t.Currency != l.Currency {
+		v.Add("currency", "must be the loan's currency ("+l.Currency+")")
+	}
+	if models.IsLoanRepayment(t.Type) && t.Status == models.StatusCleared && t.Amount > 0 {
+		owed, err := s.Loans.Outstanding(ctx, db, t.UserID, l.ID, t.ID)
+		if err != nil {
+			return apperr.Internal(err)
+		}
+		if t.Amount > owed {
+			v.Add("amount", "is more than the "+reports.FormatMoney(owed)+" still owed")
+		}
+	}
+	return nil
 }
 
 func (s *TransactionService) Create(ctx context.Context, req dto.CreateTransactionRequest) (*models.Transaction, bool, error) {
@@ -168,7 +235,16 @@ func (s *TransactionService) Create(ctx context.Context, req dto.CreateTransacti
 	if t.Type == models.TxAdjustment {
 		t.Origin = models.OriginAdjustment
 	}
+	if models.LoanDirectionOf(t.Type) != "" || t.Type == models.TxIncome || t.Type == models.TxExpense {
+		t.LoanID = req.LoanID
+	}
 	err := repositories.WithTx(ctx, s.DB, func(tx *sql.Tx) error {
+		if err := s.startLoan(ctx, tx, t, req.NewLoan); err != nil {
+			return err
+		}
+		if req.Interest < 0 || (req.Interest > 0 && !models.IsLoanRepayment(t.Type)) {
+			return apperr.Validation("validation failed", map[string]string{"interest": "goes only with a loan repayment, and must be positive"})
+		}
 		if err := s.validate(ctx, tx, t); err != nil {
 			return err
 		}
@@ -176,7 +252,13 @@ func (s *TransactionService) Create(ctx context.Context, req dto.CreateTransacti
 		if err := s.Repo.Insert(ctx, tx, t); err != nil {
 			return apperr.Internal(err)
 		}
-		return s.Repo.SetTags(ctx, tx, t.UserID, t.ID, req.Tags, NewID)
+		if err := s.Repo.SetTags(ctx, tx, t.UserID, t.ID, req.Tags, NewID); err != nil {
+			return err
+		}
+		if req.Interest > 0 {
+			return s.insertInterest(ctx, tx, t, req.Interest)
+		}
+		return nil
 	})
 	if err != nil {
 		return nil, false, err
@@ -185,13 +267,77 @@ func (s *TransactionService) Create(ctx context.Context, req dto.CreateTransacti
 	return full, true, err
 }
 
+// startLoan creates the loan a lending or borrowing transaction starts, when
+// it names a person instead of an existing loan. The loan begins on the
+// transaction's date, in its currency, owing nothing until the transaction
+// itself is counted.
+func (s *TransactionService) startLoan(ctx context.Context, db repositories.DBTX, t *models.Transaction, nl *dto.NewLoan) error {
+	if nl == nil || (t.Type != models.TxLoanGiven && t.Type != models.TxLoanReceived) || (t.LoanID != nil && *t.LoanID != "") {
+		return nil
+	}
+	l := &models.Loan{UserID: t.UserID, ID: NewID(), Direction: models.LoanDirectionOf(t.Type),
+		Counterparty: strings.TrimSpace(nl.Counterparty), Currency: t.Currency, StartDate: t.TransactionDate,
+		DueDate: nl.DueDate, CreatedAt: t.CreatedAt, UpdatedAt: t.CreatedAt}
+	if l.Currency == "" {
+		l.Currency = s.DefaultCurrency
+	}
+	if err := validateLoan(l); err != nil {
+		return err
+	}
+	if err := s.Loans.Insert(ctx, db, l); err != nil {
+		return apperr.Internal(err)
+	}
+	t.LoanID = &l.ID
+	return nil
+}
+
+// insertInterest records the interest paid or received with a repayment as
+// its own expense (paying a loan back) or income (being paid back), filed
+// under the default Interest payments / Interest category when the user has
+// it, and tied to the loan so the loan shows what it cost or earned.
+func (s *TransactionService) insertInterest(ctx context.Context, db repositories.DBTX, principal *models.Transaction, amount int64) error {
+	l, err := s.Loans.Get(ctx, db, principal.UserID, *principal.LoanID)
+	if err != nil {
+		return apperr.Internal(err)
+	}
+	typ, catName, desc := models.TxExpense, "Interest payments", "Interest to "+l.Counterparty
+	if principal.Type == models.TxLoanRepaymentReceived {
+		typ, catName, desc = models.TxIncome, "Interest", "Interest from "+l.Counterparty
+	}
+	in := &models.Transaction{UserID: principal.UserID, ID: NewID(), Type: typ, Amount: amount, Currency: principal.Currency,
+		AccountID: principal.AccountID, Description: desc, TransactionDate: principal.TransactionDate,
+		Origin: models.OriginManual, Status: principal.Status, LoanID: principal.LoanID,
+		CreatedAt: principal.CreatedAt, UpdatedAt: principal.UpdatedAt}
+	c, err := s.Categories.FindByName(ctx, db, principal.UserID, catName, typ)
+	if err != nil {
+		return apperr.Internal(err)
+	}
+	if c != nil {
+		in.CategoryID = &c.ID
+	}
+	if err := s.validate(ctx, db, in); err != nil {
+		return err
+	}
+	if err := s.Repo.Insert(ctx, db, in); err != nil {
+		return apperr.Internal(err)
+	}
+	return nil
+}
+
 func (s *TransactionService) Update(ctx context.Context, id string, req dto.UpdateTransactionRequest) (*models.Transaction, error) {
 	t, err := s.Get(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 	if req.Type != nil {
+		// A loan movement turned into anything else leaves its loan.
+		if models.LoanDirectionOf(t.Type) != "" && models.LoanDirectionOf(*req.Type) == "" {
+			t.LoanID = nil
+		}
 		t.Type = *req.Type
+	}
+	if req.LoanID != nil {
+		t.LoanID = req.LoanID
 	}
 	if req.Amount != nil {
 		t.Amount = *req.Amount
@@ -278,6 +424,7 @@ func (s *TransactionService) Duplicate(ctx context.Context, id string, date stri
 		Type: src.Type, Amount: src.Amount, Currency: src.Currency, AccountID: src.AccountID,
 		TransferAccountID: src.TransferAccountID, CategoryID: src.CategoryID, Description: src.Description,
 		Payee: src.Payee, TransactionDate: date, Notes: src.Notes, Tags: src.Tags, Status: models.StatusCleared,
+		LoanID: src.LoanID,
 	})
 	return t, err
 }

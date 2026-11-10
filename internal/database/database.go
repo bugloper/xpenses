@@ -147,23 +147,53 @@ func migrate(ctx context.Context, db *sql.DB) error {
 		if err != nil {
 			return err
 		}
-		tx, err := db.BeginTx(ctx, nil)
-		if err != nil {
-			return err
-		}
-		if _, err := tx.ExecContext(ctx, string(body)); err != nil {
-			_ = tx.Rollback()
-			return fmt.Errorf("migration %s: %w", name, err)
-		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO schema_migrations(version, applied_at) VALUES (?, strftime('%Y-%m-%dT%H:%M:%SZ','now'))`, name); err != nil {
-			_ = tx.Rollback()
-			return err
-		}
-		if err := tx.Commit(); err != nil {
+		if err := apply(ctx, db, name, string(body)); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// rebuildMarker starts a migration that rebuilds a table (SQLite cannot alter
+// a CHECK constraint in place). Such a migration runs with foreign keys off,
+// as SQLite's documented procedure requires: dropping the old table with them
+// on would cascade-delete every row that refers to it. References are checked
+// before the migration commits.
+const rebuildMarker = "-- migrate: foreign keys off"
+
+func apply(ctx context.Context, db *sql.DB, name, body string) error {
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	rebuild := strings.HasPrefix(body, rebuildMarker)
+	if rebuild {
+		if _, err := conn.ExecContext(ctx, `PRAGMA foreign_keys = OFF`); err != nil {
+			return err
+		}
+		defer conn.ExecContext(context.Background(), `PRAGMA foreign_keys = ON`)
+	}
+	tx, err := conn.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, body); err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("migration %s: %w", name, err)
+	}
+	if rebuild {
+		var broken int
+		if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM pragma_foreign_key_check`).Scan(&broken); err != nil || broken > 0 {
+			_ = tx.Rollback()
+			return fmt.Errorf("migration %s: %d broken references (%v)", name, broken, err)
+		}
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT INTO schema_migrations(version, applied_at) VALUES (?, strftime('%Y-%m-%dT%H:%M:%SZ','now'))`, name); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	return tx.Commit()
 }
 
 // OpenTest opens a fresh in-memory database with migrations applied. Intended for tests.

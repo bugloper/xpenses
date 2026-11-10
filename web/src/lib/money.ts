@@ -53,13 +53,17 @@ export function formatMoney(minor: number, currency: string = 'BTN', opts: Forma
   return body
 }
 
-/** Signed display for a transaction amount: expenses negative/red, income positive/green. */
+/** Signed display for a transaction amount: money out negative, money in positive. */
 export function signedAmount(type: string, amount: number): number {
   switch (type) {
     case 'expense':
+    case 'loan_given':
+    case 'loan_repayment':
       return -Math.abs(amount)
     case 'income':
     case 'refund':
+    case 'loan_received':
+    case 'loan_repayment_received':
       return Math.abs(amount)
     default:
       return amount

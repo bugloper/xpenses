@@ -33,6 +33,8 @@ type Deps struct {
 	Settings     *services.SettingsService
 	Backup       *services.BackupService
 	Community    *services.CommunityService
+	Loans        *services.LoanService
+	Savings      *services.SavingsService
 	Auth         *auth.Service
 	AuthMW       *auth.Middleware
 }
@@ -56,7 +58,9 @@ func NewDeps(cfg config.Config, db *sql.DB) *Deps {
 		Settings:     &services.SettingsService{DB: db},
 		Backup:       &services.BackupService{DB: db, DBPath: cfg.DBPath(), BackupsDir: cfg.BackupsDir()},
 		Community:    &services.CommunityService{DB: db},
+		Loans:        &services.LoanService{DB: db, DefaultCurrency: cfg.DefaultCurrency},
 	}
+	d.Savings = &services.SavingsService{DB: db, Txs: d.Transactions}
 	d.Auth = auth.NewService(db)
 	d.Auth.DefaultCurrency = cfg.DefaultCurrency
 	d.Auth.AttachmentsDir = cfg.AttachmentsDir()
@@ -116,6 +120,8 @@ func New(cfg config.Config, log *slog.Logger, deps *Deps, extra ...Registrar) *e
 		&handlers.RecurringHandler{Svc: deps.Recurring},
 		&handlers.SettingsHandler{Svc: deps.Settings},
 		&handlers.CommunityHandler{Svc: deps.Community},
+		&handlers.LoanHandler{Svc: deps.Loans},
+		&handlers.SavingsHandler{Svc: deps.Savings},
 	}
 	regs = append(regs, extra...)
 	for _, r := range regs {

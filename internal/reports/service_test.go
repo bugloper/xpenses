@@ -172,13 +172,14 @@ func TestSummary(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Income != 50500 || got.Expenses != 9000 || got.Net != 41500 {
+	// The Nu. 5 refund (tx6) reduces spending: it is not income.
+	if got.Income != 50000 || got.Expenses != 8500 || got.Net != 41500 {
 		t.Fatalf("totals: %+v", got)
 	}
 	if got.Previous != (PeriodTotals{From: "2026-10-02", To: "2026-10-31", Income: 0, Expenses: 8000, Net: -8000}) {
 		t.Fatalf("previous: %+v", got.Previous)
 	}
-	if got.ExpenseChangePct == nil || *got.ExpenseChangePct != 12.5 {
+	if got.ExpenseChangePct == nil || *got.ExpenseChangePct != 6.3 {
 		t.Fatalf("change pct: %v", got.ExpenseChangePct)
 	}
 	// The balance is taken at the end of the period: tx14 (1 Dec, 300) is left out.
@@ -230,10 +231,11 @@ func TestCategories(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []CategoryRow{
-		{CategoryID: ptr(f.cat["Groceries"]), Name: "Groceries", Icon: "shopping-basket", Color: "#f97316", ParentID: ptr(f.cat["Food & Groceries"]), ParentName: "Food & Groceries", Amount: 4000, Count: 1, Pct: 44.4},
-		{CategoryID: ptr(f.cat["Eating out"]), Name: "Eating out", Icon: "utensils", Color: "#f97316", ParentID: ptr(f.cat["Food & Groceries"]), ParentName: "Food & Groceries", Amount: 2500, Count: 1, Pct: 27.8},
-		{CategoryID: ptr(f.cat["Coffee"]), Name: "Coffee", Icon: "coffee", Color: "#000000", ParentID: ptr(f.cat["Eating out"]), ParentName: "Eating out", Amount: 1500, Count: 1, Pct: 16.7},
-		{CategoryID: nil, Name: "Uncategorised", Icon: "circle", Color: "#64748b", Amount: 1000, Count: 1, Pct: 11.1},
+		{CategoryID: ptr(f.cat["Groceries"]), Name: "Groceries", Icon: "shopping-basket", Color: "#f97316", ParentID: ptr(f.cat["Food & Groceries"]), ParentName: "Food & Groceries", Amount: 4000, Count: 1, Pct: 47.1},
+		{CategoryID: ptr(f.cat["Eating out"]), Name: "Eating out", Icon: "utensils", Color: "#f97316", ParentID: ptr(f.cat["Food & Groceries"]), ParentName: "Food & Groceries", Amount: 2500, Count: 1, Pct: 29.4},
+		{CategoryID: ptr(f.cat["Coffee"]), Name: "Coffee", Icon: "coffee", Color: "#000000", ParentID: ptr(f.cat["Eating out"]), ParentName: "Eating out", Amount: 1500, Count: 1, Pct: 17.6},
+		// The refund was filed under an income category, so it comes off uncategorised spending.
+		{CategoryID: nil, Name: "Uncategorised", Icon: "circle", Color: "#64748b", Amount: 500, Count: 2, Pct: 5.9},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("expense:\n got %s\nwant %s", dump(got), dump(want))
@@ -242,8 +244,8 @@ func TestCategories(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got) != 2 || got[0].Name != "Salary" || got[0].Amount != 50000 || got[0].Pct != 99.0 ||
-		got[1].Name != "Refunds" || got[1].Amount != 500 || got[1].Pct != 1.0 {
+	// The refund is not income, even under the income category it was filed in.
+	if len(got) != 1 || got[0].Name != "Salary" || got[0].Amount != 50000 || got[0].Pct != 100 {
 		t.Fatalf("income: %s", dump(got))
 	}
 	empty, err := f.svc.Categories(f.ctx, Period{From: "2020-01-01", To: "2020-01-31"}, FlowExpense)
@@ -258,7 +260,7 @@ func TestCashFlow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := []CashFlowRow{{"2026-11", 50500, 9000, 41500}}; !reflect.DeepEqual(got, want) {
+	if want := []CashFlowRow{{"2026-11", 50000, 8500, 41500}}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("month: %+v", got)
 	}
 	got, err = f.svc.CashFlow(f.ctx, Period{From: "2026-11-01", To: "2026-11-05"}, GranDay)
@@ -267,7 +269,7 @@ func TestCashFlow(t *testing.T) {
 	}
 	want := []CashFlowRow{
 		{"2026-11-01", 50000, 2500, 47500},
-		{"2026-11-02", 500, 0, 500},
+		{"2026-11-02", 0, -500, 500}, // a day with only a refund: spending goes down
 		{"2026-11-03", 0, 1500, -1500},
 		{"2026-11-04", 0, 0, 0},
 		{"2026-11-05", 0, 4000, -4000},
@@ -279,7 +281,7 @@ func TestCashFlow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want = []CashFlowRow{{"2026-W44", 50000, 2500, 47500}, {"2026-W45", 500, 5500, -5000}}
+	want = []CashFlowRow{{"2026-W44", 50000, 2500, 47500}, {"2026-W45", 0, 5000, -5000}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("week: %+v", got)
 	}
@@ -287,7 +289,7 @@ func TestCashFlow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want = []CashFlowRow{{"2026-09", 0, 0, 0}, {"2026-10", 0, 8700, -8700}, {"2026-11", 50500, 9000, 41500}, {"2026-12", 0, 300, -300}}
+	want = []CashFlowRow{{"2026-09", 0, 0, 0}, {"2026-10", 0, 8700, -8700}, {"2026-11", 50000, 8500, 41500}, {"2026-12", 0, 300, -300}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("months zero-filled: %+v", got)
 	}
@@ -299,7 +301,7 @@ func TestMerchants(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []MerchantRow{{"8 Eleven", 4000, 1}, {"Ambient Cafe", 4000, 2}, {"(no payee)", 1000, 1}}
+	want := []MerchantRow{{"8 Eleven", 4000, 1}, {"Ambient Cafe", 3500, 3}, {"(no payee)", 1000, 1}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("expense: %+v", got)
 	}
@@ -307,7 +309,7 @@ func TestMerchants(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want = []MerchantRow{{"Employer", 50000, 1}, {"Ambient Cafe", 500, 1}}
+	want = []MerchantRow{{"Employer", 50000, 1}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("income: %+v", got)
 	}
@@ -321,7 +323,7 @@ func TestAccounts(t *testing.T) {
 	}
 	want := []AccountRow{
 		{AccountID: "acc-bank", Name: "BOB", Type: "bank", Currency: "BTN", OpeningBalance: 100000, Balance: 123700,
-			Income: 50700, Expenses: 8000, TransfersIn: 0, TransfersOut: 10000},
+			Income: 50200, Expenses: 7500, TransfersIn: 0, TransfersOut: 10000},
 		{AccountID: "acc-cash", Name: "Wallet", Type: "cash", Currency: "BTN", OpeningBalance: 5000, Balance: 13700,
 			Income: 0, Expenses: 1300, TransfersIn: 10000, TransfersOut: 0},
 	}
@@ -378,7 +380,7 @@ func TestExportCSV(t *testing.T) {
 	if lines[0] != "Categories (expense)" || lines[1] != "Period: 2026-11-01 to 2026-11-30" || !strings.HasPrefix(lines[2], "Generated: ") {
 		t.Fatalf("header: %q", lines[:3])
 	}
-	want := []string{"", "Category,Count,Amount,%", "Groceries,1,40.00,44.4", "Eating out,1,25.00,27.8", "Coffee,1,15.00,16.7", "Uncategorised,1,10.00,11.1"}
+	want := []string{"", "Category,Count,Amount,%", "Groceries,1,40.00,47.1", "Eating out,1,25.00,29.4", "Coffee,1,15.00,17.6", "Uncategorised,2,5.00,5.9"}
 	if !reflect.DeepEqual(lines[3:], want) {
 		t.Fatalf("body: %q", lines[3:])
 	}

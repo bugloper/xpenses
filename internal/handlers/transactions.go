@@ -119,6 +119,7 @@ func filterFromQuery(c echo.Context) dto.TransactionFilter {
 		CategoryID: c.QueryParam("category_id"),
 		AccountID:  c.QueryParam("account_id"),
 		Type:       c.QueryParam("type"),
+		LoanID:     c.QueryParam("loan_id"),
 		Status:     c.QueryParam("status"),
 		Origin:     c.QueryParam("origin"),
 		Unmatched:  queryBool(c, "unmatched"),

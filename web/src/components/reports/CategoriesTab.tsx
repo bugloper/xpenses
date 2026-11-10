@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import type { DateRange } from '@/lib/dates'
 import { formatMoney } from '@/lib/money'
 import { useReportCategories } from '@/lib/queries'
-import { pct1, pctOf, rollupCategories, type CategoryRollup } from '@/lib/reports'
+import { pct1, pctOf, refundsBeyondSpending, rollupCategories, type CategoryRollup } from '@/lib/reports'
 import { cn } from '@/lib/utils'
 import type { FlowType, ReportCategory } from '@/types/api'
 
@@ -26,28 +26,33 @@ export function CategoriesTab({
 }: {
   range: DateRange
   type: FlowType
-  onType: (t: FlowType) => void
+  /** Offer the expenses / income switch; without it the tab shows one flow. */
+  onType?: (t: FlowType) => void
   currency: string
 }) {
   const q = useReportCategories(range.from, range.to, type)
   const [active, setActive] = useState<string | null>(null)
   const [openGroup, setOpenGroup] = useState<string | null>(null)
-  const groups = useMemo(() => rollupCategories((q.data ?? []).filter((r) => r.amount > 0)), [q.data])
+  const groups = useMemo(() => rollupCategories(q.data ?? []), [q.data])
   const rows = groups.map((g) => g.row)
   const total = rows.reduce((n, r) => n + r.amount, 0)
+  // Refunds that outweigh their category's spending: off the total, not ranked.
+  const refunds = refundsBeyondSpending(q.data ?? [])
   const count = rows.reduce((n, r) => n + r.count, 0)
   const expense = type === 'expense'
   return (
     <div className="flex flex-col gap-4">
-      <Segmented
-        aria-label="Flow type"
-        value={type}
-        onChange={onType}
-        options={[
-          { value: 'expense', label: 'Expenses', tone: 'expense' },
-          { value: 'income', label: 'Income', tone: 'income' },
-        ]}
-      />
+      {onType && (
+        <Segmented
+          aria-label="Flow type"
+          value={type}
+          onChange={onType}
+          options={[
+            { value: 'expense', label: 'Expenses', tone: 'expense' },
+            { value: 'income', label: 'Income', tone: 'income' },
+          ]}
+        />
+      )}
       <Panel
         flush
         eyebrow={
@@ -68,8 +73,13 @@ export function CategoriesTab({
                   expense ? 'text-expense' : 'text-income',
                 )}
               >
-                {formatMoney(total, currency)}
+                {formatMoney(total + refunds, currency)}
               </div>
+              {refunds < 0 && (
+                <div className="text-muted-foreground mt-1 text-xs">
+                  after {formatMoney(-refunds, currency)} refunds not ranked
+                </div>
+              )}
             </div>
           ) : undefined
         }

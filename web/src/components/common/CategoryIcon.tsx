@@ -1,5 +1,5 @@
 import { createElement } from 'react'
-import { ArrowLeftRight, Scale } from 'lucide-react'
+import { ArrowLeftRight, HandCoins, Scale } from 'lucide-react'
 import { iconFor } from '@/lib/icons'
 import { cn } from '@/lib/utils'
 
@@ -9,7 +9,7 @@ type Props = {
   size?: 'sm' | 'md' | 'lg'
   className?: string
   /** Special glyphs for non-category transactions. */
-  kind?: 'transfer' | 'adjustment'
+  kind?: 'transfer' | 'adjustment' | 'loan'
 }
 
 const SIZES = { sm: 'size-8 [&>svg]:size-4', md: 'size-10 [&>svg]:size-5', lg: 'size-14 [&>svg]:size-7' }
@@ -22,9 +22,18 @@ export function CategoryIcon({ icon, color, size = 'md', className, kind }: Prop
       style={{ backgroundColor: `${c}1f`, color: c, boxShadow: `inset 0 0 0 1px ${c}2e` }}
       aria-hidden
     >
-      {createElement(kind === 'transfer' ? ArrowLeftRight : kind === 'adjustment' ? Scale : iconFor(icon), {
-        strokeWidth: 2,
-      })}
+      {createElement(
+        kind === 'transfer'
+          ? ArrowLeftRight
+          : kind === 'adjustment'
+            ? Scale
+            : kind === 'loan'
+              ? HandCoins
+              : iconFor(icon),
+        {
+          strokeWidth: 2,
+        },
+      )}
     </span>
   )
 }

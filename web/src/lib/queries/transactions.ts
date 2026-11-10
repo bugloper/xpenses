@@ -11,6 +11,7 @@ export function transactionsQuery(filter: TransactionFilter): string {
     category_id: filter.category_id,
     account_id: filter.account_id,
     type: filter.type,
+    loan_id: filter.loan_id,
     status: filter.status,
     origin: filter.origin,
     unmatched: filter.unmatched,

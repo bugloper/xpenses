@@ -5,8 +5,11 @@ import { PageHeader } from '@/components/common/PageHeader'
 import { AccountsTab } from '@/components/reports/AccountsTab'
 import { CategoriesTab } from '@/components/reports/CategoriesTab'
 import { ExportButtons } from '@/components/reports/ExportButtons'
+import { IncomeTab } from '@/components/reports/IncomeTab'
+import { LoansReport } from '@/components/reports/LoansReport'
 import { OverviewTab } from '@/components/reports/OverviewTab'
-import { ReportsPeriodSelector } from '@/components/reports/ReportsPeriodSelector'
+import { PeriodSelector } from '@/components/dashboard/PeriodSelector'
+import { SavingsReport } from '@/components/reports/SavingsReport'
 import { SpendingTab } from '@/components/reports/SpendingTab'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { rangeLabel } from '@/lib/dates'
@@ -21,26 +24,35 @@ import {
 import type { ExportReport } from '@/types/api'
 import { appRoute } from './__root'
 
-// Budgets have their own page (with the month picker), so there is no budgets
-// tab here; the merchants list was dropped as noise.
-const TABS = ['overview', 'categories', 'spending', 'accounts'] as const
+// One tab per question: how did the period go (Overview), where did the
+// money go (Spending), where did it come from (Income), how did each account
+// move (Accounts), what is set aside (Savings), and who owes whom (Loans).
+// Budgets have their own page, with the month picker.
+const TABS = ['overview', 'spending', 'income', 'accounts', 'savings', 'loans'] as const
 type Tab = (typeof TABS)[number]
 const TAB_LABELS: Record<Tab, string> = {
   overview: 'Overview',
-  categories: 'Categories',
   spending: 'Spending',
+  income: 'Income',
   accounts: 'Accounts',
+  savings: 'Savings',
+  loans: 'Loans',
 }
-const TAB_REPORT: Record<Tab, ExportReport> = {
+/** The export each tab offers; savings and loans have none yet. */
+const TAB_REPORT: Partial<Record<Tab, ExportReport>> = {
   overview: 'summary',
-  categories: 'categories',
-  spending: 'cash-flow',
+  spending: 'categories',
+  income: 'categories',
   accounts: 'accounts',
 }
 
 const searchSchema = z.object({
-  tab: z.enum(TABS).optional().catch(undefined),
-  period: z.enum(['month', 'prev_month', 'week', 'last3', 'custom']).optional().catch(undefined),
+  // The old Categories tab is now part of Spending.
+  tab: z
+    .preprocess((v) => (v === 'categories' ? 'spending' : v), z.enum(TABS))
+    .optional()
+    .catch(undefined),
+  period: z.enum(['today', 'week', 'month', 'prev_month', 'year', 'custom']).optional().catch(undefined),
   from: z.string().optional().catch(undefined),
   to: z.string().optional().catch(undefined),
   gran: z.enum(['day', 'week', 'month']).optional().catch(undefined),
@@ -57,7 +69,8 @@ function ReportsPage() {
   const { preset, range } = useMemo(() => resolveReportRange(search), [search])
   const granularity = search.gran ?? defaultGranularity(range)
   const spend = search.spend ?? 'day'
-  const type = search.type ?? 'expense'
+  const type = tab === 'income' ? 'income' : 'expense'
+  const report = TAB_REPORT[tab]
 
   const patch = (p: Partial<ReportsSearchParams>) =>
     void navigate({ search: (s) => ({ ...s, ...p }), replace: true })
@@ -65,7 +78,7 @@ function ReportsPage() {
   const exportParams: ExportParams = {
     from: range.from,
     to: range.to,
-    granularity: tab === 'spending' ? spend : granularity,
+    granularity,
     type,
   }
 
@@ -77,7 +90,7 @@ function ReportsPage() {
         eyebrow={`Statement · ${presetLabel}`}
         title="Reports"
         description={<span className="font-display text-foreground/80 text-lg">{rangeLabel(range)}</span>}
-        actions={<ExportButtons report={TAB_REPORT[tab]} params={exportParams} />}
+        actions={report && <ExportButtons report={report} params={exportParams} />}
         rule={false}
       />
       <Tabs
@@ -86,11 +99,7 @@ function ReportsPage() {
         className="gap-6"
       >
         <div className="flex flex-col gap-4">
-          <ReportsPeriodSelector
-            preset={preset}
-            range={range}
-            onChange={(p, r) => patch(periodSearch(p, r))}
-          />
+          <PeriodSelector preset={preset} range={range} onChange={(p, r) => patch(periodSearch(p, r))} />
           <div className="-mx-4 scrollbar-none overflow-x-auto border-b px-4 sm:mx-0 sm:px-0">
             <TabsList
               variant="line"
@@ -119,27 +128,29 @@ function ReportsPage() {
             />
           )}
         </TabsContent>
-        <TabsContent value="categories">
-          {tab === 'categories' && (
-            <CategoriesTab
-              range={range}
-              type={type}
-              onType={(t) => patch({ type: t === 'expense' ? undefined : t })}
-              currency={currency}
-            />
-          )}
-        </TabsContent>
         <TabsContent value="spending">
           {tab === 'spending' && (
-            <SpendingTab
-              range={range}
-              granularity={spend}
-              onGranularity={(g) => patch({ spend: g === 'day' ? undefined : g })}
-              currency={currency}
-            />
+            <div className="flex flex-col gap-8">
+              <CategoriesTab range={range} type="expense" currency={currency} />
+              <SpendingTab
+                range={range}
+                granularity={spend}
+                onGranularity={(g) => patch({ spend: g === 'day' ? undefined : g })}
+                currency={currency}
+              />
+            </div>
           )}
         </TabsContent>
+        <TabsContent value="income">
+          {tab === 'income' && <IncomeTab range={range} currency={currency} />}
+        </TabsContent>
         <TabsContent value="accounts">{tab === 'accounts' && <AccountsTab range={range} />}</TabsContent>
+        <TabsContent value="savings">
+          {tab === 'savings' && <SavingsReport range={range} currency={currency} />}
+        </TabsContent>
+        <TabsContent value="loans">
+          {tab === 'loans' && <LoansReport range={range} currency={currency} />}
+        </TabsContent>
       </Tabs>
     </div>
   )

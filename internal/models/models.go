@@ -18,7 +18,36 @@ const (
 	TxTransfer   = "transfer"
 	TxRefund     = "refund"
 	TxAdjustment = "adjustment"
+	// Loan movements: money between an account and a loan. They change
+	// account balances and what is owed, never income or expenses.
+	TxLoanGiven             = "loan_given"              // the user lends: money out
+	TxLoanReceived          = "loan_received"           // the user borrows: money in
+	TxLoanRepayment         = "loan_repayment"          // the user pays back a loan: money out
+	TxLoanRepaymentReceived = "loan_repayment_received" // someone pays the user back: money in
 )
+
+// Loan directions.
+const (
+	LoanGiven    = "given"
+	LoanReceived = "received"
+)
+
+// LoanDirectionOf is the direction of loan a loan transaction type belongs
+// to, "" for a type that is not a loan movement.
+func LoanDirectionOf(txType string) string {
+	switch txType {
+	case TxLoanGiven, TxLoanRepaymentReceived:
+		return LoanGiven
+	case TxLoanReceived, TxLoanRepayment:
+		return LoanReceived
+	}
+	return ""
+}
+
+// IsLoanRepayment is true for the two types that pay a loan down.
+func IsLoanRepayment(txType string) bool {
+	return txType == TxLoanRepayment || txType == TxLoanRepaymentReceived
+}
 
 // Transaction origins.
 const (
@@ -105,9 +134,77 @@ type Transaction struct {
 	AttachmentMime string `json:"-"`
 	HasAttachment  bool   `json:"has_attachment"`
 	// Receipt holds what the attached payment screenshot said; nil when nothing is known.
-	Receipt   *Receipt `json:"receipt"`
-	CreatedAt string   `json:"created_at"`
-	UpdatedAt string   `json:"updated_at"`
+	Receipt *Receipt `json:"receipt"`
+	// LoanID is the loan a loan movement (or an interest row) belongs to.
+	LoanID           *string `json:"loan_id"`
+	LoanCounterparty string  `json:"loan_counterparty,omitempty"`
+	CreatedAt        string  `json:"created_at"`
+	UpdatedAt        string  `json:"updated_at"`
+}
+
+// Loan is money lent or borrowed. The amounts after Notes are computed from
+// cleared transactions, never stored.
+type Loan struct {
+	UserID        string  `json:"-"`
+	ID            string  `json:"id"`
+	Direction     string  `json:"direction"`
+	Counterparty  string  `json:"counterparty"`
+	OpeningAmount int64   `json:"opening_amount"`
+	Currency      string  `json:"currency"`
+	StartDate     string  `json:"start_date"`
+	DueDate       *string `json:"due_date"`
+	Notes         string  `json:"notes"`
+	// Principal is opening_amount plus every amount lent or borrowed on it.
+	Principal int64 `json:"principal"`
+	// Repaid is the principal paid back so far.
+	Repaid      int64 `json:"repaid"`
+	Outstanding int64 `json:"outstanding"`
+	// Interest is the interest paid (borrowed) or earned (lent) on it, kept
+	// apart from principal.
+	Interest         int64  `json:"interest"`
+	TransactionCount int    `json:"transaction_count"`
+	LastActivity     string `json:"last_activity"`
+	// Status is open while anything is owed, settled once it is paid off.
+	Status    string `json:"status"`
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
+}
+
+// Loan statuses (derived).
+const (
+	LoanOpen    = "open"
+	LoanSettled = "settled"
+)
+
+// SavingsGoal is money set aside for something. Saved is the sum of its
+// contributions less withdrawals: an allocation, not money in an account.
+type SavingsGoal struct {
+	UserID       string  `json:"-"`
+	ID           string  `json:"id"`
+	Name         string  `json:"name"`
+	TargetAmount int64   `json:"target_amount"`
+	TargetDate   *string `json:"target_date"`
+	AccountID    *string `json:"account_id"`
+	AccountName  string  `json:"account_name,omitempty"`
+	Notes        string  `json:"notes"`
+	Saved        int64   `json:"saved"`
+	// Pct is saved/target, 0-100 (capped), to one decimal.
+	Pct       float64 `json:"pct"`
+	Reached   bool    `json:"reached"`
+	CreatedAt string  `json:"created_at"`
+	UpdatedAt string  `json:"updated_at"`
+}
+
+// SavingsGoalEntry is one contribution (positive) or withdrawal (negative).
+type SavingsGoalEntry struct {
+	UserID        string  `json:"-"`
+	ID            string  `json:"id"`
+	GoalID        string  `json:"goal_id"`
+	Amount        int64   `json:"amount"`
+	EntryDate     string  `json:"entry_date"`
+	Note          string  `json:"note"`
+	TransactionID *string `json:"transaction_id"`
+	CreatedAt     string  `json:"created_at"`
 }
 
 type RecurringTransaction struct {

@@ -63,8 +63,28 @@ export type UpdateCategoryRequest = {
   sort_order?: number
 }
 
-export type TransactionType = 'expense' | 'income' | 'transfer' | 'refund' | 'adjustment'
-export const TRANSACTION_TYPES: TransactionType[] = ['expense', 'income', 'transfer', 'refund', 'adjustment']
+/**
+ * Loan movements move money between an account and a loan: they change
+ * balances and what is owed, never income or expenses.
+ */
+export type LoanTransactionType =
+  'loan_given' | 'loan_received' | 'loan_repayment' | 'loan_repayment_received'
+export const LOAN_TYPES: LoanTransactionType[] = [
+  'loan_given',
+  'loan_received',
+  'loan_repayment',
+  'loan_repayment_received',
+]
+export type TransactionType =
+  'expense' | 'income' | 'transfer' | 'refund' | 'adjustment' | LoanTransactionType
+export const TRANSACTION_TYPES: TransactionType[] = [
+  'expense',
+  'income',
+  'transfer',
+  'refund',
+  'adjustment',
+  ...LOAN_TYPES,
+]
 export type TransactionStatus = 'cleared' | 'pending' | 'void'
 export type TransactionOrigin = 'manual' | 'imported' | 'adjustment'
 
@@ -115,6 +135,9 @@ export type Transaction = {
   recurring_id: string | null
   client_id?: string | null
   tags: string[] | null
+  /** The loan a loan movement (or an interest row) belongs to. */
+  loan_id?: string | null
+  loan_counterparty?: string
   created_at: string
   updated_at: string
 }
@@ -134,6 +157,11 @@ export type CreateTransactionRequest = {
   status?: TransactionStatus
   client_id?: string
   receipt?: Receipt | null
+  loan_id?: string | null
+  /** Lending or borrowing may start a new loan instead of naming one. */
+  new_loan?: { counterparty: string; due_date?: string | null } | null
+  /** Interest paid or received with a repayment, on top of the principal amount. */
+  interest?: number
 }
 
 export type UpdateTransactionRequest = {
@@ -153,6 +181,7 @@ export type UpdateTransactionRequest = {
   clear_transfer_account?: boolean
   receipt?: Receipt | null
   clear_receipt?: boolean
+  loan_id?: string
 }
 
 export type TransactionSort = 'date' | 'amount' | 'created_at' | 'payee'
@@ -163,7 +192,9 @@ export type TransactionFilter = {
   date_to?: string
   category_id?: string
   account_id?: string
-  type?: TransactionType
+  /** 'loan' matches every loan movement. */
+  type?: TransactionType | 'loan'
+  loan_id?: string
   status?: TransactionStatus
   origin?: TransactionOrigin
   unmatched?: boolean
@@ -281,6 +312,10 @@ export type ReportAccount = {
   expenses: number
   transfers_in: number
   transfers_out: number
+  /** Money borrowed, or repaid to the user. */
+  loans_in: number
+  /** Money lent, or paid back on what the user borrowed. */
+  loans_out: number
 }
 
 export type ExportReport = 'summary' | 'categories' | 'cash-flow' | 'merchants' | 'accounts' | 'budgets'
@@ -423,3 +458,104 @@ export interface CommunityCounts {
   new_feedback: number
   pending_testimonials: number
 }
+
+// ---------------------------------------------------------------------------
+// Loans and savings goals.
+// ---------------------------------------------------------------------------
+export type LoanDirection = 'given' | 'received'
+export type Loan = {
+  id: string
+  direction: LoanDirection
+  counterparty: string
+  /** Owed before the loan was recorded here; no money moved in the app. */
+  opening_amount: number
+  currency: string
+  start_date: string
+  due_date: string | null
+  notes: string
+  /** Opening amount plus everything lent or borrowed on it. */
+  principal: number
+  repaid: number
+  outstanding: number
+  /** Interest paid (borrowed) or earned (lent), kept apart from principal. */
+  interest: number
+  transaction_count: number
+  last_activity: string
+  status: 'open' | 'settled'
+  created_at: string
+  updated_at: string
+}
+export type CreateLoanRequest = {
+  direction: LoanDirection
+  counterparty: string
+  opening_amount: number
+  start_date?: string
+  due_date?: string | null
+  notes?: string
+}
+export type UpdateLoanRequest = {
+  counterparty?: string
+  opening_amount?: number
+  start_date?: string
+  due_date?: string
+  clear_due_date?: boolean
+  notes?: string
+}
+
+export type SavingsGoal = {
+  id: string
+  name: string
+  target_amount: number
+  target_date: string | null
+  /** Where the goal's money is kept, when the user says. */
+  account_id: string | null
+  account_name?: string
+  notes: string
+  /** Contributions less withdrawals: set aside, not a separate balance. */
+  saved: number
+  pct: number
+  reached: boolean
+  created_at: string
+  updated_at: string
+}
+export type SavingsGoalEntry = {
+  id: string
+  goal_id: string
+  /** Positive: a contribution; negative: a withdrawal. */
+  amount: number
+  entry_date: string
+  note: string
+  /** The transfer that moved the money, when the entry moved any. */
+  transaction_id: string | null
+  created_at: string
+}
+export type SavingsGoalDetail = SavingsGoal & { entries: SavingsGoalEntry[] }
+export type SavingsGoalRequest = {
+  name?: string
+  target_amount?: number
+  target_date?: string | null
+  clear_target_date?: boolean
+  account_id?: string | null
+  clear_account?: boolean
+  notes?: string
+}
+export type SavingsGoalEntryRequest = {
+  amount: number
+  entry_date?: string
+  note?: string
+  from_account_id?: string | null
+  to_account_id?: string | null
+}
+
+/** GET /reports/loans: one month of money moving on loans (never income or expense). */
+export type ReportLoanActivity = {
+  period: string
+  lent: number
+  repaid_to_you: number
+  borrowed: number
+  you_repaid: number
+  interest_paid: number
+  interest_earned: number
+}
+/** GET /reports/savings: one month of goal contributions and withdrawals. */
+export type ReportSavingsActivity = { period: string; added: number; taken: number }

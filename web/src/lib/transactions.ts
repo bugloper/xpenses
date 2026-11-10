@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import type { PendingTransaction } from '@/lib/offline/queue'
 import { signedAmount } from '@/lib/money'
-import type { Transaction } from '@/types/api'
+import { LOAN_TYPES, type LoanDirection, type LoanTransactionType, type Transaction } from '@/types/api'
 
 const isoDate = () =>
   z
@@ -22,7 +22,21 @@ export const transactionsSearchSchema = z.object({
   to: isoDate(),
   account: z.string().optional().catch(undefined),
   category: z.string().optional().catch(undefined),
-  type: z.enum(['expense', 'income', 'transfer', 'refund', 'adjustment']).optional().catch(undefined),
+  type: z
+    .enum([
+      'expense',
+      'income',
+      'transfer',
+      'refund',
+      'adjustment',
+      'loan_given',
+      'loan_received',
+      'loan_repayment',
+      'loan_repayment_received',
+      'loan',
+    ])
+    .optional()
+    .catch(undefined),
   status: z.enum(['cleared', 'pending', 'void']).optional().catch(undefined),
   sort: z.enum(['date', 'amount', 'created_at', 'payee']).optional().catch(undefined),
   order: z.enum(['asc', 'desc']).optional().catch(undefined),
@@ -36,7 +50,7 @@ export type ListRow =
 export type DayGroup = {
   date: string
   rows: ListRow[]
-  /** Net of income/refund minus expense for the day (transfers/adjustments excluded). */
+  /** Income less spending (net of refunds) for the day; transfers, loans and adjustments excluded. */
   net: number
   income: number
   expense: number
@@ -64,21 +78,49 @@ export function pendingToTransaction(item: PendingTransaction): Transaction {
     receipt: null,
     client_id: item.client_id,
     tags: p.tags ?? [],
+    loan_id: p.loan_id ?? null,
+    loan_counterparty: p.new_loan?.counterparty,
     created_at: item.created_at,
     updated_at: item.updated_at,
   }
 }
 
-export function dayContribution(tx: Transaction): number {
-  if (tx.status !== 'cleared') return 0
+/** Picked in the loan field to start a new loan instead of adding to one. */
+export const NEW_LOAN = '__new'
+
+export function isLoanType(type: string): type is LoanTransactionType {
+  return (LOAN_TYPES as string[]).includes(type)
+}
+
+/** Lending and being repaid are loans given; borrowing and repaying, loans received. */
+export function loanDirection(type: LoanTransactionType): LoanDirection {
+  return type === 'loan_given' || type === 'loan_repayment_received' ? 'given' : 'received'
+}
+
+/** Short names for the loan movements, as the form's options and the ledger's labels. */
+export const LOAN_LABELS: Record<LoanTransactionType, string> = {
+  loan_given: 'Lent',
+  loan_received: 'Borrowed',
+  loan_repayment: 'Repaid',
+  loan_repayment_received: 'Repaid to you',
+}
+
+/**
+ * A transaction's part in the day's income and expenses: income counts in,
+ * spending out, and a refund gives spending back. Transfers, loan movements
+ * and adjustments are neither.
+ */
+export function dayFlows(tx: Transaction): { income: number; expense: number } {
+  if (tx.status !== 'cleared') return { income: 0, expense: 0 }
   switch (tx.type) {
-    case 'expense':
-      return -tx.amount
     case 'income':
+      return { income: tx.amount, expense: 0 }
+    case 'expense':
+      return { income: 0, expense: tx.amount }
     case 'refund':
-      return tx.amount
+      return { income: 0, expense: -tx.amount }
     default:
-      return 0
+      return { income: 0, expense: 0 }
   }
 }
 
@@ -122,9 +164,9 @@ export function groupByDay(
     let income = 0
     let expense = 0
     for (const r of dayRows) {
-      const c = dayContribution(r.tx)
-      if (c > 0) income += c
-      else expense += -c
+      const f = dayFlows(r.tx)
+      income += f.income
+      expense += f.expense
     }
     return { date, rows: dayRows, income, expense, net: income - expense }
   })
@@ -141,11 +183,28 @@ export function displayAmount(tx: Transaction, perspectiveAccountId?: string): n
 export type TitleFields = Pick<
   Transaction,
   'type' | 'account_name' | 'transfer_account_name' | 'payee' | 'description' | 'category_name'
->
+> &
+  Partial<Pick<Transaction, 'loan_counterparty'>>
+
+/** What a loan movement did, in a few words: "Lent to Pema", "Repaid by Pema". */
+export function loanTitle(type: LoanTransactionType, who?: string): string {
+  const name = who || 'someone'
+  switch (type) {
+    case 'loan_given':
+      return `Lent to ${name}`
+    case 'loan_received':
+      return `Borrowed from ${name}`
+    case 'loan_repayment':
+      return `Repaid ${name}`
+    case 'loan_repayment_received':
+      return `Repaid by ${name}`
+  }
+}
 
 export function transactionTitle(tx: TitleFields): string {
   if (tx.type === 'transfer')
     return `${tx.account_name ?? 'Account'} → ${tx.transfer_account_name ?? 'Account'}`
+  if (isLoanType(tx.type)) return loanTitle(tx.type, tx.loan_counterparty)
   return (
     tx.payee ||
     tx.description ||
@@ -160,4 +219,12 @@ export function transactionSubtitle(tx: TitleFields): string {
   if (tx.payee && tx.description) parts.push(tx.description)
   if (tx.account_name) parts.push(tx.account_name)
   return parts.join(' · ')
+}
+
+/** The glyph a transaction shows instead of a category icon, if any. */
+export function specialKind(type: string): 'transfer' | 'adjustment' | 'loan' | undefined {
+  if (type === 'transfer') return 'transfer'
+  if (type === 'adjustment') return 'adjustment'
+  if (isLoanType(type)) return 'loan'
+  return undefined
 }

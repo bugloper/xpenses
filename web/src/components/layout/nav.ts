@@ -1,8 +1,10 @@
 import {
   BookOpen,
+  HandCoins,
   LayoutGrid,
   LifeBuoy,
   PieChart,
+  PiggyBank,
   Settings,
   Shapes,
   ShieldCheck,
@@ -26,6 +28,8 @@ export const PRIMARY_NAV: NavItem[] = [
   { to: '/', label: 'Dashboard', short: 'Home', icon: LayoutGrid, exact: true },
   { to: '/transactions', label: 'Transactions', short: 'Ledger', icon: BookOpen },
   { to: '/budgets', label: 'Budgets', icon: Target },
+  { to: '/savings', label: 'Savings', icon: PiggyBank },
+  { to: '/loans', label: 'Loans', icon: HandCoins },
   { to: '/reports', label: 'Reports', icon: PieChart },
 ]
 
@@ -43,7 +47,7 @@ export const ACCOUNT_NAV: NavItem[] = [
 
 /** The phone's tab bar shows the first three primary screens; the rest live under More. */
 export const TAB_NAV: NavItem[] = PRIMARY_NAV.slice(0, 3)
-export const MORE_NAV: NavItem[] = [PRIMARY_NAV[3]!, ...SETUP_NAV, ...ACCOUNT_NAV]
+export const MORE_NAV: NavItem[] = [...PRIMARY_NAV.slice(3), ...SETUP_NAV, ...ACCOUNT_NAV]
 
 export const ALL_NAV: NavItem[] = [...PRIMARY_NAV, ...SETUP_NAV, ...ACCOUNT_NAV]
 

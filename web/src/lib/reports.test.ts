@@ -19,7 +19,7 @@ describe('reportPresetRange', () => {
     expect(reportPresetRange('month', now)).toEqual({ from: '2026-11-01', to: '2026-11-30' })
     expect(reportPresetRange('prev_month', now)).toEqual({ from: '2026-10-01', to: '2026-10-31' })
     expect(reportPresetRange('week', now)).toEqual({ from: '2026-11-02', to: '2026-11-08' })
-    expect(reportPresetRange('last3', now)).toEqual({ from: '2026-09-01', to: '2026-11-30' })
+    expect(reportPresetRange('year', now)).toEqual({ from: '2026-01-01', to: '2026-12-31' })
   })
 })
 
@@ -46,8 +46,8 @@ describe('resolveReportRange', () => {
       from: undefined,
       to: undefined,
     })
-    expect(periodSearch('last3', { from: 'x', to: 'y' })).toEqual({
-      period: 'last3',
+    expect(periodSearch('year', { from: 'x', to: 'y' })).toEqual({
+      period: 'year',
       from: undefined,
       to: undefined,
     })

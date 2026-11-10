@@ -44,7 +44,12 @@ export function LedgerFigures({
             ) : (
               <span
                 className={cn(
-                  'figure block truncate text-[1.625rem] leading-none sm:text-[2rem]',
+                  // Four across leaves less room: a smaller figure that wraps
+                  // rather than cutting off a long amount.
+                  'figure block leading-none break-words',
+                  items.length === 4
+                    ? 'text-[1.375rem] sm:text-[1.625rem]'
+                    : 'truncate text-[1.625rem] sm:text-[2rem]',
                   f.tone === 'income' && 'text-income',
                   f.tone === 'expense' && 'text-expense',
                   f.tone === 'muted' && 'text-muted-foreground',

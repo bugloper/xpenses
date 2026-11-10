@@ -23,7 +23,8 @@ export type TxFilters = {
   to?: string
   account?: string
   category?: string
-  type?: TransactionType
+  /** 'loan' shows every loan movement. */
+  type?: TransactionType | 'loan'
   status?: TransactionStatus
   sort?: TransactionSort
   order?: 'asc' | 'desc'
@@ -32,12 +33,17 @@ export type TxFilters = {
 const ANY = '__any'
 const sel = (v: string | undefined) => v ?? ANY
 
-const TYPE_LABEL: Record<TransactionType, string> = {
+const TYPE_LABEL: Record<TransactionType | 'loan', string> = {
   expense: 'Expense',
   income: 'Income',
   transfer: 'Transfer',
   refund: 'Refund',
   adjustment: 'Adjustment',
+  loan: 'Loans',
+  loan_given: 'Lent',
+  loan_received: 'Borrowed',
+  loan_repayment: 'Repaid',
+  loan_repayment_received: 'Repaid to you',
 }
 const STATUS_LABEL: Record<TransactionStatus, string> = {
   cleared: 'Cleared',
@@ -245,7 +251,7 @@ export function TransactionFiltersSheet({
             <FieldLabel>Type</FieldLabel>
             <Select
               value={sel(value.type)}
-              onValueChange={(v) => set({ type: v === ANY ? undefined : (v as TransactionType) })}
+              onValueChange={(v) => set({ type: v === ANY ? undefined : (v as TransactionType | 'loan') })}
             >
               <SelectTrigger className="w-full">
                 <SelectValue />
@@ -256,6 +262,7 @@ export function TransactionFiltersSheet({
                 <SelectItem value="income">Income</SelectItem>
                 <SelectItem value="transfer">Transfer</SelectItem>
                 <SelectItem value="refund">Refund</SelectItem>
+                <SelectItem value="loan">Loans and repayments</SelectItem>
                 <SelectItem value="adjustment">Adjustment</SelectItem>
               </SelectContent>
             </Select>

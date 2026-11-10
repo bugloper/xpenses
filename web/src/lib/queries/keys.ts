@@ -16,6 +16,14 @@ export const keys = {
     detail: (id: string) => ['transactions', 'detail', id] as const,
   },
   budgets: { all: ['budgets'] as const },
+  loans: {
+    all: ['loans'] as const,
+    detail: (id: string) => ['loans', 'detail', id] as const,
+  },
+  savings: {
+    all: ['savings'] as const,
+    detail: (id: string) => ['savings', 'detail', id] as const,
+  },
   recurring: { all: ['recurring'] as const },
   settings: { all: ['settings'] as const },
   reports: {
@@ -37,4 +45,6 @@ export const transactionDependentKeys = [
   keys.transactions.all,
   keys.accounts.all,
   keys.reports.all,
+  keys.loans.all,
+  keys.savings.all,
 ] as const

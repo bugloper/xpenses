@@ -30,7 +30,8 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { errorMessage } from '@/lib/api'
 import { formatMoney } from '@/lib/money'
-import { useAccounts, useDefaultCurrency, useUpdateAccount } from '@/lib/queries'
+import { loanTotals } from '@/lib/loans'
+import { useAccounts, useDefaultCurrency, useLoans, useUpdateAccount } from '@/lib/queries'
 import { cn } from '@/lib/utils'
 import type { Account } from '@/types/api'
 import { appRoute } from './__root'
@@ -66,6 +67,9 @@ function AccountsPage() {
   const total = useMemo(() => active.reduce((n, a) => n + a.current_balance, 0), [active])
   const assets = useMemo(() => active.reduce((n, a) => n + Math.max(0, a.current_balance), 0), [active])
   const owed = useMemo(() => active.reduce((n, a) => n + Math.min(0, a.current_balance), 0), [active])
+  // Loans count too: money lent is still the user's, money borrowed is not.
+  const { data: loans = [] } = useLoans()
+  const loanSums = useMemo(() => loanTotals(loans), [loans])
   // Colours follow the composition order, so a row's swatch matches its slice of the bar.
   const colour = useMemo(() => {
     const m = new Map<string, string>()
@@ -137,6 +141,8 @@ function AccountsPage() {
         <>
           <NetWorth
             total={total}
+            owedToYou={loanSums.owedToYou}
+            youOwe={loanSums.youOwe}
             assets={assets}
             owed={owed}
             currency={currency}
@@ -232,6 +238,8 @@ function AccountsPage() {
 /** The headline: what everything adds up to, and how it is spread across accounts. */
 function NetWorth({
   total,
+  owedToYou,
+  youOwe,
   assets,
   owed,
   currency,
@@ -239,12 +247,17 @@ function NetWorth({
   colour,
 }: {
   total: number
+  /** Outstanding on loans the user gave, and on loans they took. */
+  owedToYou: number
+  youOwe: number
   assets: number
   owed: number
   currency: string
   accounts: Account[]
   colour: Map<string, string>
 }) {
+  const hasLoans = owedToYou > 0 || youOwe > 0
+  const worth = total + owedToYou - youOwe
   const held = accounts.filter((a) => a.current_balance > 0)
   const debts = accounts.filter((a) => a.current_balance < 0)
   const rest = held.slice(SERIES.length)
@@ -253,14 +266,14 @@ function NetWorth({
     <section className="bg-card grid overflow-hidden rounded-lg border" aria-label="Net worth">
       <div className="flex flex-col justify-between gap-5 p-5 sm:p-6">
         <div>
-          <div className="eyebrow">Net worth · active accounts</div>
+          <div className="eyebrow">Net worth · {hasLoans ? 'accounts and loans' : 'active accounts'}</div>
           <div
             className={cn(
               'figure mt-3 text-[2.75rem] leading-none break-words sm:text-[3.5rem]',
-              total < 0 && 'text-expense',
+              worth < 0 && 'text-expense',
             )}
           >
-            {formatMoney(total, currency)}
+            {formatMoney(worth, currency)}
           </div>
         </div>
         <dl className="divide-rule grid grid-cols-2 divide-x border-t pt-4">
@@ -275,6 +288,26 @@ function NetWorth({
             </dd>
           </div>
         </dl>
+        {hasLoans && (
+          <dl className="divide-rule grid grid-cols-2 divide-x border-t pt-4">
+            <div className="pr-4">
+              <dt className="eyebrow">Lent, owed to you</dt>
+              <dd className="figure mt-1.5 text-xl">
+                <Link to="/loans" className="hover:underline">
+                  {formatMoney(owedToYou, currency)}
+                </Link>
+              </dd>
+            </div>
+            <div className="pl-4">
+              <dt className="eyebrow">Borrowed, you owe</dt>
+              <dd className={cn('figure mt-1.5 text-xl', youOwe > 0 && 'text-expense')}>
+                <Link to="/loans" className="hover:underline">
+                  {formatMoney(-youOwe, currency)}
+                </Link>
+              </dd>
+            </div>
+          </dl>
+        )}
       </div>
       <div className="flex flex-col gap-4 border-t p-5 sm:p-6">
         <div className="flex items-baseline justify-between gap-3">

@@ -5,6 +5,7 @@ import { AccountFormSheet } from '@/components/accounts/AccountForm'
 import { DeleteAccountDialog } from '@/components/accounts/DeleteAccountDialog'
 import { TransferDialog } from '@/components/accounts/TransferDialog'
 import { AccountIcon, accountTypeLabel } from '@/components/common/AccountIcon'
+import { Meter, Panel, Row, Rows } from '@/components/common/kit'
 import { Section } from '@/components/common/PageHeader'
 import { Money } from '@/components/common/Money'
 import { ErrorState, ListSkeleton } from '@/components/common/States'
@@ -15,7 +16,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { formatShortDate } from '@/lib/dates'
 import { formatMoney } from '@/lib/money'
 import { usePendingTransactions } from '@/lib/offline'
-import { useAccount, useInfiniteTransactions, useReportAccounts } from '@/lib/queries'
+import { useAccount, useInfiniteTransactions, useReportAccounts, useSavingsGoals } from '@/lib/queries'
 import { groupByDay } from '@/lib/transactions'
 import { uiStore } from '@/lib/ui-store'
 import { cn } from '@/lib/utils'
@@ -24,6 +25,47 @@ import { appRoute } from './__root'
 
 // The statement covers every cleared transaction the account has ever had.
 const ALL_TIME = { from: '1970-01-01', to: '9999-12-31' }
+
+/**
+ * The goals whose money is kept in this account: how much of its balance is
+ * earmarked, and how much is free. Goals don't hold money of their own.
+ */
+function Earmarks({ account }: { account: Account }) {
+  const { data: goals = [] } = useSavingsGoals()
+  const mine = goals.filter((g) => g.account_id === account.id)
+  if (mine.length === 0) return null
+  const earmarked = mine.reduce((n, g) => n + g.saved, 0)
+  const free = account.current_balance - earmarked
+  return (
+    <Panel
+      eyebrow="Savings goals"
+      title="Earmarked in this account"
+      description="Part of the balance above, set aside for goals. Not extra money."
+      flush
+      footer={
+        <div className="flex items-baseline justify-between gap-3">
+          <span className={cn(free < 0 && 'text-expense')}>
+            {free < 0 ? 'Goals hold more than the account has' : 'Not earmarked'}
+          </span>
+          <Money minor={free} currency={account.currency} className="font-medium" />
+        </div>
+      }
+    >
+      <Rows>
+        {mine.map((g) => (
+          <Row
+            key={g.id}
+            to="/savings"
+            title={g.name}
+            subtitle={<Meter value={g.pct} tone={g.reached ? 'income' : 'saffron'} className="mt-1.5" />}
+            trailing={<Money minor={g.saved} currency={account.currency} className="font-medium" />}
+            chevron
+          />
+        ))}
+      </Rows>
+    </Panel>
+  )
+}
 
 function AccountDetailPage() {
   const { id } = accountDetailRoute.useParams()
@@ -106,6 +148,7 @@ function AccountDetailPage() {
       </header>
 
       <Statement account={a} />
+      <Earmarks account={a} />
 
       <Section title="Transactions">
         <TransactionList
@@ -141,8 +184,9 @@ function AccountDetailPage() {
 function Statement({ account: a }: { account: Account }) {
   const report = useReportAccounts(ALL_TIME.from, ALL_TIME.to)
   const r = report.data?.find((x) => x.account_id === a.id)
-  const moneyIn = r ? r.income + r.transfers_in : null
-  const moneyOut = r ? r.expenses + r.transfers_out : null
+  // Everything that moved the balance, loans included, so the statement adds up.
+  const moneyIn = r ? r.income + r.transfers_in + r.loans_in : null
+  const moneyOut = r ? r.expenses + r.transfers_out + r.loans_out : null
   const line = 'flex items-baseline justify-between gap-4 py-2.5 text-sm'
   return (
     <section className="bg-card grid overflow-hidden rounded-lg border" aria-label="Statement">
@@ -180,6 +224,9 @@ function Statement({ account: a }: { account: Account }) {
               {r && r.transfers_in > 0 && (
                 <span className="text-xs"> · incl. {formatMoney(r.transfers_in, a.currency)} transfers</span>
               )}
+              {r && r.loans_in > 0 && (
+                <span className="text-xs"> · {formatMoney(r.loans_in, a.currency)} loans</span>
+              )}
             </dt>
             <dd className="font-medium">
               {moneyIn === null ? (
@@ -194,6 +241,9 @@ function Statement({ account: a }: { account: Account }) {
               Money out
               {r && r.transfers_out > 0 && (
                 <span className="text-xs"> · incl. {formatMoney(r.transfers_out, a.currency)} transfers</span>
+              )}
+              {r && r.loans_out > 0 && (
+                <span className="text-xs"> · {formatMoney(r.loans_out, a.currency)} loans</span>
               )}
             </dt>
             <dd className="font-medium">

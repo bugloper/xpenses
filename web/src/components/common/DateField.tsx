@@ -14,6 +14,7 @@ export function DateField({
   id,
   className,
   invalid,
+  clearable,
 }: {
   value: string
   onChange: (iso: string) => void
@@ -21,6 +22,8 @@ export function DateField({
   id?: string
   className?: string
   invalid?: boolean
+  /** An optional date: offers to clear it (onChange('')). */
+  clearable?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const t = today()
@@ -47,7 +50,8 @@ export function DateField({
             aria-invalid={invalid}
             className={cn(
               'h-9 justify-start rounded-md font-normal',
-              value !== t &&
+              value &&
+                value !== t &&
                 value !== y &&
                 'border-foreground bg-foreground text-background hover:bg-foreground/90',
             )}
@@ -86,6 +90,17 @@ export function DateField({
           />
         </PopoverContent>
       </Popover>
+      {clearable && value && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="text-muted-foreground"
+          onClick={() => onChange('')}
+        >
+          Clear
+        </Button>
+      )}
     </div>
   )
 }

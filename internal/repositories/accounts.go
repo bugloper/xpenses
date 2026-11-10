@@ -13,14 +13,19 @@ type AccountRepo struct{}
 
 // balanceExpr computes an account's current balance from the ledger. Only
 // 'cleared' transactions count. Transfers debit account_id and credit
-// transfer_account_id; adjustments are signed.
+// transfer_account_id; adjustments are signed. Borrowing and being repaid
+// bring money in, lending and repaying take it out.
 const balanceExpr = `a.opening_balance
 	+ COALESCE((SELECT SUM(CASE t.type
 		WHEN 'income' THEN t.amount
 		WHEN 'refund' THEN t.amount
 		WHEN 'adjustment' THEN t.amount
+		WHEN 'loan_received' THEN t.amount
+		WHEN 'loan_repayment_received' THEN t.amount
 		WHEN 'expense' THEN -t.amount
 		WHEN 'transfer' THEN -t.amount
+		WHEN 'loan_given' THEN -t.amount
+		WHEN 'loan_repayment' THEN -t.amount
 		ELSE 0 END)
 		FROM transactions t WHERE t.account_id = a.id AND t.status = 'cleared'), 0)
 	+ COALESCE((SELECT SUM(t.amount) FROM transactions t
