@@ -14,7 +14,9 @@ import {
 import type { ReactNode } from 'react'
 import { Logo } from '@/components/layout/Brand'
 import { Button } from '@/components/ui/button'
+import { usePublicTestimonials } from '@/lib/queries/community'
 import { useAuthStatus } from '@/lib/queries/auth'
+import { formatMonthLabel } from '@/lib/dates'
 import { cn } from '@/lib/utils'
 
 /** The banks whose success screens Xpenses reads, as they are known at the counter. */
@@ -211,6 +213,8 @@ export function HomePage() {
           </div>
         </section>
 
+        <Testimonials />
+
         {/* The free year, as a statement. */}
         <section aria-labelledby="year-heading" className="border-b">
           <div className="mx-auto grid max-w-7xl gap-10 px-4 py-14 sm:px-8 lg:grid-cols-12 lg:py-20">
@@ -336,6 +340,52 @@ function Masthead({ registrationOpen }: { registrationOpen: boolean }) {
         </nav>
       </div>
     </header>
+  )
+}
+
+/**
+ * What people who use Xpenses say, in their own words: only what the
+ * administrator has read and approved. Not shown at all until there is some.
+ */
+function Testimonials() {
+  const { data } = usePublicTestimonials()
+  if (!data || data.length === 0) return null
+  return (
+    <section aria-labelledby="words-heading" className="border-b">
+      <div className="mx-auto max-w-7xl px-4 py-14 sm:px-8 lg:py-20">
+        <SectionHead eyebrow="In their words" id="words-heading">
+          From people keeping their book
+        </SectionHead>
+        <div className="mt-10 columns-1 gap-4 md:columns-2 lg:columns-3">
+          {data.map((t) => (
+            <figure key={t.id} className="bg-card mb-4 break-inside-avoid rounded-lg border p-6">
+              <span aria-hidden className="font-display text-saffron block text-5xl leading-none">
+                “
+              </span>
+              <blockquote className="font-display -mt-2 text-xl leading-snug text-pretty">
+                {t.body}
+              </blockquote>
+              <figcaption className="mt-5 flex items-center gap-3 border-t pt-4">
+                <span
+                  aria-hidden
+                  className="bg-saffron text-saffron-foreground flex size-9 shrink-0 items-center justify-center rounded-md font-mono text-xs font-semibold"
+                >
+                  {t.name.trim().charAt(0).toUpperCase()}
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-medium">{t.name}</span>
+                  {t.since && (
+                    <span className="eyebrow block truncate">
+                      Using Xpenses since {formatMonthLabel(t.since)}
+                    </span>
+                  )}
+                </span>
+              </figcaption>
+            </figure>
+          ))}
+        </div>
+      </div>
+    </section>
   )
 }
 

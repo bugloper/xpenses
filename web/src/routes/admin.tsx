@@ -1,9 +1,13 @@
 import { createRoute, redirect } from '@tanstack/react-router'
+import { z } from 'zod'
 import { ShieldCheck } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { FeedbackSection } from '@/components/admin/FeedbackSection'
 import { inviteStatus, InvitesSection } from '@/components/admin/InvitesSection'
 import { RegistrationSection } from '@/components/admin/RegistrationSection'
+import { TestimonialsSection } from '@/components/admin/TestimonialsSection'
 import { accessState, UsersSection } from '@/components/admin/UsersSection'
+import { useCommunityCounts } from '@/lib/queries'
 import { useAdminSettings, useAdminUsers, useInvites } from '@/lib/queries/auth'
 import { cn } from '@/lib/utils'
 import { appRoute } from './__root'
@@ -82,7 +86,59 @@ function Overview() {
   )
 }
 
+const TABS = ['users', 'feedback', 'testimonials'] as const
+type Tab = (typeof TABS)[number]
+const searchSchema = z.object({ tab: z.enum(TABS).optional().catch(undefined) })
+
+/** The console's sections: people, what they write to you, and what they say publicly. */
+function ConsoleTabs({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => void }) {
+  const counts = useCommunityCounts()
+  const badge = (n: number | undefined) =>
+    n ? (
+      <span className="bg-saffron text-saffron-foreground ml-1.5 inline-flex h-4.5 min-w-4.5 items-center justify-center rounded-sm px-1 font-mono text-[0.625rem] font-semibold">
+        {n}
+      </span>
+    ) : null
+  const item = (t: Tab, label: string, n?: number) => (
+    <button
+      key={t}
+      type="button"
+      role="tab"
+      aria-selected={tab === t}
+      onClick={() => onChange(t)}
+      className={cn(
+        'font-display relative flex h-11 shrink-0 items-center text-[1.0625rem] transition-colors',
+        tab === t ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground',
+      )}
+    >
+      {label}
+      {badge(n)}
+      <span
+        aria-hidden
+        className={cn(
+          'bg-saffron absolute inset-x-0 -bottom-px h-[3px]',
+          tab === t ? 'opacity-100' : 'opacity-0',
+        )}
+      />
+    </button>
+  )
+  return (
+    <div
+      role="tablist"
+      aria-label="Console section"
+      className="no-scrollbar flex gap-6 overflow-x-auto border-b sm:gap-8"
+    >
+      {item('users', 'Users')}
+      {item('feedback', 'Feedback', counts.data?.new_feedback)}
+      {item('testimonials', 'Testimonials', counts.data?.pending_testimonials)}
+    </div>
+  )
+}
+
 function AdminPage() {
+  const search = adminRoute.useSearch()
+  const navigate = adminRoute.useNavigate()
+  const tab: Tab = search.tab ?? 'users'
   return (
     <div className="flex flex-col gap-6">
       <header className="bg-ink text-ink-foreground border-ink-foreground/10 overflow-hidden rounded-lg border">
@@ -93,7 +149,7 @@ function AdminPage() {
             </div>
             <h1 className="font-display text-[2rem] leading-[1.05] font-medium sm:text-[2.5rem]">Admin</h1>
             <p className="text-ink-muted mt-2 max-w-prose text-sm">
-              Users, registration and invites for this instance.
+              Users, registration, invites, and what people write to you.
             </p>
           </div>
           <span className="text-ink-muted font-mono text-[0.6875rem] tracking-[0.12em] uppercase">
@@ -102,11 +158,21 @@ function AdminPage() {
         </div>
         <Overview />
       </header>
-      <UsersSection id="users" />
-      <div className="grid items-start gap-6">
-        <RegistrationSection />
-        <InvitesSection />
-      </div>
+      <ConsoleTabs
+        tab={tab}
+        onChange={(t) => void navigate({ search: t === 'users' ? {} : { tab: t }, replace: true })}
+      />
+      {tab === 'users' && (
+        <>
+          <UsersSection id="users" />
+          <div className="grid items-start gap-6">
+            <RegistrationSection />
+            <InvitesSection />
+          </div>
+        </>
+      )}
+      {tab === 'feedback' && <FeedbackSection />}
+      {tab === 'testimonials' && <TestimonialsSection />}
     </div>
   )
 }
@@ -114,6 +180,7 @@ function AdminPage() {
 export const adminRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/admin',
+  validateSearch: searchSchema,
   // The root guard already redirects non-admins; this keeps the rule local too.
   beforeLoad: ({ context }) => {
     if (context.auth.user?.role !== 'admin') throw redirect({ to: '/' })

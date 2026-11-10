@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { ChevronDown, LogOut, Settings, ShieldCheck } from 'lucide-react'
+import { ChevronDown, LifeBuoy, LogOut, Settings, ShieldCheck } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -69,6 +69,11 @@ export function UserMenu() {
         <DropdownMenuItem asChild>
           <Link to="/settings">
             <Settings /> Settings
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link to="/help">
+            <LifeBuoy /> Feedback & support
           </Link>
         </DropdownMenuItem>
         {isAdmin && (

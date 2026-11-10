@@ -38,12 +38,16 @@ const APIPrefix = "/api/v1"
 // publicPaths (relative to APIPrefix) need no session.
 var publicPaths = map[string]bool{
 	"/health": true, "/auth/status": true, "/auth/setup": true, "/auth/register": true, "/auth/login": true, "/auth/reset-password": true,
+	// Approved testimonials, for the public home page.
+	"/public/testimonials": true,
 }
 
 // expiredAllowed are the paths a user whose free year has ended may still
-// call: enough to see who they are, sign out and manage their sessions.
+// call: enough to see who they are, sign out, manage their sessions, and ask
+// for help (Feedback & support is how they reach the administrator).
 var expiredAllowed = map[string]bool{
 	"/auth/me": true, "/auth/me/avatar": true, "/auth/logout": true, "/auth/logout-all": true, "/auth/sessions": true, "/auth/password": true,
+	"/feedback": true,
 }
 
 // adminOnly reports whether a relative API path is restricted to administrators.

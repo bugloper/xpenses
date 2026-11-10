@@ -91,8 +91,11 @@ Every user may use the app for one year from sign-up: `User.access_until` (YYYY-
 allowed day) is set at registration and existing users got a year from their `created_at`. There is
 no payment system; the administrator extends the date from the Users list. Administrators are never
 cut off. Once the date has passed, every data route answers `403 access_expired`; only
-`/auth/me`, `/auth/me/avatar`, `/auth/logout`, `/auth/logout-all`, `/auth/sessions*` and `/auth/password`
-still work, so the app can show the "your free year has ended" page and let the user sign out.
+`/auth/me`, `/auth/me/avatar`, `/auth/logout`, `/auth/logout-all`, `/auth/sessions*`, `/auth/password`
+and `/feedback` still work, so the app can show the "your free year has ended" page, let the user ask
+the administrator for more time, and sign out. Days run on Bhutan time (Asia/Thimphu) on the server
+and in the app alike, whatever the server or device clock is set to: the year is stamped from the
+Bhutan date at sign-up, and access ends at midnight in Thimphu after the last allowed day.
 Sign-in itself still succeeds (the page needs the user to show who they are).
 
 ## Admin routes (role `admin`)

@@ -32,6 +32,7 @@ type Deps struct {
 	Recurring    *services.RecurringService
 	Settings     *services.SettingsService
 	Backup       *services.BackupService
+	Community    *services.CommunityService
 	Auth         *auth.Service
 	AuthMW       *auth.Middleware
 }
@@ -54,6 +55,7 @@ func NewDeps(cfg config.Config, db *sql.DB) *Deps {
 		Recurring:    &services.RecurringService{DB: db, DefaultCurrency: cfg.DefaultCurrency},
 		Settings:     &services.SettingsService{DB: db},
 		Backup:       &services.BackupService{DB: db, DBPath: cfg.DBPath(), BackupsDir: cfg.BackupsDir()},
+		Community:    &services.CommunityService{DB: db},
 	}
 	d.Auth = auth.NewService(db)
 	d.Auth.DefaultCurrency = cfg.DefaultCurrency
@@ -113,6 +115,7 @@ func New(cfg config.Config, log *slog.Logger, deps *Deps, extra ...Registrar) *e
 		&handlers.BudgetHandler{Svc: deps.Budgets},
 		&handlers.RecurringHandler{Svc: deps.Recurring},
 		&handlers.SettingsHandler{Svc: deps.Settings},
+		&handlers.CommunityHandler{Svc: deps.Community},
 	}
 	regs = append(regs, extra...)
 	for _, r := range regs {

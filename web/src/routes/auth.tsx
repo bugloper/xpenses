@@ -2,6 +2,7 @@ import { Link, Outlet, createRoute, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { AuthLayout } from '@/components/auth/AuthLayout'
+import { FeedbackForm } from '@/components/help/FeedbackForm'
 import { ForgotPasswordDialog } from '@/components/auth/ForgotPasswordDialog'
 import { LoginForm } from '@/components/auth/LoginForm'
 import { RegisterForm } from '@/components/auth/RegisterForm'
@@ -223,6 +224,15 @@ function ExpiredPage() {
             ))}
           </ol>
         </div>
+        <section aria-labelledby="expired-support" className="bg-card rounded-lg border p-4">
+          <h2 id="expired-support" className="font-display text-lg">
+            Ask the administrator
+          </h2>
+          <p className="text-muted-foreground mt-1 mb-3">
+            Send a note from here; they see it in their console and can extend your access.
+          </p>
+          <FeedbackForm kind="support" />
+        </section>
         <Button
           size="lg"
           className="h-12 w-full"

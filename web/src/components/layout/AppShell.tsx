@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils'
 import { AccessBanner } from './AccessBanner'
 import { Logo } from './Brand'
 import { CurrencyMenu } from './CurrencyMenu'
-import { MORE_NAV, PRIMARY_NAV, SETUP_NAV, TAB_NAV, visibleNav, type NavItem } from './nav'
+import { ACCOUNT_NAV, MORE_NAV, PRIMARY_NAV, SETUP_NAV, TAB_NAV, visibleNav, type NavItem } from './nav'
 import { PendingSheet } from './PendingSheet'
 import { PwaInstallPrompt } from './PwaInstallPrompt'
 import { PwaUpdatePrompt } from './PwaUpdatePrompt'
@@ -98,6 +98,8 @@ function Sidebar() {
           Set up
         </div>
         {SETUP_NAV.map(item)}
+        <span className="flex-1" />
+        {ACCOUNT_NAV.filter((i) => i.to === '/help').map(item)}
       </nav>
       <div className="border-ink-foreground/10 flex items-center gap-1.5 border-t px-3 py-3">
         <UserMenu />

@@ -432,7 +432,8 @@ func TestFreeYear(t *testing.T) {
 	}
 	bobID := testutil.Data(created)["id"].(string)
 	// A new user gets a year from today.
-	want := time.Now().UTC().AddDate(1, 0, 0).Format("2006-01-02")
+	// The free year runs on the Bhutan calendar, whatever the server clock says.
+	want := auth.AccessDate(time.Now().AddDate(1, 0, 0))
 	if got := testutil.Data(created)["access_until"]; got != want {
 		t.Fatalf("access_until want %s got %v", want, got)
 	}
@@ -443,7 +444,7 @@ func TestFreeYear(t *testing.T) {
 	if st, b := admin.Do("PATCH", "/admin/users/"+bobID, map[string]any{"access_until": "not a date"}); st != 422 {
 		t.Fatalf("bad date want 422 got %d %v", st, b)
 	}
-	yesterday := time.Now().UTC().AddDate(0, 0, -1).Format("2006-01-02")
+	yesterday := auth.AccessDate(time.Now().AddDate(0, 0, -1))
 	if st, b := admin.Do("PATCH", "/admin/users/"+bobID, map[string]any{"access_until": yesterday}); st != 200 || testutil.Data(b)["access_until"] != yesterday {
 		t.Fatalf("expire: %d %v", st, b)
 	}
@@ -461,7 +462,7 @@ func TestFreeYear(t *testing.T) {
 		t.Fatalf("login while expired want 200 got %d", st)
 	}
 	// Today is still allowed; the admin extends by a year.
-	today := time.Now().UTC().Format("2006-01-02")
+	today := auth.AccessDate(time.Now())
 	admin.Do("PATCH", "/admin/users/"+bobID, map[string]any{"access_until": today})
 	if st, _ := bob.Do("GET", "/accounts", nil); st != 200 {
 		t.Fatalf("last day want 200 got %d", st)

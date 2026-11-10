@@ -54,6 +54,16 @@ Status codes: 200 OK, 201 Created, 204 No Content, 400 bad_request, 404 not_foun
 | POST | /recurring/run?as_of=YYYY-MM-DD | generate due occurrences → `{generated,skipped,transaction_ids}` |
 | GET/PATCH/DELETE | /recurring/:id | |
 | GET/PATCH | /settings | flat `{key: value}`; keys: default_currency, ui.last_account_id, ui.last_category_id, ui.theme |
+| GET | /feedback | `{kinds:[{key,label}], messages:[{id,kind,kind_label,body,status,reply,created_at,acknowledged_at,replied_at}]}`, the user's own, newest first. Allowed for a user whose free year has ended |
+| POST | /feedback | `{kind: feedback\|feature\|support, body}` (≤ 2000 chars) → 201. Allowed after the free year ends |
+| GET/PUT/DELETE | /testimonial | the user's one testimonial (`null` when none); PUT `{body}` (20–300 chars) saves it as `pending`, so a rewrite goes back for review |
+| GET | /public/testimonials | no session; approved testimonials of active users `[{id, body, name, since: "YYYY-MM"}]`, newest approval first, at most 12 |
+| GET | /admin/community | `{new_feedback, pending_testimonials}` |
+| GET | /admin/feedback?status=new\|acknowledged\|replied | the inbox with `from:{id,name,email}`; no status = all |
+| POST | /admin/feedback/:id/acknowledge | 204; marks a new message seen |
+| POST | /admin/feedback/:id/reply | `{reply}` → 204; one reply per message (409 after that) |
+| GET | /admin/testimonials?status=pending\|approved\|hidden | review list; no status = all |
+| POST | /admin/testimonials/:id/approve, /admin/testimonials/:id/hide | 204 |
 | GET | /backup?passphrase= | downloads SQLite snapshot (encrypted `.enc` when passphrase given; header `X-Backup-Passphrase` also accepted) |
 | POST | /restore | multipart `file` (+ `passphrase`) |
 

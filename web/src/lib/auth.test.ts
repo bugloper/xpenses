@@ -7,6 +7,7 @@ import {
   authErrorInfo,
   authStore,
   initials,
+  accessDate,
   accessDaysLeft,
   accessExpired,
   isAuthPath,
@@ -125,13 +126,25 @@ describe('resolveAuthRedirect', () => {
 })
 
 describe('free year', () => {
-  const nov8 = new Date(2026, 10, 8, 15, 0)
+  // Midday on 8 Nov in Thimphu (UTC+6), the same instant whatever zone the tests run in.
+  const nov8 = new Date('2026-11-08T06:00:00Z')
   it('counts the days left and treats the last day as allowed', () => {
     expect(accessDaysLeft({ role: 'user', access_until: '2027-11-08' }, nov8)).toBe(365)
     expect(accessDaysLeft({ role: 'user', access_until: '2026-11-08' }, nov8)).toBe(0)
     expect(accessDaysLeft({ role: 'user', access_until: '2026-11-07' }, nov8)).toBe(-1)
     expect(accessExpired({ role: 'user', access_until: '2026-11-08' }, nov8)).toBe(false)
     expect(accessExpired({ role: 'user', access_until: '2026-11-07' }, nov8)).toBe(true)
+  })
+  it('turns over at midnight Bhutan time, not on the device clock or UTC', () => {
+    const user = { role: 'user' as const, access_until: '2026-11-09' }
+    // 23:59 on 9 Nov in Thimphu (17:59 UTC): the last day, still allowed.
+    expect(accessDate(new Date('2026-11-09T17:59:00Z'))).toBe('2026-11-09')
+    expect(accessDaysLeft(user, new Date('2026-11-09T17:59:00Z'))).toBe(0)
+    expect(accessExpired(user, new Date('2026-11-09T17:59:00Z'))).toBe(false)
+    // 00:00 on 10 Nov in Thimphu (18:00 UTC, still 9 Nov in UTC): over.
+    expect(accessDate(new Date('2026-11-09T18:00:00Z'))).toBe('2026-11-10')
+    expect(accessDaysLeft(user, new Date('2026-11-09T18:00:00Z'))).toBe(-1)
+    expect(accessExpired(user, new Date('2026-11-09T18:00:00Z'))).toBe(true)
   })
   it('never applies to admins', () => {
     expect(accessDaysLeft({ role: 'admin', access_until: '2020-01-01' }, nov8)).toBeNull()

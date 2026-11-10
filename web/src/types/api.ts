@@ -362,3 +362,64 @@ export interface CategoryUsage {
   budgets: number
   recurring: number
 }
+
+// Feedback & support, and testimonials (see internal/services/community.go).
+export type FeedbackKindKey = 'feedback' | 'feature' | 'support'
+export type FeedbackStatus = 'new' | 'acknowledged' | 'replied'
+
+export interface FeedbackMessage {
+  id: string
+  kind: FeedbackKindKey
+  kind_label: string
+  body: string
+  status: FeedbackStatus
+  /** The administrator's answer; empty until there is one. */
+  reply: string
+  created_at: string
+  acknowledged_at: string | null
+  replied_at: string | null
+}
+
+export interface MyFeedback {
+  kinds: { key: FeedbackKindKey; label: string }[]
+  messages: FeedbackMessage[]
+}
+
+export interface CommunitySender {
+  id: string
+  name: string
+  email: string
+}
+
+export interface AdminFeedbackMessage extends FeedbackMessage {
+  from: CommunitySender
+  reviewed_by_name: string | null
+}
+
+export type TestimonialStatus = 'pending' | 'approved' | 'hidden'
+
+export interface Testimonial {
+  id: string
+  body: string
+  status: TestimonialStatus
+  updated_at: string
+}
+
+export interface PublicTestimonial {
+  id: string
+  body: string
+  name: string
+  /** YYYY-MM the writer started using Xpenses. */
+  since: string
+}
+
+export interface AdminTestimonial extends Testimonial {
+  from: CommunitySender
+  reviewed_by_name: string | null
+  reviewed_at: string | null
+}
+
+export interface CommunityCounts {
+  new_feedback: number
+  pending_testimonials: number
+}

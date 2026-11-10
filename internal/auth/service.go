@@ -63,17 +63,15 @@ func now() time.Time { return time.Now().UTC() }
 
 func fmtTime(t time.Time) string { return t.Format(time.RFC3339) }
 
-func fmtDate(t time.Time) string { return t.Format("2006-01-02") }
-
 // FreeTrial is how long a new user may use the app before an administrator
 // has to extend their access.
 const FreeTrial = "1 year"
 
-// AccessExpired reports whether the user's access date has passed.
-// Administrators are never cut off, and a user without a date (never the case
-// after migration 0007) is left alone.
-func AccessExpired(u *models.User, today time.Time) bool {
-	return u.Role != models.RoleAdmin && u.AccessUntil != "" && u.AccessUntil < fmtDate(today)
+// AccessExpired reports whether the user's access date has passed, on the
+// Bhutan calendar (see AccessDate). Administrators are never cut off, and a
+// user without a date (never the case after migration 0007) is left alone.
+func AccessExpired(u *models.User, now time.Time) bool {
+	return u.Role != models.RoleAdmin && u.AccessUntil != "" && u.AccessUntil < AccessDate(now)
 }
 
 func hashToken(tok string) string {
@@ -192,7 +190,7 @@ func (s *Service) createUser(ctx context.Context, tx *sql.Tx, name, email, passw
 	}
 	t := now()
 	ts := fmtTime(t)
-	u := &models.User{ID: uuid.NewString(), Name: strings.TrimSpace(name), Email: email, PasswordHash: hash, Role: role, IsActive: true, CreatedAt: ts, UpdatedAt: ts, AccessUntil: fmtDate(t.AddDate(1, 0, 0))}
+	u := &models.User{ID: uuid.NewString(), Name: strings.TrimSpace(name), Email: email, PasswordHash: hash, Role: role, IsActive: true, CreatedAt: ts, UpdatedAt: ts, AccessUntil: accessUntilFrom(t)}
 	if err := s.Repo.InsertUser(ctx, tx, u); err != nil {
 		if strings.Contains(err.Error(), "UNIQUE") {
 			return nil, &apperr.Error{Status: 409, Code: "email_taken", Message: "an account with that email already exists"}

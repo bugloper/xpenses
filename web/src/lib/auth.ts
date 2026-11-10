@@ -135,17 +135,35 @@ export async function adoptUser(user: User | null): Promise<void> {
 // ---------------------------------------------------------------------------
 // Route guard (pure)
 // ---------------------------------------------------------------------------
-/** Days of access left, negative once the date has passed; null for admins (never cut off). */
-export function accessDaysLeft(user: Pick<User, 'role' | 'access_until'>, today = new Date()): number | null {
-  if (user.role === 'admin' || !user.access_until) return null
-  const end = Date.parse(`${user.access_until}T00:00:00`)
-  const start = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()
-  if (Number.isNaN(end)) return null
-  return Math.round((end - start) / 86_400_000)
+/**
+ * The free year runs on Bhutan time, like the server (internal/auth/access.go):
+ * a day of access starts and ends at midnight in Thimphu, whatever the
+ * device's own time zone is.
+ */
+const ACCESS_TIME_ZONE = 'Asia/Thimphu'
+const accessDateFormat = new Intl.DateTimeFormat('en-CA', {
+  timeZone: ACCESS_TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+})
+
+/** `now`'s calendar date in Bhutan, as YYYY-MM-DD. */
+export function accessDate(now = new Date()): string {
+  return accessDateFormat.format(now)
 }
 
-export function accessExpired(user: Pick<User, 'role' | 'access_until'>, today = new Date()): boolean {
-  const left = accessDaysLeft(user, today)
+/** Days of access left on the Bhutan calendar, negative once the date has passed; null for admins (never cut off). */
+export function accessDaysLeft(user: Pick<User, 'role' | 'access_until'>, now = new Date()): number | null {
+  if (user.role === 'admin' || !user.access_until) return null
+  const end = Date.parse(`${user.access_until}T00:00:00Z`)
+  const today = Date.parse(`${accessDate(now)}T00:00:00Z`)
+  if (Number.isNaN(end) || Number.isNaN(today)) return null
+  return Math.round((end - today) / 86_400_000)
+}
+
+export function accessExpired(user: Pick<User, 'role' | 'access_until'>, now = new Date()): boolean {
+  const left = accessDaysLeft(user, now)
   return left !== null && left < 0
 }
 
@@ -267,7 +285,10 @@ export function authErrorInfo(e: unknown): AuthErrorInfo {
     case 'access_expired':
       return { message: 'Your free year has ended. Ask the administrator to extend your access.' }
     case 'invalid_reset':
-      return { message: 'This reset link is invalid, expired or has already been used. Ask your administrator for a new one.' }
+      return {
+        message:
+          'This reset link is invalid, expired or has already been used. Ask your administrator for a new one.',
+      }
     case 'email_taken':
       return { message: 'An account with this email already exists.', field: 'email' }
     case 'csrf_rejected':

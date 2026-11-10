@@ -11,7 +11,15 @@ import { budgetsRoute } from './routes/budgets'
 import { settingsRoute } from './routes/settings'
 import { reportsRoute } from './routes/reports'
 import { adminRoute } from './routes/admin'
-import { authLayoutRoute, expiredRoute, loginRoute, registerRoute, resetPasswordRoute, setupRoute } from './routes/auth'
+import { helpRoute } from './routes/help'
+import {
+  authLayoutRoute,
+  expiredRoute,
+  loginRoute,
+  registerRoute,
+  resetPasswordRoute,
+  setupRoute,
+} from './routes/auth'
 
 const routeTree = rootRoute.addChildren([
   appRoute.addChildren([
@@ -26,6 +34,7 @@ const routeTree = rootRoute.addChildren([
     settingsRoute,
     reportsRoute,
     adminRoute,
+    helpRoute,
   ]),
   authLayoutRoute.addChildren([loginRoute, setupRoute, registerRoute, resetPasswordRoute, expiredRoute]),
 ])
